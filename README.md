@@ -1,4 +1,4 @@
-# TestHub 智能测试管理平台
+# testing 智能测试管理平台
 
 <div align="center">
 
@@ -13,7 +13,7 @@
 
 ## 📖 项目简介
 
-TestHub 是一个功能强大的智能测试管理平台，集成了 **AI 需求分析**、**测试用例管理**、**API 测试**、**UI 自动化测试** 等多个模块，旨在提升测试效率和质量。平台采用 Django + Vue3 技术栈，提供现代化的用户界面和丰富的功能特性。
+testing 是一个功能强大的智能测试管理平台，集成了 **AI 需求分析**、**测试用例管理**、**API 测试**、**UI 自动化测试** 等多个模块，旨在提升测试效率和质量。平台采用 Django + Vue3 技术栈，提供现代化的用户界面和丰富的功能特性。
 
 ## ✨ 核心特性
 
@@ -114,7 +114,7 @@ TestHub 是一个功能强大的智能测试管理平台，集成了 **AI 需求
 ## 📁 项目结构
 
 ```
-testhub_platform/
+testing_platform/
 ├── apps/                           # Django 应用模块
 │   ├── users/                      # 用户管理
 │   ├── projects/                   # 项目管理
@@ -175,7 +175,7 @@ testhub_platform/
 1. **克隆项目**
 ```bash
 git clone <repository-url>
-cd testhub_platform
+cd testing_platform
 ```
 
 2. **创建虚拟环境**
@@ -197,7 +197,7 @@ pip install -r requirements.txt
 创建 `.env` 文件：
 ```env
 # 数据库配置
-DB_NAME=testhub
+DB_NAME=testing
 DB_USER=root
 DB_PASSWORD=your_password
 DB_HOST=localhost
@@ -220,7 +220,7 @@ DEFAULT_FROM_EMAIL=your_email@gmail.com
 ```bash
 # 创建数据库
 mysql -u root -p
-CREATE DATABASE testhub CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE DATABASE testing CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 EXIT;
 
 # 创建 migrations 目录（如果不存在）
@@ -289,7 +289,7 @@ npm run build
 
 ### 2. 系统功能概述
 
-TestHub智能测试管理平台包含以下核心功能模块：
+testing智能测试管理平台包含以下核心功能模块：
 
 | 模块名称 | 主要功能 | 访问路径 |
 |---------|---------|---------|
