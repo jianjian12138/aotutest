@@ -6,7 +6,7 @@ from .models import (
     ElementGroup, PageObject, PageObjectElement, ScriptStep, ScriptElementUsage,
     TestCase, TestCaseStep, TestCaseExecution, OperationRecord,
     UiScheduledTask, UiNotificationConfig, UiNotificationLog, UiTaskNotificationSetting,
-    AICase, AIExecutionRecord
+    AICase, AIExecutionRecord, UiDevice
 )
 from django.contrib.auth import get_user_model
 
@@ -533,7 +533,8 @@ class TestCaseStepSerializer(serializers.ModelSerializer):
         model = TestCaseStep
         fields = [
             'id', 'step_number', 'action_type', 'element', 'element_name', 'element_locator',
-            'input_value', 'wait_time', 'assert_type', 'assert_value', 'description', 'created_at'
+            'input_value', 'wait_time', 'assert_type', 'assert_value', 'description', 
+            'enable_debug_capture', 'created_at'
         ]
 
 
@@ -542,16 +543,29 @@ class TestCaseSerializer(serializers.ModelSerializer):
     steps = TestCaseStepSerializer(many=True, read_only=True)
     created_by_name = serializers.CharField(source='created_by.username', read_only=True)
     project_name = serializers.CharField(source='project.name', read_only=True)
+    project_id = serializers.IntegerField(write_only=True, required=False)
 
     class Meta:
         model = TestCase
         fields = [
-            'id', 'name', 'description', 'project', 'project_name', 'status', 'priority',
+            'id', 'name', 'description', 'project', 'project_id', 'project_name', 'status', 'priority',
             'created_by', 'created_by_name', 'created_at', 'updated_at', 'steps'
         ]
-        read_only_fields = ['created_by']
+        read_only_fields = ['created_by', 'project']
+
+    def validate(self, attrs):
+        if not attrs.get('project_id') and not self.instance:
+            raise serializers.ValidationError({'project_id': '请选择所属项目'})
+        return attrs
 
     def create(self, validated_data):
+        project_id = validated_data.pop('project_id', None)
+        if project_id:
+            try:
+                validated_data['project'] = UiProject.objects.get(id=project_id)
+            except UiProject.DoesNotExist:
+                raise serializers.ValidationError({'project_id': '所选项目不存在'})
+        
         validated_data['created_by'] = self.context['request'].user
         return super().create(validated_data)
 
@@ -956,4 +970,19 @@ class UiTaskNotificationSettingSerializer(serializers.ModelSerializer):
         if 'webhook' in types:
             type_names.append('Webhook机器人')
         return ', '.join(type_names) if type_names else "无"
+
+
+# Removed TestStepSerializer
+
+
+class UiDeviceSerializer(serializers.ModelSerializer):
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    platform_display = serializers.CharField(source='get_platform_display', read_only=True)
+    type_display = serializers.CharField(source='get_type_display', read_only=True)
+
+    class Meta:
+        model = UiDevice
+        fields = '__all__'
+        read_only_fields = ('created_at', 'last_online')
+
 

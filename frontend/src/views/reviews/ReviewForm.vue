@@ -493,6 +493,15 @@ onMounted(() => {
 </script>
 
 <style lang="scss" scoped>
+/* 页面特定样式 */
+.page-container {
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+
+  max-width: 100%; /* 新增：覆盖全局样式的 max-width: 1600px，确保铺满 */
+}
+
 .testcase-selector {
   .search-bar {
     display: flex;

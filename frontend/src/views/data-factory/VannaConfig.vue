@@ -2,7 +2,7 @@
   <div class="config-container">
     <el-card shadow="hover" class="page-card">
       <template #header>
-        <div class="card-header">
+        <div class="card-header page-header" style="margin-bottom: 0;">
           <h2 class="page-title">Vanna 配置管理</h2>
           <el-button type="primary" @click="handleCreateConfig">
             <el-icon><Plus /></el-icon>
@@ -489,6 +489,14 @@ onMounted(() => {
 </script>
 
 <style scoped>
+/* 页面特定样式 */
+.page-container {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-width: 100%; /* 新增：覆盖全局样式的 max-width: 1600px，确保铺满 */
+}
 .config-container {
   width: 100%;
 }
@@ -505,7 +513,7 @@ onMounted(() => {
 
 .page-title {
   margin: 0;
-  font-size: 20px;
+  font-size: 24px;
   font-weight: 600;
 }
 

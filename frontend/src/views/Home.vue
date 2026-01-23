@@ -1,426 +1,420 @@
 <template>
   <div class="home-container">
-    <div class="content-wrapper">
-      <div class="header-actions">
-        <el-dropdown @command="handleCommand">
-          <span class="el-dropdown-link">
-            <el-avatar :size="32" :icon="UserFilled" />
-            <span class="username">{{ userStore.user?.username || '用户' }}</span>
-            <el-icon class="el-icon--right"><arrow-down /></el-icon>
-          </span>
-          <template #dropdown>
-            <el-dropdown-menu>
-              <el-dropdown-item command="logout">退出登录</el-dropdown-item>
-            </el-dropdown-menu>
-          </template>
-        </el-dropdown>
+    <!-- 顶部用户信息栏 -->
+    <div class="home-user-bar" v-if="userStore.user">
+      <el-dropdown placement="bottom-end">
+        <span class="user-trigger">
+          <div class="avatar">{{ avatarInitials }}</div>
+          <span class="username">{{ displayName }}</span>
+          <el-icon class="arrow-icon"><ArrowDown /></el-icon>
+        </span>
+        <template #dropdown>
+          <el-dropdown-menu>
+            <el-dropdown-item @click="router.push('/configuration/profile')">个人中心</el-dropdown-item>
+            <el-dropdown-item divided @click="handleLogout">退出登录</el-dropdown-item>
+          </el-dropdown-menu>
+        </template>
+      </el-dropdown>
+    </div>
+
+    <div class="orbit-scene">
+      <!-- 中心核心区域 -->
+      <div class="center-core">
+        <div class="core-glow"></div>
+        <div class="core-content">
+          <h1>Testing<br />Platform</h1>
+          <p>智能测试平台</p>
+        </div>
       </div>
-      <h1 class="main-title"><span class="title-word">Testing</span> <span class="title-word">测试</span> <span class="title-word">平台</span></h1>
-      <p class="subtitle">一站式智能化测试解决方案</p>
-      
-      <div class="cards-container" ref="cardsContainer">
-        <!-- 用例管理 -->
-        <div class="nav-card animate-on-scroll" @click="handleNavigate('ai')" role="button" tabindex="0">
-          <div class="card-icon ai-icon">
-            <el-icon><MagicStick /></el-icon>
-          </div>
-          <h3>用例管理</h3>
-          <p>智能分析需求，自动生成测试用例</p>
-        </div>
 
-        <!-- 接口测试 -->
-        <div class="nav-card animate-on-scroll" @click="handleNavigate('api')" role="button" tabindex="0">
-          <div class="card-icon api-icon">
-            <el-icon><Link /></el-icon>
-          </div>
-          <h3>接口测试</h3>
-          <p>高效的接口自动化测试与管理</p>
-        </div>
+      <!-- 旋转轨道容器 -->
+      <div
+        class="orbit-ring"
+        :class="{ paused: isPaused }"
+        @mouseenter="isPaused = true"
+        @mouseleave="isPaused = false"
+      >
+        <!-- 轨道线 -->
+        <div class="orbit-line"></div>
 
-        <!-- UI自动化测试 -->
-        <div class="nav-card animate-on-scroll" @click="handleNavigate('ui')" role="button" tabindex="0">
-          <div class="card-icon ui-icon">
-            <el-icon><Monitor /></el-icon>
+        <!-- 围绕的菜单项 -->
+        <div
+          v-for="(card, index) in allCards"
+          :key="card.type"
+          class="orbit-item"
+          :style="getItemStyle(index)"
+          @click="handleNavigate(card.type)"
+        >
+          <div class="planet-card">
+            <div class="planet-icon" :class="card.iconClass">
+              <el-icon><component :is="card.icon" /></el-icon>
+            </div>
+            <div class="planet-info">
+              <h3>{{ card.title }}</h3>
+            </div>
           </div>
-          <h3>UI自动化测试</h3>
-          <p>可视化的Web/App UI自动化测试</p>
         </div>
-
-        <!-- 数据工厂 -->
-        <div class="nav-card animate-on-scroll" @click="handleNavigate('data')" role="button" tabindex="0">
-          <div class="card-icon data-icon">
-            <el-icon><DataLine /></el-icon>
-          </div>
-          <h3>数据工厂</h3>
-          <p>灵活的测试数据构造与管理</p>
-        </div>
-
-        <!-- 自然语言Web测试 -->
-        <div class="nav-card animate-on-scroll" @click="handleNavigate('midscene')" role="button" tabindex="0">
-          <div class="card-icon midscene-icon">
-            <el-icon><Message /></el-icon>
-          </div>
-          <h3>自然语言Web测试</h3>
-          <p>AI驱动的UI自动化，支持自然语言操作</p>
-        </div>
-        <!-- 安全测试 -->
-        <div class="nav-card animate-on-scroll" @click="handleNavigate('security')" role="button" tabindex="0">
-          <div class="card-icon security-icon">
-            <el-icon><Lock /></el-icon>
-          </div>
-          <h3>安全测试</h3>
-          <p>基于Strix框架的安全漏洞扫描</p>
-        </div>
-        <!-- 性能测试 -->
-        <div class="nav-card animate-on-scroll" @click="handleNavigate('performance')" role="button" tabindex="0">
-          <div class="card-icon performance-icon">
-            <el-icon><Timer /></el-icon>
-          </div>
-          <h3>性能测试</h3>
-          <p>基于Locust的性能测试与压测</p>
-        </div>
-        <!-- 配置中心 -->
-        <div class="nav-card animate-on-scroll" @click="handleNavigate('config')" role="button" tabindex="0">
-          <div class="card-icon config-icon">
-            <el-icon><Setting /></el-icon>
-          </div>
-          <h3>配置中心</h3>
-          <p>系统环境、AI模型及通知配置</p>
-        </div>
-        
-        <!-- 知识图谱 -->
-        <div class="nav-card animate-on-scroll" @click="handleNavigate('knowledge-graph')" role="button" tabindex="0">
-          <div class="card-icon knowledge-graph-icon">
-            <el-icon><Connection /></el-icon>
-          </div>
-          <h3>知识图谱</h3>
-          <p>基于RAG的多模态文档管理与知识图谱生成</p>
-        </div>
-        <!-- 智能化测试 -->
-        <div class="nav-card animate-on-scroll" @click="handleNavigate('wharttest')" role="button" tabindex="0">
-          <div class="card-icon wharttest-icon">
-            <el-icon><DocumentChecked /></el-icon>
-          </div>
-          <h3>智能化测试</h3>
-          <p>智能化测试功能模块，提供完整的测试解决方案</p>
-        </div>
-        
-
-
       </div>
+    </div>
+
+    <div class="footer-tips">
+      <el-icon><Mouse /></el-icon>
+      悬停停止转动，点击进入模块
     </div>
   </div>
 </template>
 
 <script setup>
+import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import { MagicStick, Link, Monitor, DataLine, Cpu, Setting, ChatDotRound, UserFilled, ArrowDown, Message, Lock, Timer, Connection, DocumentChecked, Operation } from '@element-plus/icons-vue'
-import { ref, onMounted, onBeforeUnmount } from 'vue'
+import {
+  MagicStick,
+  Link,
+  Monitor,
+  DataLine,
+  Cpu,
+  Setting,
+  Mouse,
+  Connection,
+  DocumentChecked,
+  Operation,
+  ArrowDown
+} from '@element-plus/icons-vue'
 
 const router = useRouter()
 const userStore = useUserStore()
-const cardsContainer = ref(null)
-const observer = ref(null)
+const isPaused = ref(false)
 
-const handleCommand = (command) => {
-  if (command === 'logout') {
-    handleLogout()
+const allCards = [
+  { type: 'case', title: '用例管理', icon: DocumentChecked, iconClass: 'case-icon' },
+  { type: 'api', title: '接口测试', icon: Link, iconClass: 'api-icon' },
+  { type: 'ui', title: 'UI自动化', icon: Monitor, iconClass: 'ui-icon' },
+  { type: 'midscene', title: '自然语言测试', icon: Operation, iconClass: 'midscene-icon' },
+  { type: 'security', title: '安全测试', icon: Cpu, iconClass: 'security-icon' },
+  { type: 'knowledge', title: '知识图谱', icon: MagicStick, iconClass: 'knowledge-icon' },
+  { type: 'data', title: '数据工厂', icon: DataLine, iconClass: 'data-icon' },
+  { type: 'performance', title: '性能测试', icon: Cpu, iconClass: 'performance-icon' },
+  { type: 'wharttest', title: '智能化测试', icon: Connection, iconClass: 'wharttest-icon' },
+  { type: 'config', title: '配置中心', icon: Setting, iconClass: 'config-icon' }
+]
+
+const totalItems = allCards.length
+const radius = 320
+
+// 计算每个星球的位置
+const getItemStyle = (index) => {
+  const angle = (360 / totalItems) * index
+  return {
+    '--rotate-angle': `${angle}deg`,
+    '--counter-angle': `-${angle}deg`
   }
 }
 
-const handleLogout = () => {
-  ElMessageBox.confirm('确定要退出登录吗？', '提示', {
-    confirmButtonText: '确定',
-    cancelButtonText: '取消',
-    type: 'warning'
-  }).then(() => {
-    userStore.logout()
-    router.push('/login')
-    ElMessage.success('已退出登录')
-  }).catch(() => {})
+const avatarInitials = computed(() => {
+  const u = userStore.user
+  if (!u) return ''
+  const base = u.username || u.email || ''
+  return base.slice(0, 2).toUpperCase()
+})
+
+const displayName = computed(() => {
+  const u = userStore.user
+  if (!u) return ''
+  return u.username || u.email || '用户'
+})
+
+const handleLogout = async () => {
+  await userStore.logout()
 }
 
 const handleNavigate = (type) => {
-    const routes = {
-      'ai': '/ai-generation/requirement-analysis',
-      'api': '/api-testing/dashboard',
-      'ui': '/ui-automation/dashboard',
-      'config': '/configuration/ai-model',
-      'midscene': '/midscene/dashboard',
-      'security': '/strix-security/dashboard',
-      'performance': '/performance-test/dashboard',
-      'data': '/data-factory/dashboard',
-      'knowledge-graph': '/knowledge-graph',
-      'wharttest': '/wharttest/dashboard',
-      'cicd': '/configuration/cicd-dashboard'
-    }
-
-    if (routes[type]) {
-      router.push(routes[type])
-    }
+  const routes = {
+    case: '/ai-generation/testcases',
+    api: '/api-testing/dashboard',
+    ui: '/ui-automation/dashboard',
+    midscene: '/natural-language-testing/web-testing',
+    security: '/strix-security/dashboard',
+    knowledge: '/knowledge-graph/dashboard',
+    data: '/data-factory/dashboard',
+    performance: '/performance-test/dashboard',
+    wharttest: '/wharttest/dashboard',
+    config: '/configuration/ai-model'
   }
 
-// 滑动动画逻辑
-const initScrollAnimation = () => {
-  // 标题文字动画
-  const titleWords = document.querySelectorAll('.title-word')
-  titleWords.forEach((word, index) => {
-    word.style.opacity = '0'
-    word.style.transform = 'translateY(-20px)'
-    word.style.transition = `all 0.6s ease ${index * 0.15}s`
-    setTimeout(() => {
-      word.style.opacity = '1'
-      word.style.transform = 'translateY(0)'
-    }, 100)
-  })
-
-  // 卡片滚动动画
-  const options = {
-    threshold: 0.1,
-    rootMargin: '0px 0px -50px 0px'
+  if (routes[type]) {
+    router.push(routes[type])
   }
-
-  observer.value = new IntersectionObserver((entries) => {
-    entries.forEach((entry, index) => {
-      if (entry.isIntersecting) {
-        entry.target.style.opacity = '0'
-        entry.target.style.transform = 'translateY(30px)'
-        entry.target.style.transition = `all 0.6s ease ${index * 0.1}s`
-        
-        setTimeout(() => {
-          entry.target.style.opacity = '1'
-          entry.target.style.transform = 'translateY(0)'
-        }, 50)
-        
-        observer.value.unobserve(entry.target)
-      }
-    })
-  }, options)
-
-  const animatedElements = document.querySelectorAll('.animate-on-scroll')
-  animatedElements.forEach(el => {
-    observer.value.observe(el)
-  })
 }
-
-onMounted(() => {
-  initScrollAnimation()
-})
-
-onBeforeUnmount(() => {
-  if (observer.value) {
-    observer.value.disconnect()
-  }
-})
 </script>
 
-<style scoped lang="scss">
+<style lang="scss" scoped>
 .home-container {
-  min-height: 100vh;
-  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  height: 100vh;
+  width: 100%;
+  background-color: #0f172a;
+  background-image: radial-gradient(circle at center, #1e293b 0%, #0f172a 70%);
   display: flex;
+  flex-direction: column;
   justify-content: center;
   align-items: center;
-  padding: 20px;
-}
-
-.content-wrapper {
-  text-align: center;
-  max-width: 1200px;
-  width: 100%;
+  overflow: hidden;
+  perspective: 1000px;
   position: relative;
 }
 
-.header-actions {
+.home-user-bar {
   position: absolute;
-  top: 0;
-  right: 0;
-  padding: 10px;
-  
-  .el-dropdown-link {
+  top: 20px;
+  right: 32px;
+  z-index: 20;
+
+  .user-trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: rgba(15, 23, 42, 0.7);
+    border: 1px solid rgba(148, 163, 184, 0.3);
+    cursor: pointer;
+    color: #e5e7eb;
+    backdrop-filter: blur(8px);
+  }
+
+  .avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
     display: flex;
     align-items: center;
-    cursor: pointer;
-    color: #5e6d82;
-    
-    .username {
-      margin: 0 8px;
-      font-size: 14px;
-    }
-    
-    &:hover {
-      color: #409eff;
-    }
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 700;
+    color: #f9fafb;
+  }
+
+  .username {
+    font-size: 14px;
+    font-weight: 500;
+  }
+
+  .arrow-icon {
+    font-size: 14px;
   }
 }
 
-.main-title {
-  font-size: 3.5rem;
-  color: #2c3e50;
-  margin-bottom: 1rem;
-  font-weight: 700;
-  letter-spacing: 2px;
+.orbit-scene {
+  position: relative;
+  width: 800px;
+  height: 800px;
   display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
   justify-content: center;
+  align-items: center;
+}
 
-  .title-word {
-    display: inline-block;
-    opacity: 0;
-    transform: translateY(-20px);
-    transition: all 0.6s ease;
+/* 中心核心 */
+.center-core {
+  position: absolute;
+  width: 200px;
+  height: 200px;
+  z-index: 10;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  
+  .core-glow {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(99, 102, 241, 0.2) 0%, transparent 70%);
+    box-shadow: 0 0 60px rgba(99, 102, 241, 0.3);
+    animation: pulse 3s infinite ease-in-out;
+  }
+  
+  .core-content {
+    position: relative;
+    z-index: 2;
+    
+    h1 {
+      font-size: 32px;
+      font-weight: 800;
+      line-height: 1.1;
+      margin-bottom: 8px;
+      background: linear-gradient(135deg, #fff 0%, #a5b4fc 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      text-shadow: 0 0 20px rgba(99, 102, 241, 0.5);
+    }
+    
+    p {
+      color: #94a3b8;
+      font-size: 14px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
   }
 }
 
-.subtitle {
-  font-size: 1.5rem;
-  color: #5e6d82;
-  margin-bottom: 4rem;
-  opacity: 0;
-  transform: translateY(20px);
-  animation: fadeInUp 0.8s ease 0.5s forwards;
+/* 轨道环 */
+.orbit-ring {
+  position: absolute;
+  width: 640px; /* 2 * radius */
+  height: 640px;
+  border-radius: 50%;
+  animation: orbit-rotate 60s linear infinite;
+  transform-origin: center center;
+  
+  &.paused {
+    animation-play-state: paused;
+    
+    .orbit-item {
+      /* 暂停时也停止反向旋转，保持相对静止 */
+      animation-play-state: paused;
+    }
+  }
 }
 
-.cards-container {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 30px;
-  padding: 20px;
+.orbit-line {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 1px dashed rgba(255, 255, 255, 0.1);
+  box-shadow: 0 0 30px rgba(99, 102, 241, 0.05);
 }
 
-.nav-card {
-  background: rgba(255, 255, 255, 0.9);
-  border-radius: 16px;
-  padding: 40px 20px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+/* 轨道上的物体 */
+.orbit-item {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  /* 
+    1. rotate(--rotate-angle): 将坐标系旋转到对应角度
+    2. translate(320px): 将物体沿该角度向外推320px (半径)
+    3. rotate(--counter-angle): 将物体本身反向旋转，使其保持水平
+  */
+  transform: rotate(var(--rotate-angle)) translate(320px) rotate(var(--counter-angle));
+  
+  /* 为了抵消父容器orbit-ring的旋转，使卡片始终保持水平 */
+  animation: counter-rotate 60s linear infinite;
+}
+
+.planet-card {
+  position: absolute;
+  transform: translate(-50%, -50%); /* 居中定位点 */
+  width: 120px;
+  height: 120px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  opacity: 0;
-  transform: translateY(30px);
-  transition: all 0.6s ease;
-
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  
   &:hover {
-    transform: translateY(-10px) scale(1.02);
-    box-shadow: 0 20px 30px rgba(0, 0, 0, 0.1);
-    background: #fff;
-  }
-
-  h3 {
-    font-size: 1.5rem;
-    color: #2c3e50;
-    margin: 20px 0 10px;
-  }
-
-  p {
-    color: #7f8c8d;
-    line-height: 1.5;
-    margin: 0;
+    transform: translate(-50%, -50%) scale(1.2);
+    z-index: 20;
+    
+    .planet-icon {
+      box-shadow: 0 0 25px currentColor;
+      background: rgba(30, 41, 59, 0.9);
+    }
+    
+    .planet-info h3 {
+      color: #fff;
+      text-shadow: 0 0 10px currentColor;
+      opacity: 1;
+    }
   }
 }
 
-/* 动画效果 */
-@keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(30px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* 滚动时的动画 */
-.animate-on-scroll {
-  opacity: 0;
-  transform: translateY(30px);
-  transition: all 0.6s ease;
-}
-
-.card-icon {
-  width: 80px;
-  height: 80px;
+.planet-icon {
+  width: 72px;
+  height: 72px;
   border-radius: 50%;
+  background: rgba(30, 41, 59, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 40px;
-  margin-bottom: 10px;
+  font-size: 34px;
   transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+  margin-bottom: 8px;
+  
+  /* Icon Variants */
+  &.ai-icon { color: #a78bfa; border-color: rgba(139, 92, 246, 0.3); }
+  &.case-icon { color: #34d399; border-color: rgba(16, 185, 129, 0.3); }
+  &.api-icon { color: #60a5fa; border-color: rgba(59, 130, 246, 0.3); }
+  &.ui-icon { color: #fbbf24; border-color: rgba(245, 158, 11, 0.3); }
+  &.data-icon { color: #f472b6; border-color: rgba(236, 72, 153, 0.3); }
+  &.performance-icon { color: #f87171; border-color: rgba(239, 68, 68, 0.3); }
+  &.midscene-icon { color: #818cf8; border-color: rgba(99, 102, 241, 0.3); }
+  &.security-icon { color: #f97316; border-color: rgba(249, 115, 22, 0.3); }
+  &.knowledge-icon { color: #22c55e; border-color: rgba(34, 197, 94, 0.3); }
+  &.wharttest-icon { color: #2dd4bf; border-color: rgba(20, 184, 166, 0.3); }
+  &.assistant-icon { color: #fb923c; border-color: rgba(249, 115, 22, 0.3); }
+  &.config-icon { color: #94a3b8; border-color: rgba(100, 116, 139, 0.3); }
+  &.system-icon { color: #cbd5e1; border-color: rgba(71, 85, 105, 0.3); }
+}
 
-  &.ai-icon {
-    background: #e8f4ff;
-    color: #409eff;
-  }
-
-  &.api-icon {
-    background: #f0f9eb;
-    color: #67c23a;
-  }
-
-  &.ui-icon {
-    background: #fdf6ec;
-    color: #e6a23c;
-  }
-
-  &.data-icon {
-    background: #f4f4f5;
-    color: #909399;
-  }
-
-  &.ai-intelligent-icon {
-    background: #f0f5ff;
-    color: #2f54eb;
-  }
-
-  &.config-icon {
-    background: #e6fffb;
-    color: #13c2c2;
-  }
-
-  &.assistant-icon {
-    background: #fff7e6;
-    color: #fa8c16;
-  }
-
-  &.midscene-icon {
-    background: #f0f0ff;
-    color: #722ed1;
-  }
-
-  &.security-icon {
-    background: #fff2f0;
-    color: #f56c6c;
-  }
-
-  &.performance-icon {
-    background: #f6ffed;
-    color: #52c41a;
-  }
-
-  &.knowledge-graph-icon {
-    background: #e6f7ff;
-    color: #1890ff;
-  }
-
-  &.wharttest-icon {
-    background: #fff1f0;
-    color: #eb2f96;
-  }
-
-  &.cicd-icon {
-    background: #e6f7ff;
-    color: #1890ff;
+.planet-info {
+  h3 {
+    font-size: 14px;
+    font-weight: 500;
+    color: #cbd5e1;
+    margin: 0;
+    white-space: nowrap;
+    transition: all 0.3s;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.5);
   }
 }
 
-.nav-card:hover .card-icon {
-  transform: scale(1.1);
+.footer-tips {
+  position: absolute;
+  bottom: 40px;
+  color: rgba(255, 255, 255, 0.3);
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+@keyframes orbit-rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* 
+  反向旋转动画：
+  为了让图标始终保持水平（不随轨道倒立），
+  我们需要抵消父容器的旋转。
+  但是父容器的旋转是动态的，而我们在transform里已经用了一个静态的rotate(var(--counter-angle))来设定初始角度。
+  
+  正确的做法是：
+  1. 静态布局时，item 旋转 angle, translate radius, 然后 rotate -angle。此时item是水平的。
+  2. 动画时，Parent 旋转 0 -> 360。
+  3. Item 必须额外旋转 0 -> -360 以抵消 Parent 的旋转。
+  
+  所以动画应该是从 rotate(var(--counter-angle)) 到 rotate(var(--counter-angle) - 360deg)
+*/
+@keyframes counter-rotate {
+  from { transform: rotate(var(--rotate-angle)) translate(320px) rotate(var(--counter-angle)); }
+  to { transform: rotate(calc(var(--rotate-angle) + 360deg)) translate(320px) rotate(calc(var(--counter-angle) - 360deg)); }
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); opacity: 0.5; }
+  50% { transform: scale(1.1); opacity: 0.8; }
+  100% { transform: scale(1); opacity: 0.5; }
 }
 </style>

@@ -145,6 +145,14 @@
                 <div v-if="step.thinking" class="step-thinking">
                   <strong>思考:</strong> {{ step.thinking }}
                 </div>
+                <div v-if="step.screenshot" class="step-screenshot" style="margin-top: 10px;">
+                  <el-image 
+                    :src="step.screenshot" 
+                    :preview-src-list="[step.screenshot]" 
+                    fit="contain" 
+                    style="max-width: 100%; max-height: 300px; border: 1px solid #dcdfe6; border-radius: 4px;"
+                  />
+                </div>
               </div>
             </el-card>
           </div>

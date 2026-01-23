@@ -1,8 +1,8 @@
 <template>
-  <div class="project-management">
+  <div class="config-container">
     <el-card shadow="hover" class="page-card">
       <template #header>
-        <div class="card-header">
+        <div class="card-header page-header" style="margin-bottom: 0;">
           <h2 class="page-title">项目管理</h2>
           <div class="header-actions">
             <el-button type="primary" @click="handleCreateProject">
@@ -16,32 +16,31 @@
       <div class="content">
         <!-- 搜索和筛选 -->
         <div class="search-filter">
-          <el-row :gutter="20">
-            <el-col :span="8">
-              <el-input
-                v-model="searchQuery"
-                placeholder="请输入项目名称或描述"
-                prefix-icon="Search"
-              />
-            </el-col>
-            <el-col :span="6">
-              <el-select
-                v-model="statusFilter"
-                placeholder="项目状态"
-                clearable
-              >
-                <el-option label="全部" value="" />
-                <el-option label="活跃" value="active" />
-                <el-option label="已归档" value="archived" />
-              </el-select>
-            </el-col>
-            <el-col :span="4">
-              <el-button type="primary" @click="handleSearch">
-                <el-icon><Search /></el-icon>
-                搜索
-              </el-button>
-            </el-col>
-          </el-row>
+          <el-input
+            v-model="searchQuery"
+            placeholder="请输入项目名称或描述"
+            clearable
+            class="search-input"
+          >
+            <template #prefix>
+              <el-icon><Search /></el-icon>
+            </template>
+          </el-input>
+          
+          <el-select
+            v-model="statusFilter"
+            placeholder="筛选项目状态"
+            clearable
+            class="filter-select"
+          >
+            <el-option label="活跃" value="active" />
+            <el-option label="已归档" value="archived" />
+          </el-select>
+          
+          <el-button type="primary" @click="handleSearch">
+            <el-icon><Search /></el-icon>
+            搜索
+          </el-button>
         </div>
         
         <!-- 项目列表 -->
@@ -93,7 +92,7 @@
             v-model:page-size="pagination.pageSize"
             :page-sizes="[10, 20, 50, 100]"
             layout="total, sizes, prev, pager, next, jumper"
-            :total="totalProjects"
+            :total="pagination.total"
             @size-change="handleSizeChange"
             @current-change="handleCurrentChange"
           />
@@ -135,12 +134,26 @@
     </el-dialog>
   </div>
 </template>
-
+<style scoped>
+.page-container {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-width: 100%; /* 新增：覆盖全局样式的 max-width: 1600px，确保铺满 */
+}
+</style>
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElNotification, ElMessageBox } from 'element-plus'
 import { Plus, Search, View, EditPen, Delete } from '@element-plus/icons-vue'
+import { 
+  getPerformanceProjects, 
+  createPerformanceProject, 
+  updatePerformanceProject, 
+  deletePerformanceProject 
+} from '@/api/performance-test'
 
 const router = useRouter()
 
@@ -149,59 +162,42 @@ const searchQuery = ref('')
 const statusFilter = ref('')
 
 // 分页
-const pagination = ref({
+const pagination = reactive({
   currentPage: 1,
-  pageSize: 20
+  pageSize: 20,
+  total: 0
 })
-const totalProjects = ref(25)
 
 // 项目数据
-const projects = ref([
-  {
-    id: 1,
-    name: '电商网站性能测试',
-    description: '使用Locust测试电商网站的性能',
-    status: 'active',
-    created_by: 'admin',
-    created_at: '2026-01-10 14:30:00',
-    updated_at: '2026-01-10 14:30:00'
-  },
-  {
-    id: 2,
-    name: 'API服务性能测试',
-    description: '测试API服务的并发处理能力',
-    status: 'active',
-    created_by: 'testuser',
-    created_at: '2026-01-11 09:15:00',
-    updated_at: '2026-01-11 09:15:00'
-  },
-  {
-    id: 3,
-    name: '管理后台性能测试',
-    description: '测试管理后台的性能表现',
-    status: 'archived',
-    created_by: 'admin',
-    created_at: '2026-01-05 16:00:00',
-    updated_at: '2026-01-08 10:30:00'
-  },
-  {
-    id: 4,
-    name: '移动端APP性能测试',
-    description: '测试移动端APP的API性能',
-    status: 'active',
-    created_by: 'testuser',
-    created_at: '2026-01-12 10:00:00',
-    updated_at: '2026-01-12 10:00:00'
-  }
-])
+const projects = ref([])
 
 // 对话框
 const dialogVisible = ref(false)
+const dialogType = ref('create') // create or edit
 const form = ref({
+  id: null,
   name: '',
   description: '',
   status: 'active'
 })
+
+// 获取项目列表
+const fetchProjects = async () => {
+  try {
+    const params = {
+      page: pagination.currentPage,
+      page_size: pagination.pageSize,
+      search: searchQuery.value,
+      status: statusFilter.value
+    }
+    const response = await getPerformanceProjects(params)
+    projects.value = response.results || []
+    pagination.total = response.count || 0
+  } catch (error) {
+    console.error('获取项目列表失败:', error)
+    ElMessage.error('获取项目列表失败')
+  }
+}
 
 // 获取状态标签类型
 const getStatusTagType = (status) => {
@@ -223,7 +219,8 @@ const getStatusText = (status) => {
 
 // 搜索
 const handleSearch = () => {
-  ElMessage.info('搜索功能开发中')
+  pagination.currentPage = 1
+  fetchProjects()
 }
 
 // 处理行点击
@@ -238,11 +235,14 @@ const handleViewProject = (row) => {
 
 // 编辑项目
 const handleEditProject = (row) => {
-  ElNotification({
-    title: '提示',
-    message: `开始编辑项目：${row.name}`,
-    type: 'success'
-  })
+  dialogType.value = 'edit'
+  form.value = {
+    id: row.id,
+    name: row.name,
+    description: row.description,
+    status: row.status
+  }
+  dialogVisible.value = true
 }
 
 // 删除项目
@@ -251,8 +251,14 @@ const handleDeleteProject = (row) => {
     confirmButtonText: '确定',
     cancelButtonText: '取消',
     type: 'warning'
-  }).then(() => {
-    ElMessage.success('项目删除成功')
+  }).then(async () => {
+    try {
+      await deletePerformanceProject(row.id)
+      ElMessage.success('项目删除成功')
+      fetchProjects()
+    } catch (error) {
+      ElMessage.error('删除失败')
+    }
   }).catch(() => {
     // 取消删除
   })
@@ -260,70 +266,59 @@ const handleDeleteProject = (row) => {
 
 // 新建项目
 const handleCreateProject = () => {
-  dialogVisible.value = true
+  dialogType.value = 'create'
   form.value = {
+    id: null,
     name: '',
     description: '',
     status: 'active'
   }
+  dialogVisible.value = true
 }
 
 // 提交表单
-const submitForm = () => {
-  ElMessage.success('项目创建成功')
-  dialogVisible.value = false
+const submitForm = async () => {
+  if (!form.value.name) {
+    ElMessage.warning('请输入项目名称')
+    return
+  }
+
+  try {
+    if (dialogType.value === 'create') {
+      await createPerformanceProject({
+        name: form.value.name,
+        description: form.value.description,
+        status: form.value.status
+      })
+      ElMessage.success('项目创建成功')
+    } else {
+      await updatePerformanceProject(form.value.id, {
+        name: form.value.name,
+        description: form.value.description,
+        status: form.value.status
+      })
+      ElMessage.success('项目更新成功')
+    }
+    dialogVisible.value = false
+    fetchProjects()
+  } catch (error) {
+    ElMessage.error(dialogType.value === 'create' ? '创建失败' : '更新失败')
+  }
 }
 
 // 分页变化
 const handleSizeChange = (size) => {
-  pagination.value.pageSize = size
+  pagination.pageSize = size
+  fetchProjects()
 }
 
 const handleCurrentChange = (current) => {
-  pagination.value.currentPage = current
+  pagination.currentPage = current
+  fetchProjects()
 }
+
+onMounted(() => {
+  fetchProjects()
+})
 </script>
 
-<style scoped>
-.project-management {
-  width: 100%;
-}
-
-.page-card {
-  margin-bottom: 20px;
-}
-
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.page-title {
-  margin: 0;
-  font-size: 20px;
-  font-weight: 600;
-}
-
-.content {
-  padding: 20px 0;
-}
-
-.search-filter {
-  margin-bottom: 20px;
-  padding: 20px 0;
-  background-color: #fafafa;
-  border-radius: 8px;
-}
-
-.pagination-container {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 20px;
-}
-
-.header-actions {
-  display: flex;
-  gap: 10px;
-}
-</style>

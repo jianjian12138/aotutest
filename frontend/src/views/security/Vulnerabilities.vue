@@ -2,8 +2,8 @@
   <div class="vulnerabilities">
     <el-card shadow="hover">
       <template #header>
-        <div class="card-header">
-          <h2>漏洞管理</h2>
+        <div class="card-header page-header" style="margin-bottom: 0;">
+          <h2 class="page-title">漏洞管理</h2>
           <el-button type="primary" @click="handleExport">
             <el-icon><Download /></el-icon>
             导出漏洞
@@ -158,10 +158,16 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElNotification } from 'element-plus'
 import { Search, View, EditPen, Download } from '@element-plus/icons-vue'
+import { 
+  getVulnerabilities, 
+  updateVulnerability, 
+  getSecurityDashboardStats 
+} from '@/api/security'
+import api from '@/utils/api'
 
 const router = useRouter()
 
@@ -171,118 +177,73 @@ const severityFilter = ref('')
 const statusFilter = ref('')
 
 // 分页
-const pagination = ref({
+const pagination = reactive({
   currentPage: 1,
-  pageSize: 20
+  pageSize: 20,
+  total: 0
 })
 
-// 漏洞数据
-const vulnerabilities = ref([
-  {
-    id: 1,
-    name: 'SQL注入漏洞',
-    severity: 'high',
-    target: 'https://example.com/login',
-    detected_at: '2026-01-10 14:30:00',
-    status: 'unhandled',
-    scan_task_id: 1
-  },
-  {
-    id: 2,
-    name: 'XSS跨站脚本漏洞',
-    severity: 'medium',
-    target: 'https://example.com/search',
-    detected_at: '2026-01-10 14:35:00',
-    status: 'processing',
-    scan_task_id: 1
-  },
-  {
-    id: 3,
-    name: '弱密码策略',
-    severity: 'medium',
-    target: 'https://example.com/register',
-    detected_at: '2026-01-10 14:40:00',
-    status: 'fixed',
-    scan_task_id: 1
-  },
-  {
-    id: 4,
-    name: '目录遍历漏洞',
-    severity: 'high',
-    target: 'https://example.com/files',
-    detected_at: '2026-01-10 14:45:00',
-    status: 'unhandled',
-    scan_task_id: 1
-  },
-  {
-    id: 5,
-    name: '信息泄露',
-    severity: 'low',
-    target: 'https://example.com/.git/config',
-    detected_at: '2026-01-10 14:50:00',
-    status: 'ignored',
-    scan_task_id: 1
-  },
-  {
-    id: 6,
-    name: 'CSRF漏洞',
-    severity: 'medium',
-    target: 'https://example.com/account',
-    detected_at: '2026-01-11 09:15:00',
-    status: 'unhandled',
-    scan_task_id: 2
-  },
-  {
-    id: 7,
-    name: '服务器版本泄露',
-    severity: 'info',
-    target: 'https://example.com',
-    detected_at: '2026-01-11 09:20:00',
-    status: 'ignored',
-    scan_task_id: 2
-  },
-  {
-    id: 8,
-    name: '不安全的HTTP头',
-    severity: 'low',
-    target: 'https://example.com',
-    detected_at: '2026-01-11 09:25:00',
-    status: 'processing',
-    scan_task_id: 2
-  },
-  {
-    id: 9,
-    name: '命令注入漏洞',
-    severity: 'high',
-    target: 'https://api.example.com/exec',
-    detected_at: '2026-01-12 10:00:00',
-    status: 'unhandled',
-    scan_task_id: 4
-  },
-  {
-    id: 10,
-    name: '未加密的敏感数据传输',
-    severity: 'medium',
-    target: 'https://api.example.com/user',
-    detected_at: '2026-01-12 10:05:00',
-    status: 'fixed',
-    scan_task_id: 4
+const loading = ref(false)
+const vulnerabilities = ref([])
+const stats = ref({
+  total: 0,
+  high: 0,
+  medium: 0,
+  low: 0
+})
+
+// 获取漏洞列表
+const fetchData = async () => {
+  loading.value = true
+  try {
+    const params = {
+      page: pagination.currentPage,
+      page_size: pagination.pageSize,
+      search: searchQuery.value,
+      severity: severityFilter.value,
+      status: statusFilter.value
+    }
+    
+    const response = await getVulnerabilities(params)
+    vulnerabilities.value = response.results
+    pagination.total = response.count
+  } catch (error) {
+    ElMessage.error('获取漏洞列表失败')
+  } finally {
+    loading.value = false
   }
-])
+}
+
+// 获取统计数据
+const fetchStats = async () => {
+  try {
+    const response = await getSecurityDashboardStats()
+    const data = response.data || response
+    stats.value = {
+      total: data.total_vulnerabilities,
+      high: (data.vulnerability_stats?.high || 0) + (data.vulnerability_stats?.critical || 0),
+      medium: data.vulnerability_stats?.medium || 0,
+      low: (data.vulnerability_stats?.low || 0) + (data.vulnerability_stats?.info || 0)
+    }
+  } catch (error) {
+    console.error('获取统计数据失败', error)
+  }
+}
 
 // 统计数据
-const totalVulnerabilities = computed(() => vulnerabilities.value.length)
-const highVulnerabilities = computed(() => vulnerabilities.value.filter(v => v.severity === 'high').length)
-const mediumVulnerabilities = computed(() => vulnerabilities.value.filter(v => v.severity === 'medium').length)
-const lowVulnerabilities = computed(() => vulnerabilities.value.filter(v => v.severity === 'low' || v.severity === 'info').length)
+const totalVulnerabilities = computed(() => stats.value.total)
+const highVulnerabilities = computed(() => stats.value.high)
+const mediumVulnerabilities = computed(() => stats.value.medium)
+const lowVulnerabilities = computed(() => stats.value.low)
 
 // 获取漏洞级别标签类型
 const getSeverityTagType = (severity) => {
   const typeMap = {
-    high: 'danger',
-    medium: 'warning',
-    low: 'info',
-    info: 'primary'
+    CRITICAL: 'danger',
+    HIGH: 'danger',
+    MEDIUM: 'warning',
+    LOW: 'info',
+    INFO: 'primary'
   }
   return typeMap[severity] || 'info'
 }
@@ -290,10 +251,11 @@ const getSeverityTagType = (severity) => {
 // 获取漏洞级别文本
 const getSeverityText = (severity) => {
   const textMap = {
-    high: '高危',
-    medium: '中危',
-    low: '低危',
-    info: '信息'
+    CRITICAL: '严重',
+    HIGH: '高危',
+    MEDIUM: '中危',
+    LOW: '低危',
+    INFO: '信息'
   }
   return textMap[severity] || severity
 }
@@ -301,10 +263,10 @@ const getSeverityText = (severity) => {
 // 获取状态标签类型
 const getStatusTagType = (status) => {
   const typeMap = {
-    unhandled: 'danger',
-    processing: 'warning',
-    fixed: 'success',
-    ignored: 'info'
+    UNHANDLED: 'danger',
+    PROCESSING: 'warning',
+    FIXED: 'success',
+    IGNORED: 'info'
   }
   return typeMap[status] || 'info'
 }
@@ -312,17 +274,18 @@ const getStatusTagType = (status) => {
 // 获取状态文本
 const getStatusText = (status) => {
   const textMap = {
-    unhandled: '未处理',
-    processing: '处理中',
-    fixed: '已修复',
-    ignored: '已忽略'
+    UNHANDLED: '未处理',
+    PROCESSING: '处理中',
+    FIXED: '已修复',
+    IGNORED: '已忽略'
   }
   return textMap[status] || status
 }
 
 // 搜索
 const handleSearch = () => {
-  ElMessage.info('搜索功能开发中')
+  pagination.currentPage = 1
+  fetchData()
 }
 
 // 处理行点击
@@ -332,36 +295,65 @@ const handleRowClick = (row) => {
 
 // 查看漏洞
 const handleViewVulnerability = (row) => {
-  router.push(`/strix-security/vulnerabilities/${row.id}`)
-}
-
-// 处理漏洞
-const handleFixVulnerability = (row) => {
-  ElNotification({
-    title: '提示',
-    message: `开始处理漏洞：${row.name}`,
-    type: 'success'
+  ElMessageBox.alert(`
+    <p><strong>漏洞名称:</strong> ${row.name}</p>
+    <p><strong>描述:</strong> ${row.description || '暂无描述'}</p>
+    <p><strong>修复建议:</strong> ${row.solution || '暂无建议'}</p>
+  `, '漏洞详情', {
+    dangerouslyUseHTMLString: true
   })
 }
 
+// 处理漏洞
+const handleFixVulnerability = async (row) => {
+  try {
+    await updateVulnerability(row.id, {
+      status: 'PROCESSING'
+    })
+    ElMessage.success('已标记为处理中')
+    fetchData()
+  } catch (error) {
+    ElMessage.error('操作失败')
+  }
+}
+
 // 导出漏洞
-const handleExport = () => {
-  ElMessage.success('漏洞导出功能开发中')
+const handleExport = async () => {
+  try {
+    const response = await api.get('/strix-security/vulnerabilities/export/', { responseType: 'blob' })
+    const url = window.URL.createObjectURL(new Blob([response.data]))
+    const link = document.createElement('a')
+    link.href = url
+    link.setAttribute('download', 'vulnerabilities.csv')
+    document.body.appendChild(link)
+    link.click()
+    ElMessage.success('导出成功')
+  } catch (error) {
+    ElMessage.error('导出失败')
+  }
 }
 
 // 分页变化
 const handleSizeChange = (size) => {
-  pagination.value.pageSize = size
+  pagination.pageSize = size
+  fetchData()
 }
 
 const handleCurrentChange = (current) => {
-  pagination.value.currentPage = current
+  pagination.currentPage = current
+  fetchData()
 }
+
+onMounted(() => {
+  fetchData()
+  fetchStats()
+})
 </script>
 
 <style scoped>
+
 .vulnerabilities {
-  padding: 20px;
+  padding: 0px;
 }
 
 .card-header {

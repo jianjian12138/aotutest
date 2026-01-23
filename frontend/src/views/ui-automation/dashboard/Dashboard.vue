@@ -1,5 +1,12 @@
 <template>
   <div class="dashboard-container">
+      <el-card shadow="hover" class="page-card">
+      <template #header>
+        <div class="card-header page-header" style="margin-bottom: 0;">
+          <h2 class="page-title">数据看板</h2>
+        </div>
+      </template>
+    </el-card>
     <!-- 数据概览 -->
     <div class="stats-section">
       <el-row :gutter="20">
@@ -237,14 +244,15 @@ const loadDashboardData = async () => {
     ])
 
     // 更新统计数据
-    const stats = statsRes.data
+    const stats = statsRes?.data || {}
     projectCount.value = stats.project_count || 0
     testCaseCount.value = stats.test_case_count || 0
     suiteCount.value = stats.suite_count || 0
     executionCount.value = stats.execution_count || 0
 
     // 操作记录
-    operationRecords.value = recordsRes.data.results || recordsRes.data || []
+    const recordsData = recordsRes?.data || {}
+    operationRecords.value = recordsData.results || (Array.isArray(recordsData) ? recordsData : [])
   } catch (error) {
     ElMessage.error('加载仪表板数据失败')
     console.error('加载仪表板数据失败:', error)

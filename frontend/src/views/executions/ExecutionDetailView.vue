@@ -1,168 +1,169 @@
 <template>
-  <div class="execution-detail">
-    <!-- 美化的页面头部 -->
-    <div class="page-header-card">
-      <div class="header-content">
-        <div class="title-section">
-          <h1 class="page-title">{{ testPlan.name }}</h1>
-          <el-tag v-if="testPlan.version" type="primary" size="large" class="version-tag">
-            <el-icon><Stamp /></el-icon>
-            {{ testPlan.version }}
-          </el-tag>
-        </div>
-        
-        <!-- 项目信息 -->
-        <div class="project-info">
-          <el-icon class="info-icon"><FolderOpened /></el-icon>
-          <span v-if="testPlan.projects && testPlan.projects.length > 0">
-            {{ testPlan.projects.join(', ') }}
-          </span>
-          <span v-else class="no-data">未关联项目</span>
-        </div>
+  <div class="page-container">
+    <!-- 页面头部 -->
+    <div class="page-header">
+      <h1 class="page-title">{{ testPlan.name }}</h1>
+      <div class="header-actions">
+        <el-button @click="$router.back()">返回</el-button>
+        <el-tag v-if="testPlan.version" type="primary" size="large" class="version-tag">
+          <el-icon><Stamp /></el-icon>
+          {{ testPlan.version }}
+        </el-tag>
       </div>
     </div>
 
-    <!-- 测试执行区域 -->
-    <div v-if="testPlan.test_runs && testPlan.test_runs.length > 0">
-      <div v-for="run in testPlan.test_runs" :key="run.id" class="test-run-card">
-        <!-- 美化的运行头部 -->
-        <div class="run-header">
-          <div class="run-title-section">
-            <h2 class="run-title">{{ run.name }}</h2>
-            <el-tag :type="getRunStatusType(run.progress)" size="large" class="run-status-tag">
-              {{ getRunStatusText(run.progress) }}
-            </el-tag>
+    <div class="card-container">
+      <!-- 项目信息 -->
+      <div class="project-info" style="margin-bottom: 20px; color: #606266;">
+        <el-icon class="info-icon" style="vertical-align: middle; margin-right: 5px;"><FolderOpened /></el-icon>
+        <span v-if="testPlan.projects && testPlan.projects.length > 0">
+          {{ testPlan.projects.join(', ') }}
+        </span>
+        <span v-else class="no-data">未关联项目</span>
+      </div>
+
+      <!-- 测试执行区域 -->
+      <div v-if="testPlan.test_runs && testPlan.test_runs.length > 0">
+        <div v-for="run in testPlan.test_runs" :key="run.id" class="test-run-card">
+          <!-- 运行头部 -->
+          <div class="run-header">
+            <div class="run-title-section">
+              <h2 class="run-title">{{ run.name }}</h2>
+              <el-tag :type="getRunStatusType(run.progress)" size="large" class="run-status-tag">
+                {{ getRunStatusText(run.progress) }}
+              </el-tag>
+            </div>
+            
+            <!-- 统计卡片 -->
+            <div class="stats-cards">
+              <div class="stat-card total">
+                <el-icon class="stat-icon"><Document /></el-icon>
+                <div class="stat-content">
+                  <div class="stat-value">{{ run.progress.total }}</div>
+                  <div class="stat-label">总计</div>
+                </div>
+              </div>
+              <div class="stat-card passed">
+                <el-icon class="stat-icon"><CircleCheck /></el-icon>
+                <div class="stat-content">
+                  <div class="stat-value">{{ run.progress.passed }}</div>
+                  <div class="stat-label">通过</div>
+                </div>
+              </div>
+              <div class="stat-card failed">
+                <el-icon class="stat-icon"><CircleClose /></el-icon>
+                <div class="stat-content">
+                  <div class="stat-value">{{ run.progress.failed }}</div>
+                  <div class="stat-label">失败</div>
+                </div>
+              </div>
+              <div class="stat-card blocked">
+                <el-icon class="stat-icon"><WarningFilled /></el-icon>
+                <div class="stat-content">
+                  <div class="stat-value">{{ run.progress.blocked }}</div>
+                  <div class="stat-label">阻塞</div>
+                </div>
+              </div>
+              <div class="stat-card untested">
+                <el-icon class="stat-icon"><QuestionFilled /></el-icon>
+                <div class="stat-content">
+                  <div class="stat-value">{{ run.progress.untested }}</div>
+                  <div class="stat-label">未测</div>
+                </div>
+              </div>
+            </div>
+          </div>
+  
+          <!-- 进度条 -->
+          <div class="progress-section">
+            <el-progress 
+              :percentage="run.progress.progress" 
+              :stroke-width="12"
+              :color="getProgressColor(run.progress.progress)"
+              :show-text="true">
+              <template #default="{ percentage }">
+                <span class="progress-text">{{ percentage }}%</span>
+              </template>
+            </el-progress>
+          </div>
+  
+          <!-- 批量操作按钮 -->
+          <div v-if="selectedCases.length > 0" class="batch-actions">
+            <el-button 
+              type="danger" 
+              :icon="Delete"
+              @click="batchDeleteCases"
+              :disabled="isDeleting">
+              批量删除 ({{ selectedCases.length }})
+            </el-button>
           </div>
           
-          <!-- 美化的统计卡片 -->
-          <div class="stats-cards">
-            <div class="stat-card total">
-              <el-icon class="stat-icon"><Document /></el-icon>
-              <div class="stat-content">
-                <div class="stat-value">{{ run.progress.total }}</div>
-                <div class="stat-label">总计</div>
-              </div>
-            </div>
-            <div class="stat-card passed">
-              <el-icon class="stat-icon"><CircleCheck /></el-icon>
-              <div class="stat-content">
-                <div class="stat-value">{{ run.progress.passed }}</div>
-                <div class="stat-label">通过</div>
-              </div>
-            </div>
-            <div class="stat-card failed">
-              <el-icon class="stat-icon"><CircleClose /></el-icon>
-              <div class="stat-content">
-                <div class="stat-value">{{ run.progress.failed }}</div>
-                <div class="stat-label">失败</div>
-              </div>
-            </div>
-            <div class="stat-card blocked">
-              <el-icon class="stat-icon"><WarningFilled /></el-icon>
-              <div class="stat-content">
-                <div class="stat-value">{{ run.progress.blocked }}</div>
-                <div class="stat-label">阻塞</div>
-              </div>
-            </div>
-            <div class="stat-card untested">
-              <el-icon class="stat-icon"><QuestionFilled /></el-icon>
-              <div class="stat-content">
-                <div class="stat-value">{{ run.progress.untested }}</div>
-                <div class="stat-label">未测</div>
-              </div>
-            </div>
+          <!-- 用例表格 -->
+          <el-table 
+            ref="tableRef"
+            :data="paginatedCases(run.run_cases)" 
+            style="width: 100%" 
+            class="execution-table"
+            @selection-change="handleSelectionChange"
+            :row-key="(row) => row.id">
+            <el-table-column type="selection" width="55" :reserve-selection="true" />
+            <el-table-column 
+              type="index" 
+              label="序号" 
+              width="80" 
+              :index="getSerialNumber" />
+            <el-table-column prop="testcase" label="测试用例" min-width="250" />
+            <el-table-column label="执行状态" width="150">
+              <template #default="scope">
+                <el-select 
+                  v-model="scope.row.status" 
+                  @change="updateCaseStatus(scope.row)"
+                  size="small">
+                  <el-option label="未测试" value="untested" />
+                  <el-option label="通过" value="passed" />
+                  <el-option label="失败" value="failed" />
+                  <el-option label="阻塞" value="blocked" />
+                  <el-option label="重测" value="retest" />
+                </el-select>
+              </template>
+            </el-table-column>
+            <el-table-column label="备注" min-width="250">
+              <template #default="scope">
+                <el-input 
+                  v-model="scope.row.comments" 
+                  placeholder="请输入备注"
+                  type="textarea"
+                  :rows="2"
+                  size="small"
+                  @blur="updateCaseDetails(scope.row)">
+                </el-input>
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" width="120" fixed="right">
+              <template #default="scope">
+                <el-button 
+                  size="small" 
+                  type="primary" 
+                  :icon="Clock"
+                  @click="viewCaseHistory(scope.row)">
+                  历史
+                </el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+  
+          <!-- 分页组件 -->
+          <div v-if="run.run_cases && run.run_cases.length > 0" class="pagination-container">
+            <el-pagination
+              v-model:current-page="currentPage"
+              v-model:page-size="pageSize"
+              :page-sizes="[10, 20, 50, 100]"
+              :total="run.run_cases.length"
+              layout="total, sizes, prev, pager, next, jumper"
+              @current-change="handlePageChange"
+              @size-change="handleSizeChange">
+            </el-pagination>
           </div>
-        </div>
-
-        <!-- 进度条 -->
-        <div class="progress-section">
-          <el-progress 
-            :percentage="run.progress.progress" 
-            :stroke-width="12"
-            :color="getProgressColor(run.progress.progress)"
-            :show-text="true">
-            <template #default="{ percentage }">
-              <span class="progress-text">{{ percentage }}%</span>
-            </template>
-          </el-progress>
-        </div>
-
-        <!-- 批量操作按钮 -->
-        <div v-if="selectedCases.length > 0" class="batch-actions">
-          <el-button 
-            type="danger" 
-            :icon="Delete"
-            @click="batchDeleteCases"
-            :disabled="isDeleting">
-            批量删除 ({{ selectedCases.length }})
-          </el-button>
-        </div>
-        
-        <!-- 优化的用例表格 -->
-        <el-table 
-          ref="tableRef"
-          :data="paginatedCases(run.run_cases)" 
-          style="width: 100%" 
-          class="execution-table"
-          @selection-change="handleSelectionChange"
-          :row-key="(row) => row.id">
-          <el-table-column type="selection" width="55" :reserve-selection="true" />
-          <el-table-column 
-            type="index" 
-            label="序号" 
-            width="80" 
-            :index="getSerialNumber" />
-          <el-table-column prop="testcase" label="测试用例" min-width="250" />
-          <el-table-column label="执行状态" width="150">
-            <template #default="scope">
-              <el-select 
-                v-model="scope.row.status" 
-                @change="updateCaseStatus(scope.row)"
-                size="small">
-                <el-option label="未测试" value="untested" />
-                <el-option label="通过" value="passed" />
-                <el-option label="失败" value="failed" />
-                <el-option label="阻塞" value="blocked" />
-                <el-option label="重测" value="retest" />
-              </el-select>
-            </template>
-          </el-table-column>
-          <el-table-column label="备注" min-width="250">
-            <template #default="scope">
-              <el-input 
-                v-model="scope.row.comments" 
-                placeholder="请输入备注"
-                type="textarea"
-                :rows="2"
-                size="small"
-                @blur="updateCaseDetails(scope.row)">
-              </el-input>
-            </template>
-          </el-table-column>
-          <el-table-column label="操作" width="120" fixed="right">
-            <template #default="scope">
-              <el-button 
-                size="small" 
-                type="primary" 
-                :icon="Clock"
-                @click="viewCaseHistory(scope.row)">
-                历史
-              </el-button>
-            </template>
-          </el-table-column>
-        </el-table>
-
-        <!-- 分页组件 -->
-        <div v-if="run.run_cases && run.run_cases.length > 0" class="pagination-container">
-          <el-pagination
-            v-model:current-page="currentPage"
-            v-model:page-size="pageSize"
-            :page-sizes="[10, 20, 50, 100]"
-            :total="run.run_cases.length"
-            layout="total, sizes, prev, pager, next, jumper"
-            @current-change="handlePageChange"
-            @size-change="handleSizeChange">
-          </el-pagination>
         </div>
       </div>
     </div>
@@ -400,68 +401,50 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.execution-detail {
-  padding: 24px;
-  background: #f5f7fa;
-  min-height: 100vh;
-}
-
-/* 美化的页面头部 */
-.page-header-card {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  border-radius: 16px;
-  padding: 32px;
-  margin-bottom: 24px;
-  box-shadow: 0 8px 24px rgba(102, 126, 234, 0.25);
-  color: white;
-}
-
-.header-content {
+/* 页面特定样式 */
+.page-container {
+  padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+
+  max-width: 100%; /* 新增：覆盖全局样式的 max-width: 1600px，确保铺满 */
 }
 
-.title-section {
+.page-header {
   display: flex;
+  justify-content: space-between;
   align-items: center;
-  gap: 16px;
+  padding: 15px 20px;
+  border-bottom: 1px solid #e6e6e6;
+  background: white;
+  flex-shrink: 0;
 }
 
 .page-title {
   margin: 0;
-  font-size: 28px;
+  font-size: 24px;
   font-weight: 600;
-  color: white;
+  color: #303133;
+  position: relative;
+  padding-left: 16px;
 }
 
-.version-tag {
+.page-title::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 20px;
+  background: var(--primary-color, #409eff);
+  border-radius: 2px;
+}
+
+.header-actions {
   display: flex;
-  align-items: center;
-  gap: 6px;
-  background: rgba(255, 255, 255, 0.2);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  color: white;
-  backdrop-filter: blur(10px);
+  gap: 15px;
 }
-
-.project-info {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
-  color: rgba(255, 255, 255, 0.9);
-}
-
-.info-icon {
-  font-size: 18px;
-}
-
-.no-data {
-  color: rgba(255, 255, 255, 0.6);
-  font-style: italic;
-}
-
 /* 测试运行卡片 */
 .test-run-card {
   background: white;
@@ -594,5 +577,11 @@ onMounted(() => {
   margin-top: 20px;
   display: flex;
   justify-content: center;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 </style>

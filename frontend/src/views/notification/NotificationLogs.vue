@@ -1,7 +1,17 @@
 <template>
   <div class="notification-logs-container">
-    <!-- 页面操作栏 -->
-    <div class="page-actions">
+    <!-- 顶部标题 -->
+    <el-card shadow="hover" class="page-card header-card">
+      <template #header>
+        <div class="card-header page-header" style="margin-bottom: 0;">
+          <h2 class="page-title">通知列表</h2>
+        </div>
+      </template>
+    </el-card>
+
+    <div class="content-card">
+      <!-- 页面操作栏 -->
+      <div class="page-actions">
       <el-row :gutter="20" class="filter-row">
         <el-col :span="6">
           <el-input
@@ -164,6 +174,7 @@
             @current-change="handleCurrentChange"
         />
       </div>
+    </div>
     </div>
 
     <!-- 详情弹窗 -->
@@ -608,11 +619,24 @@ export default {
 </script>
 
 <style scoped>
+/* 页面特定样式 */
+.page-container {
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  max-width: 100%; /* 新增：覆盖全局样式的 max-width: 1600px，确保铺满 */
+}
 .notification-logs-container {
-  padding: 20px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.content-card {
   background: #fff;
   border-radius: 8px;
   box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+  padding: 20px;
 }
 
 .page-actions {

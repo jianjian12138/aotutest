@@ -1,23 +1,20 @@
 <template>
-  <div class="workflow-config-container">
+  <div class="page-container">
     <div class="page-header">
-      <h1>🤖 工作流配置</h1>
-      <p>配置AI工作流引擎以启用自动化功能，支持多引擎管理</p>
+      <h3 class="page-title">工作流配置</h3>
+      <div class="header-actions">
+        <el-button type="primary" @click="prepareAddConfig">
+          <el-icon><Plus /></el-icon> 新增配置
+        </el-button>
+      </div>
     </div>
 
-    <div class="config-content">
-      <!-- 配置列表卡片 -->
-      <el-card class="config-card">
-        <template #header>
-          <div class="card-header">
-            <span>工作流引擎配置</span>
-            <el-button type="primary" @click="prepareAddConfig">
-              <el-icon><Plus /></el-icon> 新增配置
-            </el-button>
-          </div>
-        </template>
-
-        <el-table :data="workflowConfigs" style="width: 100%" v-loading="loading">
+    <div class="main-content">
+      <div class="card-container">
+        <p class="description-text">配置AI工作流引擎以启用自动化功能，支持多引擎管理</p>
+        
+        <!-- 配置列表卡片 -->
+        <el-table :data="workflowConfigs" style="width: 100%; flex: 1;" v-loading="loading">
           <el-table-column prop="name" label="配置名称" width="180" />
           <el-table-column prop="provider" label="提供商" width="120">
              <template #default="scope">
@@ -42,7 +39,7 @@
             </template>
           </el-table-column>
         </el-table>
-      </el-card>
+      </div>
     </div>
 
     <!-- 编辑/新增对话框 -->
@@ -386,40 +383,71 @@ onMounted(() => {
 </script>
 
 <style scoped lang="scss">
-.workflow-config-container {
-  padding: 20px;
-  max-width: 1200px;
-  margin: 0 auto;
+.page-container {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  background-color: var(--el-bg-color-page);
+  max-width: 100%; /* 新增：覆盖全局样式的 max-width: 1600px，确保铺满 */
 }
 
 .page-header {
-  text-align: center;
-  margin-bottom: 30px;
-
-  h1 {
-    font-size: 2rem;
-    color: #2c3e50;
-    margin-bottom: 10px;
-  }
-
-  p {
-    color: #666;
-    font-size: 1rem;
-  }
+  flex-shrink: 0;
+  padding: 16px 24px;
+  background: #fff;
+  border-bottom: 1px solid var(--el-border-color-light);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
-.config-content {
+.page-title {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+  display: flex;
+  align-items: center;
+  margin: 0;
+}
+
+.page-title::before {
+  content: '';
+  width: 4px;
+  height: 16px;
+  background-color: var(--el-color-primary);
+  margin-right: 8px;
+  border-radius: 2px;
+}
+
+.header-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.main-content {
+  flex: 1;
+  padding: 0;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
-  gap: 20px;
 }
 
-.config-card {
-  .card-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    font-weight: 600;
-  }
+.card-container {
+  flex: 1;
+  background: #fff;
+  border-radius: 4px;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  overflow: hidden;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+}
+
+.description-text {
+  margin-top: 0;
+  margin-bottom: 16px;
+  font-size: 13px;
+  color: var(--el-text-color-secondary);
 }
 </style>

@@ -58,6 +58,7 @@ LOCAL_APPS = [
     'apps.strix_security',
     'apps.cicd',
     'apps.knowledge_graph',
+    'apps.scheduler',
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -212,6 +213,8 @@ if DEBUG:
         "http://127.0.0.1:5173",
         "http://localhost:5656",
         "http://127.0.0.1:5656",
+        "http://localhost:5566",
+        "http://127.0.0.1:5566",
     ]
     CORS_ALLOW_CREDENTIALS = True
 else:
@@ -226,6 +229,8 @@ CSRF_TRUSTED_ORIGINS = [
     "http://127.0.0.1:5173",
     "http://localhost:4545",
     "http://127.0.0.1:4545",
+    "http://localhost:5566",
+    "http://127.0.0.1:5566",
 ]
 
 # Spectacular Settings

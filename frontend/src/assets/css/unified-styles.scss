@@ -1,0 +1,109 @@
+/* 统一页面样式 */
+
+/* 页面容器 */
+.page-container {
+  width: 100%;
+}
+
+/* 卡片样式 */
+.page-card {
+  margin-bottom: 20px;
+}
+
+/* 卡片标题区域 */
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.page-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+/* 内容区域 */
+.content {
+  padding: 20px 0;
+}
+
+/* 搜索过滤区域 */
+.search-filter {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 20px;
+  align-items: center;
+}
+
+.search-input {
+  width: 300px;
+}
+
+.filter-select {
+  width: 180px;
+}
+
+/* 分页区域 */
+.pagination-container {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 20px;
+}
+
+/* 头部操作按钮区域 */
+.header-actions {
+  display: flex;
+  gap: 10px;
+}
+
+/* 表格样式 */
+.table-container {
+  margin-bottom: 20px;
+}
+
+/* 对话框样式 */
+.dialog-content {
+  padding: 20px 0;
+}
+
+/* 表单样式 */
+.form-container {
+  width: 100%;
+}
+
+/* 按钮样式调整 */
+.action-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+/* 状态标签样式 */
+.status-tag {
+  font-size: 12px;
+  padding: 2px 8px;
+}
+
+/* 响应式调整 */
+@media screen and (max-width: 768px) {
+  .search-filter {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .search-input,
+  .filter-select {
+    width: 100%;
+  }
+  
+  .card-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  
+  .header-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}

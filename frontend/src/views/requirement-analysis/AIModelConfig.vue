@@ -1,22 +1,18 @@
 <template>
-  <div class="ai-model-config">
+  <div class="page-container">
     <div class="page-header">
-      <h1>🤖 AI用例生成模型配置</h1>
-      <p>配置用于测试用例生成和评审的AI模型</p>
+      <h1 class="page-title">AI模型配置</h1>
+      <el-button type="primary" @click="openAddModal">
+        <el-icon><Plus /></el-icon>
+        添加配置
+      </el-button>
     </div>
 
-    <div class="main-content">
+    <div class="card-container">
+      <p class="description-text">配置用于测试用例生成和评审的AI模型</p>
+      
       <!-- 配置列表 -->
       <div class="configs-section">
-        <div class="section-header">
-          <h2>模型配置列表</h2>
-          <button 
-            class="add-config-btn" 
-            @click.stop="openAddModal"
-            type="button">
-            ➕ 添加配置
-          </button>
-        </div>
 
         <div class="configs-grid">
           <template v-for="config in configs" :key="config?.id || 'unknown'">
@@ -29,7 +25,7 @@
                       {{ config.model_type_display || config.model_type }}
                     </span>
                     <span class="role-badge" :class="config.role">
-                      {{ config.role_display || config.role }}
+                      {{ roleDisplayMap[config.role] || config.role_display || config.role }}
                     </span>
                     <span class="status-badge" :class="{ active: config.is_active }">
                       {{ config.is_active ? '启用' : '禁用' }}
@@ -117,10 +113,10 @@
             <div class="form-group">
               <label>模型类型 <span class="required">*</span></label>
               <select
-                v-model="configForm.model_type"
+                v-model="displayModelType"
                 class="form-select"
                 required
-                @change="onModelTypeChange(configForm.model_type)">
+                @change="handleModelTypeChange">
                 <option value="">请选择模型类型</option>
                 <option value="deepseek">DeepSeek</option>
                 <option value="qwen">通义千问</option>
@@ -128,19 +124,39 @@
                 <option value="local">本地模型 (Ollama/LocalAI)</option>
                 <option value="other">其他</option>
               </select>
+              <div v-if="displayModelType === 'other'" style="margin-top: 10px;">
+                <input 
+                  v-model="customModelType" 
+                  type="text" 
+                  class="form-input"
+                  placeholder="请输入模型类型（可选，留空则默认为'其他'）"
+                  @input="updateConfigFormModelType">
+              </div>
             </div>
 
             <div class="form-group">
               <label>角色 <span class="required">*</span></label>
               <select 
-                v-model="configForm.role" 
+                v-model="displayRole" 
                 class="form-select" 
                 required
-                @change="console.log('Role changed to:', configForm.role)">
+                @change="handleRoleChange">
                 <option value="">请选择角色</option>
                 <option value="writer">测试用例编写专家</option>
                 <option value="reviewer">测试评审专家</option>
+                <option value="browser_use_text">Browser Use - 文本模式</option>
+                <option value="autoglm">AutoGLM - 移动端AI</option>
+                <option value="custom">手动输入...</option>
               </select>
+              <div v-if="displayRole === 'custom'" style="margin-top: 10px;">
+                <input 
+                  v-model="customRole" 
+                  type="text" 
+                  class="form-input"
+                  placeholder="请输入角色名称"
+                  required
+                  @input="updateConfigFormRole">
+              </div>
             </div>
 
             <div class="form-group">
@@ -275,9 +291,13 @@
 <script>
 import api from '@/utils/api'
 import { ElMessage } from 'element-plus'
+import { Plus } from '@element-plus/icons-vue' // Add Plus icon
 
 export default {
   name: 'AIModelConfig',
+  components: {
+    Plus // Register Plus icon
+  },
   data() {
     return {
       configs: [], // 确保初始化为空数组
@@ -300,6 +320,20 @@ export default {
         temperature: 0.7,
         top_p: 0.9,
         is_active: true
+      },
+      // UI显示控制变量
+      displayModelType: '',
+      customModelType: '',
+      displayRole: '',
+      customRole: '',
+      presetModelTypes: ['deepseek', 'qwen', 'siliconflow', 'local'],
+      presetRoles: ['writer', 'reviewer', 'browser_use_text', 'autoglm'],
+      // 角色显示映射
+      roleDisplayMap: {
+        'writer': '测试用例编写专家',
+        'reviewer': '测试评审专家',
+        'browser_use_text': 'Browser Use - 文本模式',
+        'autoglm': 'AutoGLM - 移动端AI'
       },
       // 模型类型与API Base URL的映射关系
       modelBaseUrlMap: {
@@ -353,6 +387,47 @@ export default {
   },
 
   methods: {
+    handleModelTypeChange() {
+      const type = this.displayModelType
+      console.log('Display model type changed to:', type)
+      
+      if (type === 'other') {
+        // 如果选择其他，使用自定义输入的值，如果为空则设为 'other'
+        this.configForm.model_type = this.customModelType || 'other'
+      } else {
+        // 如果是预设类型，清空自定义输入
+        this.customModelType = ''
+        this.configForm.model_type = type
+        // 触发自动填充逻辑
+        this.onModelTypeChange(type)
+      }
+    },
+
+    updateConfigFormModelType() {
+      if (this.displayModelType === 'other') {
+        // 允许输入为空，此时值为 'other'；否则为输入值
+        this.configForm.model_type = this.customModelType || 'other'
+      }
+    },
+
+    handleRoleChange() {
+      const role = this.displayRole
+      console.log('Display role changed to:', role)
+      
+      if (role === 'custom') {
+        this.configForm.role = this.customRole
+      } else {
+        this.customRole = ''
+        this.configForm.role = role
+      }
+    },
+
+    updateConfigFormRole() {
+      if (this.displayRole === 'custom') {
+        this.configForm.role = this.customRole
+      }
+    },
+
     // 当模型类型改变时自动填充API Base URL
     onModelTypeChange(modelType) {
       console.log('Model type changed to:', modelType)
@@ -462,6 +537,11 @@ export default {
         top_p: 0.9,
         is_active: true
       })
+      // 重置UI显示变量
+      this.displayModelType = ''
+      this.customModelType = ''
+      this.displayRole = ''
+      this.customRole = ''
       console.log('Form reset:', JSON.stringify(this.configForm))
     },
 
@@ -480,6 +560,27 @@ export default {
         top_p: config.top_p,
         is_active: config.is_active
       }
+      
+      // 初始化回显逻辑
+      // 1. 模型类型
+      if (this.presetModelTypes.includes(config.model_type)) {
+        this.displayModelType = config.model_type
+        this.customModelType = ''
+      } else {
+        this.displayModelType = 'other'
+        // 如果是 'other' 或其他自定义字符串，都显示在输入框中
+        this.customModelType = config.model_type === 'other' ? '' : config.model_type
+      }
+      
+      // 2. 角色
+      if (this.presetRoles.includes(config.role)) {
+        this.displayRole = config.role
+        this.customRole = ''
+      } else {
+        this.displayRole = 'custom'
+        this.customRole = config.role
+      }
+      
       this.showEditModal = true
     },
 
@@ -683,57 +784,61 @@ export default {
 </script>
 
 <style scoped>
-.ai-model-config {
-  padding: 20px;
-  max-width: 1400px;
-  margin: 0 auto;
+/* 页面特定样式 */
+.page-container {
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  max-width: 100%; /* 新增：覆盖全局样式的 max-width: 1600px，确保铺满 */
 }
 
 .page-header {
-  text-align: center;
-  margin-bottom: 40px;
-}
-
-.page-header h1 {
-  font-size: 2.5rem;
-  color: #2c3e50;
-  margin-bottom: 10px;
-}
-
-.page-header p {
-  color: #666;
-  font-size: 1.1rem;
-}
-
-.section-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 30px;
+  padding: 15px 20px;
+  border-bottom: 1px solid #e6e6e6;
+  background: white;
+  flex-shrink: 0;
 }
 
-.section-header h2 {
-  color: #2c3e50;
+.page-title {
   margin: 0;
-}
-
-.add-config-btn {
-  background: #27ae60;
-  color: white;
-  border: none;
-  padding: 12px 24px;
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 1rem;
-  transition: background 0.3s ease;
-  pointer-events: auto;
-  z-index: 1;
+  font-size: 24px;
+  font-weight: 600;
+  color: #303133;
   position: relative;
+  padding-left: 16px;
 }
 
-.add-config-btn:hover {
-  background: #219a52;
+.page-title::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 20px;
+  background: var(--primary-color, #409eff);
+  border-radius: 2px;
 }
+
+.header-actions {
+  display: flex;
+  gap: 15px;
+}
+
+.description-text {
+  color: #666;
+  font-size: 1.1rem;
+  margin-bottom: 20px;
+}
+
+/* Removed .page-header custom styles to use global styles */
+
+/* .section-header removed as buttons moved to page-header */
+
+/* .add-config-btn removed */
 
 .configs-grid {
   display: grid;
@@ -814,6 +919,11 @@ export default {
 .role-badge.reviewer {
   background: #fff3e0;
   color: #f57c00;
+}
+
+.role-badge.autoglm {
+  background: #e1bee7;
+  color: #7b1fa2;
 }
 
 .status-badge {

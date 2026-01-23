@@ -3,7 +3,7 @@ import uuid
 import chromadb
 from chromadb.utils import embedding_functions
 from django.conf import settings
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 from .models import KnowledgeDocument, DocumentChunk, KnowledgeEntity, KnowledgeRelationship, AIWorkflowConfig, DifyConfig
 import json
 import requests

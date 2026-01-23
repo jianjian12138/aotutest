@@ -2,8 +2,8 @@
   <div class="execution-management">
     <el-card shadow="hover">
       <template #header>
-        <div class="card-header">
-          <h2>执行管理</h2>
+        <div class="card-header page-header" style="margin-bottom: 0;">
+          <h2 class="page-title">执行管理</h2>
           <el-button type="primary" @click="handleCreateExecution">
             <el-icon><Plus /></el-icon>
             新建执行
@@ -52,7 +52,7 @@
         @row-click="handleRowClick"
       >
         <el-table-column prop="id" label="执行ID" width="100" />
-        <el-table-column prop="test_suite.name" label="测试套件" />
+        <el-table-column prop="test_suite.name" label="测试套件" show-overflow-tooltip />
         <el-table-column prop="status" label="状态" width="120">
           <template #default="scope">
             <el-tag
@@ -114,10 +114,15 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElNotification, ElMessageBox } from 'element-plus'
 import { Plus, Search, View, DataAnalysis, VideoPause, Delete } from '@element-plus/icons-vue'
+import { 
+  getPerformanceExecutions, 
+  deletePerformanceExecution, 
+  stopPerformanceTest 
+} from '@/api/performance-test'
 
 const router = useRouter()
 
@@ -126,59 +131,36 @@ const searchQuery = ref('')
 const statusFilter = ref('')
 
 // 分页
-const pagination = ref({
+const pagination = reactive({
   currentPage: 1,
-  pageSize: 20
+  pageSize: 20,
+  total: 0
 })
-const totalExecutions = ref(23)
 
-// 执行数据
-const executions = ref([
-  {
-    id: 1,
-    test_suite: { name: '用户登录性能测试' },
-    status: 'COMPLETED',
-    concurrency: 100,
-    total_requests: 10000,
-    response_time_avg: 123,
-    success_rate: 99.8,
-    start_time: '2026-01-12 14:30:00',
-    end_time: '2026-01-12 14:45:00'
-  },
-  {
-    id: 2,
-    test_suite: { name: '商品列表性能测试' },
-    status: 'COMPLETED',
-    concurrency: 50,
-    total_requests: 5000,
-    response_time_avg: 256,
-    success_rate: 99.5,
-    start_time: '2026-01-12 10:15:00',
-    end_time: '2026-01-12 10:30:00'
-  },
-  {
-    id: 3,
-    test_suite: { name: '订单流程性能测试' },
-    status: 'FAILED',
-    concurrency: 30,
-    total_requests: 2000,
-    response_time_avg: 456,
-    success_rate: 85.2,
-    start_time: '2026-01-11 16:00:00',
-    end_time: '2026-01-11 16:15:00'
-  },
-  {
-    id: 4,
-    test_suite: { name: 'API基础性能测试' },
-    status: 'RUNNING',
-    concurrency: 200,
-    total_requests: 5000,
-    response_time_avg: 89,
-    success_rate: 99.9,
-    start_time: '2026-01-12 16:30:00',
-    end_time: null
+// 数据
+const executions = ref([])
+const loading = ref(false)
+
+// 获取执行列表
+const fetchExecutions = async () => {
+  loading.value = true
+  try {
+    const params = {
+      page: pagination.currentPage,
+      page_size: pagination.pageSize,
+      search: searchQuery.value,
+      status: statusFilter.value
+    }
+    const response = await getPerformanceExecutions(params)
+    executions.value = response.data.results || response.results || []
+    pagination.total = response.data.count || response.count || 0
+  } catch (error) {
+    console.error('获取执行列表失败:', error)
+    ElMessage.error('获取执行列表失败')
+  } finally {
+    loading.value = false
   }
-])
+}
 
 // 获取状态标签类型
 const getStatusTagType = (status) => {
@@ -204,12 +186,13 @@ const getStatusText = (status) => {
 
 // 搜索
 const handleSearch = () => {
-  ElMessage.info('搜索功能开发中')
+  pagination.currentPage = 1
+  fetchExecutions()
 }
 
 // 处理行点击
 const handleRowClick = (row) => {
-  handleViewExecution(row)
+  // handleViewExecution(row)
 }
 
 // 查看执行
@@ -228,8 +211,14 @@ const handleStopExecution = (row) => {
     confirmButtonText: '确定',
     cancelButtonText: '取消',
     type: 'warning'
-  }).then(() => {
-    ElMessage.success(`执行 ${row.id} 已停止`)
+  }).then(async () => {
+    try {
+      await stopPerformanceTest(row.id)
+      ElMessage.success(`执行 ${row.id} 已停止`)
+      fetchExecutions()
+    } catch (error) {
+      ElMessage.error('停止失败')
+    }
   }).catch(() => {
     // 取消停止
   })
@@ -241,8 +230,14 @@ const handleDeleteExecution = (row) => {
     confirmButtonText: '确定',
     cancelButtonText: '取消',
     type: 'warning'
-  }).then(() => {
-    ElMessage.success('执行记录删除成功')
+  }).then(async () => {
+    try {
+      await deletePerformanceExecution(row.id)
+      ElMessage.success('执行记录删除成功')
+      fetchExecutions()
+    } catch (error) {
+      ElMessage.error('删除失败')
+    }
   }).catch(() => {
     // 取消删除
   })
@@ -255,17 +250,31 @@ const handleCreateExecution = () => {
 
 // 分页变化
 const handleSizeChange = (size) => {
-  pagination.value.pageSize = size
+  pagination.pageSize = size
+  fetchExecutions()
 }
 
 const handleCurrentChange = (current) => {
-  pagination.value.currentPage = current
+  pagination.currentPage = current
+  fetchExecutions()
 }
+
+onMounted(() => {
+  fetchExecutions()
+})
 </script>
 
 <style scoped>
-.execution-management {
+/* 页面特定样式 */
+.page-container {
   padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-width: 100%; /* 新增：覆盖全局样式的 max-width: 1600px，确保铺满 */
+}
+.execution-management {
+  padding: 0;
 }
 
 .card-header {

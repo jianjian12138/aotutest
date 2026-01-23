@@ -13,16 +13,25 @@
           text-color="#fff"
           active-text-color="#1890ff"
         >
-          <!-- 用例管理模块菜单 -->
+          <!-- AI用例生成模块菜单 -->
           <template v-if="currentModule === 'ai-generation'">
             <el-sub-menu index="requirement">
               <template #title>
                 <el-icon><MagicStick /></el-icon>
                 <span>智能用例生成</span>
               </template>
-              <el-menu-item index="/ai-generation/requirement-analysis">AI用例生成</el-menu-item>
-              <el-menu-item index="/ai-generation/generated-testcases">AI生成用例记录</el-menu-item>
-              <el-menu-item index="/ai-generation/prompt-config">提示词配置</el-menu-item>
+              <el-menu-item index="/ai-generation/requirement-analysis">
+                <el-icon><Edit /></el-icon>
+                <span>AI用例生成</span>
+              </el-menu-item>
+              <el-menu-item index="/ai-generation/generated-testcases">
+                <el-icon><List /></el-icon>
+                <span>AI生成用例记录</span>
+              </el-menu-item>
+              <el-menu-item index="/ai-generation/prompt-config">
+                <el-icon><Setting /></el-icon>
+                <span>提示词配置</span>
+              </el-menu-item>
             </el-sub-menu>
             <el-menu-item index="/ai-generation/projects">
               <el-icon><Folder /></el-icon>
@@ -115,6 +124,10 @@
               <el-icon><Aim /></el-icon>
               <span>元素管理</span>
             </el-menu-item>
+            <el-menu-item index="/ui-automation/page-objects">
+              <el-icon><Collection /></el-icon>
+              <span>页面对象</span>
+            </el-menu-item>
             <el-menu-item index="/ui-automation/test-cases">
               <el-icon><Document /></el-icon>
               <span>用例管理</span>
@@ -139,6 +152,14 @@
               <el-icon><DataAnalysis /></el-icon>
               <span>测试报告</span>
             </el-menu-item>
+            <el-menu-item index="/ui-automation/devices">
+              <el-icon><Monitor /></el-icon>
+              <span>设备管理</span>
+            </el-menu-item>
+            <el-menu-item index="/ui-automation/debug-files">
+              <el-icon><Folder /></el-icon>
+              <span>调试文件</span>
+            </el-menu-item>
             <el-menu-item index="/ui-automation/scheduled-tasks">
               <el-icon><AlarmClock /></el-icon>
               <span>定时任务</span>
@@ -149,27 +170,23 @@
             </el-menu-item>
           </template>
 
-          <!-- 自然语言Web测试模块菜单 -->
-          <template v-else-if="currentModule === 'midscene'">
-            <el-menu-item index="/midscene/dashboard">
-              <el-icon><Message /></el-icon>
-              <span>数据看板</span>
+          <!-- 自然语言测试模块菜单 -->
+          <template v-else-if="currentModule === 'natural-language-testing'">
+            <el-menu-item index="/natural-language-testing/web-testing">
+              <el-icon><Monitor /></el-icon>
+              <span>Web 智能测试</span>
             </el-menu-item>
-            <el-menu-item index="/midscene/ai-testing">
-              <el-icon><VideoPlay /></el-icon>
-              <span>AI 智能测试</span>
+            <el-menu-item index="/natural-language-testing/app-testing">
+              <el-icon><Cellphone /></el-icon>
+              <span>App 智能测试</span>
             </el-menu-item>
-            <el-menu-item index="/midscene/test-execution">
-              <el-icon><VideoPlay /></el-icon>
-              <span>自然语言测试执行</span>
-            </el-menu-item>
-            <el-menu-item index="/midscene/tasks">
+            <el-menu-item index="/natural-language-testing/cases">
               <el-icon><Document /></el-icon>
-              <span>任务管理</span>
+              <span>智能用例管理</span>
             </el-menu-item>
-            <el-menu-item index="/midscene/execution-logs">
+            <el-menu-item index="/natural-language-testing/execution-records">
               <el-icon><Timer /></el-icon>
-              <span>执行日志</span>
+              <span>执行历史记录</span>
             </el-menu-item>
           </template>
 
@@ -183,25 +200,25 @@
               <el-icon><Monitor /></el-icon>
               <span>UI环境配置</span>
             </el-menu-item>
-            <el-menu-item index="/configuration/scheduled-task">
-              <el-icon><Timer /></el-icon>
-              <span>定时任务配置</span>
-            </el-menu-item>
-            <el-menu-item index="/configuration/dify">
-              <el-icon><ChatDotRound /></el-icon>
-              <span>工作流配置</span>
+            <el-menu-item index="/configuration/cicd">
+              <el-icon><Operation /></el-icon>
+              <span>CI/CD配置</span>
             </el-menu-item>
             <el-menu-item index="/configuration/database">
               <el-icon><DataLine /></el-icon>
               <span>数据库配置</span>
             </el-menu-item>
-            <el-menu-item index="/configuration/midscene-config">
-              <el-icon><Operation /></el-icon>
-              <span>Midscene配置</span>
+            <el-menu-item index="/configuration/scheduled-tasks">
+              <el-icon><AlarmClock /></el-icon>
+              <span>定时任务</span>
             </el-menu-item>
-            <el-menu-item index="/configuration/cicd-dashboard">
-              <el-icon><Operation /></el-icon>
-              <span>CI/CD管理</span>
+            <el-menu-item index="/configuration/notifications">
+              <el-icon><Bell /></el-icon>
+              <span>通知列表</span>
+            </el-menu-item>
+            <el-menu-item index="/configuration/dify">
+              <el-icon><ChatDotRound /></el-icon>
+              <span>工作流配置</span>
             </el-menu-item>
             <el-menu-item index="/configuration/users">
               <el-icon><Document /></el-icon>
@@ -273,7 +290,25 @@
             </el-menu-item>
           </template>
           
-
+          <!-- 自然语言Web测试模块菜单 - 已废弃，合并入natural-language-testing -->
+          <!-- <template v-else-if="currentModule === 'midscene'">
+            <el-menu-item index="/midscene/dashboard">
+              <el-icon><Message /></el-icon>
+              <span>数据看板</span>
+            </el-menu-item>
+            <el-menu-item index="/midscene/config">
+              <el-icon><Setting /></el-icon>
+              <span>配置管理</span>
+            </el-menu-item>
+            <el-menu-item index="/midscene/tasks">
+              <el-icon><Document /></el-icon>
+              <span>任务管理</span>
+            </el-menu-item>
+            <el-menu-item index="/midscene/execution-logs">
+              <el-icon><Timer /></el-icon>
+              <span>执行日志</span>
+            </el-menu-item>
+          </template> -->
           
           <!-- 安全测试模块菜单 -->
           <template v-else-if="currentModule === 'strix-security'">
@@ -299,57 +334,35 @@
             </el-menu-item>
           </template>
           
-
+          <!-- CI/CD管理模块菜单 -->
+          <template v-else-if="currentModule === 'cicd'">
+            <el-menu-item index="/cicd/dashboard">
+              <el-icon><Operation /></el-icon>
+              <span>CI/CD仪表盘</span>
+            </el-menu-item>
+          </template>
           
           <!-- 知识图谱模块菜单 -->
           <template v-else-if="currentModule === 'knowledge-graph'">
             <el-menu-item index="/knowledge-graph/dashboard">
-              <el-icon><House /></el-icon>
-              <span>个人工作台</span>
+              <el-icon><Document /></el-icon>
+              <span>知识库管理</span>
             </el-menu-item>
-            <el-menu-item index="/knowledge-graph/notebook">
-              <el-icon><Notebook /></el-icon>
-              <span>个人笔记</span>
+            <el-menu-item index="/knowledge-graph/ai-agent">
+              <el-icon><Service /></el-icon>
+              <span>AI 助手</span>
             </el-menu-item>
-            <el-menu-item index="/knowledge-graph/idealab">
-              <el-icon><MagicStick /></el-icon>
-              <span>深度研究</span>
-            </el-menu-item>
-            <el-menu-item index="/knowledge-graph/graph">
+            <el-menu-item index="/knowledge-graph/graph-viz">
               <el-icon><Connection /></el-icon>
-              <span>数据库可视化</span>
-            </el-menu-item>
-            <el-menu-item index="/knowledge-graph/engine">
-              <el-icon><Cpu /></el-icon>
-              <span>RAG 管道</span>
-            </el-menu-item>
-            <el-menu-item index="/knowledge-graph/sources">
-              <el-icon><FolderOpened /></el-icon>
-              <span>知识库</span>
-            </el-menu-item>
-            <el-menu-item index="/knowledge-graph/settings">
-              <el-icon><Setting /></el-icon>
-              <span>系统设置</span>
-            </el-menu-item>
-            <el-menu-item index="/knowledge-graph/evaluator">
-              <el-icon><ChatDotRound /></el-icon>
-              <span>AI 评测师</span>
+              <span>图谱可视化</span>
             </el-menu-item>
           </template>
           
-          <!-- 智能化测试模块菜单 -->
+          <!-- WHartTest模块菜单 -->
           <template v-else-if="currentModule === 'wharttest'">
             <el-menu-item index="/wharttest/dashboard">
               <el-icon><DataAnalysis /></el-icon>
               <span>数据看板</span>
-            </el-menu-item>
-            <el-menu-item index="/wharttest/llm-chat">
-              <el-icon><ChatDotRound /></el-icon>
-              <span>LLM对话</span>
-            </el-menu-item>
-            <el-menu-item index="/wharttest/cases">
-              <el-icon><Document /></el-icon>
-              <span>用例管理</span>
             </el-menu-item>
             <el-menu-item index="/wharttest/projects">
               <el-icon><Folder /></el-icon>
@@ -424,7 +437,7 @@ import {
   DataAnalysis, ChatDotRound, DocumentCopy, Link, MagicStick,
   Odometer, Timer, Setting, AlarmClock, Bell, Aim, Edit, Cpu,
   DataBoard, DataLine, Message, Lock, ArrowDown, Warning, List,
-  Operation, House, Notebook, Connection, FolderOpened
+  Operation, Cellphone
 } from '@element-plus/icons-vue'
 
 const router = useRouter()
@@ -438,8 +451,11 @@ const currentModule = computed(() => {
     console.log('API Testing module detected')
     return 'api-testing'
   }
-  if (route.path.startsWith('/ui-automation')) return 'ui-automation'
-  if (route.path.startsWith('/ai-intelligent-mode')) return 'ai-intelligent-mode'
+  if (route.path.startsWith('/ui-automation')) {
+    console.log('Detected UI Automation module');
+    return 'ui-automation';
+  }
+  if (route.path.startsWith('/natural-language-testing')) return 'natural-language-testing'
   if (route.path.startsWith('/configuration')) return 'configuration'
   if (route.path.startsWith('/data-factory')) return 'data-factory'
   if (route.path.startsWith('/performance-test')) return 'performance-test'
@@ -455,13 +471,14 @@ const moduleName = computed(() => {
   const map = {
     'ai-generation': '用例管理',
     'api-testing': '接口测试',
-    'ui-automation': 'UI自动化测试',
-    'ai-intelligent-mode': 'AI 智能模式',
+    'ui-automation': 'UI测试',
+    'natural-language-testing': '自然语言测试',
     'configuration': '配置中心',
     'data-factory': '数据工厂',
     'performance-test': '性能测试',
-    'midscene': '自然语言Web测试',
+    'midscene': '自然语言测试',
     'strix-security': '安全测试',
+    'cicd': 'CI/CD管理',
     'knowledge-graph': '知识图谱',
     'wharttest': '智能化测试'
   }
@@ -470,7 +487,7 @@ const moduleName = computed(() => {
 
 const breadcrumbTitle = computed(() => {
   const routeMap = {
-    // AI用例生成
+    // 用例管理
     '/ai-generation/requirement-analysis': 'AI用例生成',
     '/ai-generation/generated-testcases': 'AI生成用例记录',
     '/ai-generation/prompt-config': '提示词配置',
@@ -480,7 +497,7 @@ const breadcrumbTitle = computed(() => {
     '/ai-generation/reviews': '评审列表',
     '/ai-generation/review-templates': '评审模板',
     '/ai-generation/testsuites': '测试套件',
-    '/ai-generation/executions': '执行记录',
+    '/ai-generation/executions': '测试计划',
     '/ai-generation/reports': '测试报告',
     
     // 接口测试
@@ -494,34 +511,36 @@ const breadcrumbTitle = computed(() => {
     '/api-testing/scheduled-tasks': '定时任务',
     '/api-testing/notification-logs': '通知列表',
     
-    // UI自动化测试
+    // UI测试
     '/ui-automation/dashboard': '数据看板',
     '/ui-automation/projects': '项目管理',
     '/ui-automation/elements-enhanced': '元素管理',
+    '/ui-automation/page-objects': '页面对象',
     '/ui-automation/test-cases': '用例管理',
     '/ui-automation/scripts-enhanced': '脚本生成',
     '/ui-automation/scripts': '脚本列表',
     '/ui-automation/suites': '套件管理',
     '/ui-automation/executions': '执行记录',
     '/ui-automation/reports': '测试报告',
+    '/ui-automation/devices': '设备管理',
+    '/ui-automation/debug-files': '调试文件',
     '/ui-automation/scheduled-tasks': '定时任务',
     '/ui-automation/notification-logs': '通知列表',
     
-    // AI 智能模式
-    '/ai-intelligent-mode/testing': 'AI 智能测试',
-    '/ai-intelligent-mode/cases': 'AI 用例管理',
-    '/ai-intelligent-mode/execution-records': 'AI 执行记录',
+    // 自然语言测试 (AI 智能模式升级)
+    '/natural-language-testing/web-testing': 'Web 智能测试',
+    '/natural-language-testing/app-testing': 'App 智能测试',
+    '/natural-language-testing/cases': '智能用例管理',
+    '/natural-language-testing/execution-records': '执行历史记录',
 
     // 配置中心
-    '/configuration/ai-model': 'AI用例生成模型配置',
+    '/configuration/ai-model': 'AI模型配置',
     '/configuration/ui-env': 'UI环境配置',
-    '/configuration/scheduled-task': '定时任务配置',
-    '/configuration/dify': 'AI评测师配置',
-    '/configuration/mcp': 'MCP配置',
+    '/configuration/cicd': 'CI/CD配置',
     '/configuration/database': '数据库配置',
-    '/configuration/midscene-config': 'Midscene配置',
-    '/configuration/cicd-config': 'CI/CD配置',
-    '/configuration/cicd-dashboard': 'CI/CD管理',
+    '/configuration/scheduled-tasks': '定时任务',
+    '/configuration/notifications': '通知列表',
+    '/configuration/dify': '工作流配置',
     
     // 数据工厂
     '/data-factory/dashboard': '数据看板',
@@ -541,10 +560,8 @@ const breadcrumbTitle = computed(() => {
     '/performance-test/executions': '执行管理',
     '/performance-test/scheduled-tasks': '定时任务',
     
-    // 自然语言Web测试
+    // 自然语言测试
     '/midscene/dashboard': '数据看板',
-    '/midscene/ai-testing': 'AI 智能测试',
-    '/midscene/test-execution': '自然语言测试执行',
     '/midscene/config': '配置管理',
     '/midscene/tasks': '任务管理',
     '/midscene/tasks/:id': '任务详情',
@@ -557,17 +574,11 @@ const breadcrumbTitle = computed(() => {
     '/strix-security/reports': '测试报告',
     '/strix-security/config': '配置管理',
     
-
+    // CI/CD管理
+    '/cicd/dashboard': 'CI/CD仪表盘',
+    
     // 知识图谱
     '/knowledge-graph': '知识图谱',
-    '/knowledge-graph/dashboard': '个人工作台',
-    '/knowledge-graph/notebook': '个人笔记',
-    '/knowledge-graph/idealab': '深度研究',
-    '/knowledge-graph/graph': '数据库可视化',
-    '/knowledge-graph/engine': 'RAG 管道',
-    '/knowledge-graph/sources': '知识库',
-    '/knowledge-graph/settings': '系统设置',
-    '/knowledge-graph/evaluator': 'AI 评测师',
     
     // WHartTest
     '/wharttest/dashboard': '数据看板',

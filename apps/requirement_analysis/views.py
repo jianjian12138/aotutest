@@ -21,7 +21,7 @@ from .serializers import (
     RequirementDocumentSerializer, RequirementAnalysisSerializer, 
     BusinessRequirementSerializer, GeneratedTestCaseSerializer, 
     AnalysisTaskSerializer, DocumentUploadSerializer,
-    TestCaseGenerationRequestSerializer, TestCaseReviewRequestSerializer,
+    TestCaseGenerationRequestSerializer, RequirementBasedTestCaseGenerationSerializer, TestCaseReviewRequestSerializer,
     AIModelConfigSerializer, PromptConfigSerializer, TestCaseGenerationTaskSerializer
 )
 from .services import RequirementAnalysisService, DocumentProcessor
@@ -329,7 +329,7 @@ class BusinessRequirementViewSet(viewsets.ReadOnlyModelViewSet):
     @action(detail=False, methods=['post'])
     def generate_test_cases(self, request):
         """为选中的需求生成测试用例"""
-        serializer = TestCaseGenerationRequestSerializer(data=request.data)
+        serializer = RequirementBasedTestCaseGenerationSerializer(data=request.data)
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         
@@ -338,6 +338,8 @@ class BusinessRequirementViewSet(viewsets.ReadOnlyModelViewSet):
             test_level = serializer.validated_data['test_level']
             test_priority = serializer.validated_data['test_priority']
             test_case_count = serializer.validated_data['test_case_count']
+            knowledge_base_ids = serializer.validated_data.get('knowledge_base_ids')
+            prompt_config_id = serializer.validated_data.get('prompt_config_id')
             
             # 生成唯一case_id的辅助函数
             def generate_unique_case_id(requirement, base_index):
@@ -356,36 +358,22 @@ class BusinessRequirementViewSet(viewsets.ReadOnlyModelViewSet):
             # 同步生成测试用例
             def run_generation():
                 try:
-                    # 获取需求数据
-                    requirements = BusinessRequirement.objects.filter(id__in=requirement_ids)
-                    generated_test_cases = []
+                    # 使用 Service 调用（支持 RAG 和 Prompt Config）
+                    import asyncio
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
                     
-                    for requirement in requirements:
-                        # 获取该需求现有测试用例的数量，作为起始索引
-                        existing_count = GeneratedTestCase.objects.filter(requirement=requirement).count()
-                        
-                        for i in range(test_case_count):
-                            # 生成唯一的case_id
-                            case_id = generate_unique_case_id(requirement, existing_count + i + 1)
-                            
-                            # 根据需求类型和序号生成不同的测试用例内容
-                            test_case_content = BusinessRequirementViewSet._generate_test_case_content(requirement, i + 1, test_level)
-                            
-                            # 创建测试用例
-                            test_case = GeneratedTestCase.objects.create(
-                                requirement=requirement,
-                                case_id=case_id,
-                                title=test_case_content['title'],
-                                priority=test_priority,
-                                precondition=test_case_content['precondition'],
-                                test_steps=test_case_content['test_steps'],
-                                expected_result=test_case_content['expected_result'],
-                                status='generated',
-                                generated_by_ai='AI-Generator-v1.0'
+                    try:
+                        generated_cases = loop.run_until_complete(
+                            RequirementAnalysisService.generate_test_cases_for_requirements(
+                                requirement_ids, test_level, test_priority, test_case_count,
+                                knowledge_base_ids=knowledge_base_ids,
+                                prompt_config_id=prompt_config_id
                             )
-                            generated_test_cases.append(test_case)
-                    
-                    return generated_test_cases
+                        )
+                        return generated_cases
+                    finally:
+                        loop.close()
                     
                 except Exception as e:
                     logger.error(f"生成测试用例失败: {e}")
@@ -1124,6 +1112,13 @@ class TestCaseGenerationTaskViewSet(viewsets.ModelViewSet):
                         status=status.HTTP_400_BAD_REQUEST
                     )
             
+            # 处理提示词配置
+            if validated_data.get('prompt_config_id'):
+                try:
+                    writer_prompt = PromptConfig.objects.get(id=validated_data['prompt_config_id'])
+                except PromptConfig.DoesNotExist:
+                    pass
+
             # 创建任务
             task_data = {
                 'title': validated_data['title'],
@@ -1134,6 +1129,24 @@ class TestCaseGenerationTaskViewSet(viewsets.ModelViewSet):
                 'reviewer_prompt_config': reviewer_prompt.id if reviewer_prompt else None,
             }
             
+            # 处理知识库文档上下文 (RAG)
+            knowledge_base_ids = validated_data.get('knowledge_base_ids')
+            if knowledge_base_ids:
+                try:
+                    from apps.assistant.models import KnowledgeDocument
+                    rag_context = "\n\n--- 关联知识库文档参考 ---\n"
+                    docs = KnowledgeDocument.objects.filter(id__in=knowledge_base_ids)
+                    for doc in docs:
+                        rag_context += f"\n[文档: {doc.title}]\n{doc.content[:2000]}...\n" # 限制每个文档长度
+                    
+                    rag_context += "\n--- 知识库文档结束 ---\n\n"
+                    
+                    # 将知识库上下文拼接到需求描述前
+                    task_data['requirement_text'] = rag_context + task_data['requirement_text']
+                    
+                except Exception as e:
+                    logger.error(f"处理知识库上下文失败: {e}")
+
             # 如果请求中包含项目ID，添加到任务数据中
             if 'project' in validated_data and validated_data['project']:
                 task_data['project'] = validated_data['project']

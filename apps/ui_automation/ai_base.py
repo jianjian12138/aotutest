@@ -42,130 +42,20 @@ try:
 except Exception as e:
     logger.warning(f"⚠️ Failed to modify ActionModel config: {e}")
 
-# Patch Agent.get_model_output 方法
-try:
-    from browser_use.agent.service import Agent
-    from browser_use.agent.message_manager.service import AgentOutput
-    import json as json_module
-
-    _original_get_model_output = Agent.get_model_output
-
-    async def _patched_get_model_output(self, input_messages):
-        """修补后的 get_model_output，直接从 response.content 解析 JSON"""
-        # logger.info("🔧 _patched_get_model_output called")
-
-        if hasattr(self, '_task_was_done') and self._task_was_done:
-            logger.info("🔧 Task was marked as done, stopping LLM interaction")
-            raise KeyboardInterrupt("Task finished")
-
-        kwargs = {'output_format': self.AgentOutput}
-
-        # Add retry logic for LLM invocation with timeout
-        max_retries = 2  # 重试次数为2次
-        last_exception = None
-        response = None
-        for attempt in range(max_retries):
-            try:
-                # 添加超时控制，设置为30秒
-                response = await asyncio.wait_for(
-                    self.llm.ainvoke(input_messages, **kwargs),
-                    timeout=30.0  # 超时时间30秒
-                )
-                break
-            except asyncio.TimeoutError as te:
-                last_exception = te
-                logger.warning(f"⚠️ LLM invocation timed out (attempt {attempt+1}/{max_retries}): {te}")
-                if attempt < max_retries - 1:
-                    await asyncio.sleep(0.5)  # 重试间隔0.5秒
-            except Exception as e:
-                last_exception = e
-                logger.warning(f"⚠️ LLM invocation failed (attempt {attempt+1}/{max_retries}): {e}")
-                if attempt < max_retries - 1:
-                    await asyncio.sleep(0.5)  # 重试间隔0.5秒
-        else:
-            logger.error(f"❌ LLM invocation failed after {max_retries} attempts.")
-            raise last_exception
-
-        # 检查响应是否为空或无效
-        if not response or not hasattr(response, 'content'):
-            error_msg = "LLM returned invalid response (no content attribute)"
-            logger.error(f"❌ {error_msg}")
-            raise ValueError(error_msg)
-
-        # 检查content是否为空字符串
-        content = response.content
-        if not content or not isinstance(content, str) or not content.strip():
-            error_msg = "LLM returned empty content - possible API error or timeout"
-            logger.error(f"❌ {error_msg}")
-            raise ValueError(error_msg)
-
-        try:
-            if hasattr(response, 'content') and isinstance(response.content, str):
-                content_dict = json_module.loads(response.content)
-                
-                # 规范化 action 字典
-                if 'action' in content_dict:
-                    normalized_actions = []
-                    for action_dict in content_dict['action']:
-                        normalized_action = {}
-                        for action_name, action_params in action_dict.items():
-                            # 自动修复: 将 int 参数转换为 index 字典
-                            if isinstance(action_params, int):
-                                normalized_action[action_name] = {'index': action_params}
-                            # 自动修复: switch_tab 的 tab_id 字符串参数
-                            elif action_name == 'switch_tab' and isinstance(action_params, str) and not isinstance(action_params, dict):
-                                normalized_action[action_name] = {'tab_id': action_params}
-                            elif isinstance(action_params, dict):
-                                normalized_params = {}
-                                for k, v in action_params.items():
-                                    if k == 'element_index':
-                                        normalized_params['index'] = v
-                                    else:
-                                        normalized_params[k] = v
-                                normalized_action[action_name] = normalized_params
-                            else:
-                                normalized_action[action_name] = action_params
-                        normalized_actions.append(normalized_action)
-                    content_dict['action'] = normalized_actions
-                
-                parsed = AgentOutput.model_construct(
-                    thinking=content_dict.get('thinking'),
-                    evaluation_previous_goal=content_dict.get('evaluation_previous_goal'),
-                    memory=content_dict.get('memory'),
-                    next_goal=content_dict.get('next_goal'),
-                    action=[]
-                )
-                
-                class _ActionWrapper:
-                    def __init__(self, action_dict):
-                        self._action_dict = action_dict
-                    def model_dump(self, **kwargs):
-                        return self._action_dict
-                    def get_index(self):
-                        for action_params in self._action_dict.values():
-                            if isinstance(action_params, dict) and 'index' in action_params:
-                                return action_params['index']
-                        return None
-
-                action_list = []
-                for action_dict in content_dict.get('action', []):
-                    action_list.append(_ActionWrapper(action_dict))
-                
-                object.__setattr__(parsed, 'action', action_list)
-                
-                if len(parsed.action) > self.settings.max_actions_per_step:
-                    parsed.action = parsed.action[:self.settings.max_actions_per_step]
-
-                return parsed
-        except Exception as e:
-            # If our complex normalization fails, fall back to the original method
-            logger.warning(f"⚠️ Custom output normalization failed, falling back: {e}")
-            return await _original_get_model_output(self, input_messages)
-    
-    Agent.get_model_output = _patched_get_model_output
-    logger.info("✅ Successfully patched Agent.get_model_output")
-except Exception as e:
-    logger.error(f"❌ Failed to patch Agent.get_model_output: {e}")
+# Patch Agent.get_model_output 方法 - 已禁用，使用 browser-use 原生逻辑
+# try:
+#     from browser_use.agent.service import Agent
+#     from browser_use.agent.message_manager.service import AgentOutput
+#     import json as json_module
+#
+#     _original_get_model_output = Agent.get_model_output
+#     
+#     # ... (此处省略被注释的代码)
+#     
+#     # Agent.get_model_output = _patched_get_model_output
+#     logger.info("ℹ️ Using native Agent.get_model_output")
+# except Exception as e:
+#     logger.error(f"❌ Failed to patch Agent.get_model_output: {e}")
 
 # Patch TokenCost
 try:
@@ -242,22 +132,57 @@ try:
             import json as json_module
             clean_content = result.content.strip() if hasattr(result, 'content') else str(result).strip()
             
+            # DEBUG LOGGING
+            if len(clean_content) > 500:
+                logger.warning(f"🔍 Raw LLM Output (first 500 chars): {clean_content[:500]}...")
+            else:
+                logger.warning(f"🔍 Raw LLM Output: {clean_content}")
+
             # Remove Markdown
             if '```' in clean_content:
-                match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', clean_content, re.DOTALL)
-                if match: clean_content = match.group(1).strip()
-                else: clean_content = re.sub(r'```[a-z]*', '', clean_content).replace('```', '').strip()
+                # 尝试更鲁棒的正则匹配
+                match = re.search(r'```(?:json)?\s*(\{[\s\S]*\})\s*```', clean_content)
+                if match: 
+                    clean_content = match.group(1).strip()
+                else:
+                    clean_content = re.sub(r'```[a-z]*', '', clean_content).replace('```', '').strip()
+
+            # DEBUG LOGGING TO FILE
+            try:
+                with open(r'd:\TEST\llm_debug.txt', 'a', encoding='utf-8') as f:
+                    from datetime import datetime
+                    f.write(f"\n\n--- LLM RESPONSE ({datetime.now()}) ---\n")
+                    f.write(clean_content)
+                    f.write("\n-----------------------------------\n")
+            except: pass
 
             parsed_data = None
             try:
                 parsed_data = json_module.loads(clean_content)
             except:
                 try:
-                    match = re.search(r'(\{.*\})', clean_content, re.DOTALL)
+                    # 尝试查找最外层 JSON 对象 (贪婪匹配)
+                    match = re.search(r'(\{[\s\S]*\})', clean_content)
                     if match: parsed_data = json_module.loads(match.group(1))
                 except:
                     pass
             
+            # Fallback for parsing failure
+            if not parsed_data:
+                logger.error("❌ Failed to parse LLM response as JSON")
+                # Create a fake 'thinking' action to show the error in UI
+                parsed_data = {
+                    "thinking": f"Failed to parse JSON. Raw output: {clean_content[:200]}...",
+                    "action": []
+                }
+            
+            # 关键修复: 处理 action 为单个字典的情况 (LLM 常见错误)
+            if 'action' in parsed_data:
+                if isinstance(parsed_data['action'], dict):
+                    parsed_data['action'] = [parsed_data['action']]
+                elif parsed_data['action'] is None:
+                    parsed_data['action'] = []
+
             # Wrapper classes
             class _ActionWrapper:
                 def __init__(self, action_dict):
@@ -313,9 +238,9 @@ try:
                     logger.error(f"🔧 Failed to create AgentOutput: {e}")
 
             class _ResponseWrapper:
-                def __init__(self, orig, completion_obj):
+                def __init__(self, orig, completion_obj, clean_content=None):
                     self._orig = orig
-                    self.content = getattr(orig, 'content', '')
+                    self.content = clean_content if clean_content is not None else getattr(orig, 'content', '')
                     self.response_metadata = getattr(orig, 'response_metadata', {})
                     self.completion = completion_obj
                     usage = getattr(orig, 'usage', None) or (orig.response_metadata.get('token_usage') if hasattr(orig, 'response_metadata') else None)
@@ -328,7 +253,7 @@ try:
                     self.usage = usage
                 def __getattr__(self, name): return getattr(self._orig, name)
 
-            wrapped = _ResponseWrapper(result, agent_output)
+            wrapped = _ResponseWrapper(result, agent_output, clean_content=clean_content)
             if hasattr(wrapped, 'usage') and wrapped.usage:
                 try: _token_service.add_usage(llm.model, wrapped.usage)
                 except: pass
@@ -571,21 +496,85 @@ class RawResponseLogger(BaseCallbackHandler):
 # PART 3: Base Browser Agent
 # ============================================================================
 
-from browser_use import Agent, Controller
-from browser_use.browser.profile import BrowserProfile
+try:
+    from browser_use import Agent, Controller
+    from browser_use.browser.profile import BrowserProfile
+except ImportError:
+    # Define placeholder classes if browser_use is not installed
+    # This prevents ModuleNotFoundError when importing BaseBrowserAgent for mobile tests
+    class Agent:
+        def __init__(self, *args, **kwargs):
+            pass
+        async def run(self, *args, **kwargs):
+            import sys
+            py_version = f"{sys.version_info.major}.{sys.version_info.minor}"
+            
+            if sys.version_info < (3, 11):
+                error_msg = (
+                    f"❌ Python {py_version} detected. 'browser-use' requires Python 3.11+.\n"
+                    "Please upgrade Python to use Web AI Testing features.\n"
+                    "Download: https://www.python.org/downloads/"
+                )
+            else:
+                error_msg = (
+                    "❌ 'browser-use' dependency is missing.\n"
+                    "Please install it: pip install browser-use playwright\n"
+                    "Then run: playwright install"
+                )
+            
+            logger.error(error_msg)
+            
+            # Try to send error to UI via callback
+            callback = kwargs.get('on_step_end') or kwargs.get('callback')
+            if callback:
+                try:
+                    if asyncio.iscoroutinefunction(callback):
+                        await callback({'type': 'log', 'content': f"\n{error_msg}\n"})
+                    else:
+                        callback({'type': 'log', 'content': f"\n{error_msg}\n"})
+                except:
+                    pass
+                    
+            # Return a structure that resembles history but indicates failure
+            class FakeHistory:
+                def __init__(self):
+                    self.steps = []
+            return FakeHistory()
+
+    class Controller:
+        def action(self, *args, **kwargs):
+            def decorator(func):
+                return func
+            return decorator
+
+    class BrowserProfile:
+        def __init__(self, *args, **kwargs):
+            pass
+    import logging
+    logger = logging.getLogger('django')
+    logger.warning("⚠️ 'browser_use' module not found. Web AI features will not work.")
 
 class BaseBrowserAgent:
-    def __init__(self, execution_mode='text', enable_gif=True, case_name=None):
+    def __init__(self, execution_mode='text', enable_gif=True, case_name=None, model_config_id=None, browser_type='chrome'):
         self.execution_mode = 'text'
         self.enable_gif = enable_gif  # GIF录制开关
         self.case_name = case_name or "Adhoc Task"  # 用例名称
+        self.browser_type = browser_type
         
         # Load Config from DB
         from apps.requirement_analysis.models import AIModelConfig
         
-        # Select Config (always use text mode config)
-        role_name = 'browser_use_text'
-        config_obj = AIModelConfig.objects.filter(role=role_name, is_active=True).first()
+        config_obj = None
+        if model_config_id:
+            try:
+                config_obj = AIModelConfig.objects.get(id=model_config_id)
+            except AIModelConfig.DoesNotExist:
+                logger.warning(f"Provided model_config_id {model_config_id} not found")
+        
+        if not config_obj:
+            # Fallback to default
+            role_name = 'browser_use_text'
+            config_obj = AIModelConfig.objects.filter(role=role_name, is_active=True).first()
         
         model_config = {}
         if config_obj:
@@ -624,19 +613,32 @@ class BaseBrowserAgent:
             
     def _format_action(self, action):
         try:
+            # 尝试多种方式获取字典
             action_dict = {}
-            if hasattr(action, 'model_dump'): action_dict = action.model_dump()
-            elif hasattr(action, '_action_dict'): action_dict = action._action_dict
-            elif hasattr(action, '_dict'): action_dict = action._dict
-            elif isinstance(action, dict): action_dict = action
-            else: return str(action)
+            if hasattr(action, 'model_dump'): 
+                # Pydantic v2
+                action_dict = action.model_dump(exclude_none=True)
+            elif hasattr(action, 'dict'): 
+                # Pydantic v1
+                action_dict = action.dict(exclude_none=True)
+            elif hasattr(action, '_action_dict'): 
+                action_dict = action._action_dict
+            elif hasattr(action, '_dict'): 
+                action_dict = action._dict
+            elif isinstance(action, dict): 
+                action_dict = action
+            else: 
+                return str(action)
 
             if not action_dict: return "待机"
 
             descriptions = []
             for name, params in action_dict.items():
-                if not params and name not in ['scroll_down', 'scroll_up', 'done']: continue
+                if params is None and name not in ['scroll_down', 'scroll_up', 'done']: continue
                 
+                # 兼容 params 为空字典的情况
+                if isinstance(params, dict) and not params and name not in ['scroll_down', 'scroll_up', 'done']: continue
+
                 if name in ['go_to_url', 'navigate']:
                     url = params.get('url') if isinstance(params, dict) else params
                     descriptions.append(f"访问: {url}")
@@ -653,43 +655,103 @@ class BaseBrowserAgent:
                     url = params.get('url', params)
                     descriptions.append(f"新标签打开: {url}")
                 elif name == 'done':
-                    descriptions.append("任务完成")
+                    text = params.get('text') if isinstance(params, dict) else ""
+                    descriptions.append(f"任务完成: {text}")
+                elif name == 'mark_task_complete':
+                    task_id = params.get('task_id') if isinstance(params, dict) else params
+                    descriptions.append(f"标记完成: 任务{task_id}")
                 else:
-                    descriptions.append(f"{name}")
+                    # 格式化其他操作
+                    param_str = ""
+                    if isinstance(params, dict):
+                        param_str = ", ".join([f"{k}={v}" for k, v in params.items()])
+                    elif params:
+                        param_str = str(params)
+                    
+                    if param_str:
+                        descriptions.append(f"{name}({param_str})")
+                    else:
+                        descriptions.append(f"{name}")
+            
+            if not descriptions:
+                return "操作(解析为空)"
+                
             return " | ".join(descriptions)
-        except:
-            return "执行操作"
+        except Exception as e:
+            logger.error(f"Error formatting action: {e}")
+            return f"执行操作(格式化错误)"
 
     async def analyze_task(self, task_description: str):
+        steps = []
         try:
-            prompt = f"Break down this task into steps: {task_description}. Return JSON list of strings."
+            # 1. 尝试使用 LLM 进行智能拆解
+            prompt = (
+                f"Break down this test task into sequential executable steps.\n"
+                f"Task: {task_description}\n"
+                f"Output: A raw JSON list of strings. No markdown, no code blocks. Just the JSON array.\n"
+                f"Example: [\"Open https://example.com\", \"Click 'Login'\", \"Enter username\"]\n"
+                f"Note: If the input already has numbered steps (like '1. xxx 2. xxx'), preserve them as separate items."
+            )
             response = await self.llm.ainvoke(prompt)
             content = response.content.strip() if hasattr(response, 'content') else str(response)
             
-            steps = []
+            # 清理 Markdown
+            content = re.sub(r'^```json\s*', '', content)
+            content = re.sub(r'^```\s*', '', content)
+            content = re.sub(r'\s*```$', '', content)
+            
             try:
                 import json
-                match = re.search(r'(\[.*\])', content, re.DOTALL)
-                if match: steps = json.loads(match.group(1))
-            except: pass
+                # 尝试查找 JSON 数组
+                match = re.search(r'\[.*\]', content, re.DOTALL)
+                if match:
+                    steps = json.loads(match.group(0))
+            except Exception as e:
+                logger.warning(f"Failed to parse LLM steps: {e}")
+        except Exception as e:
+            logger.warning(f"LLM analysis failed: {e}")
             
-            if not steps:
-                steps = [s.strip() for s in task_description.split('\n') if s.strip()]
+        # 2. 如果 LLM 失败或只返回了 1 个步骤（可能是解析错了），尝试基于文本特征的启发式拆解
+        if not steps or len(steps) <= 1:
+            raw_steps = steps[0] if steps else task_description
             
-            # 彻底清理生成的步骤描述中的重复编号
-            cleaned_steps = []
-            for s in steps:
-                desc = s
-                while True:
-                    match = re.match(r'^\s*\d+[\.\s、:]+(.*)', desc)
-                    if not match: break
-                    desc = match.group(1).strip()
-                if desc:
-                    cleaned_steps.append(desc)
-                
-            return [{'id': i+1, 'description': s, 'status': 'pending'} for i, s in enumerate(cleaned_steps)]
-        except:
-            return [{'id': 1, 'description': task_description, 'status': 'pending'}]
+            # 尝试按换行符分割
+            lines = [s.strip() for s in raw_steps.split('\n') if s.strip()]
+            
+            # 如果按换行符分割后仍只有 1 行，尝试按数字编号分割
+            if len(lines) <= 1:
+                text = lines[0] if lines else task_description
+                # 匹配 "1. ", "2. ", "3. " 或 "1、", "2、" 等
+                # 使用正向预查 split
+                import re as regex_module
+                # 正则解释：匹配 (行首或空白) + 数字 + (点/顿号/冒号)
+                parts = regex_module.split(r'(?:^|\s+)\d+[.、:：]\s*', text)
+                lines = [p.strip() for p in parts if p.strip()]
+            
+            if len(lines) > 0:
+                steps = lines
+            
+        # 兜底：如果还是空的，直接用原文本
+        if not steps:
+            steps = [task_description]
+            
+        # 彻底清理生成的步骤描述中的重复编号
+        cleaned_steps = []
+        for s in steps:
+            desc = s
+            # 移除开头可能的编号 (支持 1. 1、 1: 等)
+            while True:
+                match = re.match(r'^\s*\d+[\.\s、:：]+(.*)', desc)
+                if not match: break
+                desc = match.group(1).strip()
+            if desc:
+                cleaned_steps.append(desc)
+        
+        # 强制步骤拆分：确保步骤是列表格式
+        if isinstance(cleaned_steps, str):
+            cleaned_steps = [cleaned_steps]
+            
+        return [{'id': i+1, 'description': s, 'status': 'pending'} for i, s in enumerate(cleaned_steps)]
 
     def _create_browser_profile(self):
         # Default implementation, can be overridden
@@ -697,30 +759,59 @@ class BaseBrowserAgent:
         import platform
 
         system = platform.system()
-        if system == 'Windows':
-            paths = [
-                r"C:\Program Files\Google\Chrome\Application\chrome.exe",
-                r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
-                os.path.expanduser(r"~\AppData\Local\Google\Chrome\Application\chrome.exe")
-            ]
-            for p in paths:
-                if os.path.exists(p):
-                    chrome_path = p
-                    break
-        elif system == 'Linux':
-            # Linux 系统常见的 Chrome 路径
-            paths = [
-                '/usr/bin/google-chrome',
-                '/usr/bin/google-chrome-stable',
-                '/usr/bin/chromium-browser',
-                '/usr/bin/chromium',
-                '/opt/google/chrome/chrome',
-                '/snap/bin/chromium',
-            ]
-            for p in paths:
-                if os.path.exists(p):
-                    chrome_path = p
-                    break
+        
+        # 定义不同浏览器的路径查找逻辑
+        browser_paths = {
+            'chrome': {
+                'Windows': [
+                    r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+                    r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+                    os.path.expanduser(r"~\AppData\Local\Google\Chrome\Application\chrome.exe")
+                ],
+                'Linux': [
+                    '/usr/bin/google-chrome',
+                    '/usr/bin/google-chrome-stable',
+                    '/opt/google/chrome/chrome',
+                ],
+                'Darwin': [ # macOS
+                     '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+                ]
+            },
+            'edge': {
+                 'Windows': [
+                    r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
+                    r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
+                    os.path.expanduser(r"~\AppData\Local\Microsoft\Edge\Application\msedge.exe")
+                 ],
+                 'Linux': [
+                     '/usr/bin/microsoft-edge',
+                     '/usr/bin/microsoft-edge-stable'
+                 ],
+                 'Darwin': [
+                     '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge'
+                 ]
+            }
+        }
+        
+        # 默认回退到 Chromium
+        browser_paths['chromium'] = {
+            'Linux': ['/usr/bin/chromium', '/usr/bin/chromium-browser', '/snap/bin/chromium']
+        }
+
+        # 根据 browser_type 查找路径
+        target_browser = self.browser_type if self.browser_type in browser_paths else 'chrome'
+        paths = browser_paths.get(target_browser, {}).get(system, [])
+        
+        # 如果是 Linux 且没找到 Chrome，尝试 Chromium
+        if system == 'Linux' and target_browser == 'chrome' and not any(os.path.exists(p) for p in paths):
+             paths.extend(browser_paths['chromium']['Linux'])
+
+        for p in paths:
+            if os.path.exists(p):
+                chrome_path = p
+                break
+        
+        logger.info(f"Using browser: {target_browser}, path: {chrome_path}")
 
         # 基础性能优化参数
         extra_args = [
@@ -771,12 +862,30 @@ class BaseBrowserAgent:
         except RuntimeError:
             loop = None
             
+        # 强制发送一条测试日志
+        if callback:
+            init_msg = {'type': 'log', 'content': f"\n正在初始化浏览器... (Browser: {self.browser_type})\n"}
+            if asyncio.iscoroutinefunction(callback):
+                await callback(init_msg)
+            else:
+                callback(init_msg)
+
         controller = Controller()
         _task_was_done = False
+        
+        # Shared state for task tracking
+        state = {'last_marked_task_id': 0}
 
         @controller.action('Done')
         async def done(success: bool = True, text: str = ""):
             nonlocal _task_was_done
+            
+            # Smart check: If there are planned tasks, verify if all are marked complete
+            if planned_tasks and state['last_marked_task_id'] < len(planned_tasks):
+                pending_count = len(planned_tasks) - state['last_marked_task_id']
+                logger.warning(f"🚫 Agent tried to call Done() but {pending_count} tasks are pending. Rejecting.")
+                return f"⚠️ REJECTED: You have {pending_count} pending tasks to complete. You MUST execute task {state['last_marked_task_id'] + 1} now. Do not call Done() until all tasks are marked complete."
+
             _task_was_done = True
             return f"Finished: {text}"
 
@@ -790,6 +899,11 @@ class BaseBrowserAgent:
                         await callback(data)
                     else:
                         callback(data)
+                    
+                    # Update state
+                    if int(task_id) > state['last_marked_task_id']:
+                        state['last_marked_task_id'] = int(task_id)
+                        
                 except Exception as e:
                     logger.warning(f"Failed to execute mark_task_complete callback: {e}")
             return f"Task {task_id} marked completed"
@@ -799,8 +913,9 @@ class BaseBrowserAgent:
         if planned_tasks:
             final_task += "\n\nIMPORTANT INSTRUCTION:\n"
             final_task += "You have a list of sub-tasks. Execute strictly in order.\n"
-            final_task += "CRITICAL: MUST call 'mark_task_complete(task_id=...)' IMMEDIATELY after verifying each sub-task completion. NEVER skip this step. For every action you take, there MUST be a corresponding mark_task_complete call.\n"
+            final_task += "CRITICAL: Call 'mark_task_complete(task_id=...)' when you confirm a sub-task is done.\n"
             final_task += "IMPORTANT: If a sub-task (like opening a URL) is already fulfilled by the initial state, YOU MUST mark it complete in your VERY FIRST STEP.\n"
+            final_task += "CRITICAL RULE: DO NOT STOP until ALL sub-tasks are marked as complete. You must execute them one by one.\n"
             final_task += "Sub-tasks (Execute in order):\n"
             cleaned_tasks = []
             for t in planned_tasks:
@@ -812,12 +927,15 @@ class BaseBrowserAgent:
                     desc = match.group(1).strip()
                 cleaned_tasks.append(f"{t['id']}. {desc}")
             final_task += "\n".join(cleaned_tasks)
+            
+            # 强制将 planned_tasks 注入到 System Message 或 Prompt 的开头，确保 Agent 无法忽略
+            final_task = f"GOAL: Execute the following {len(planned_tasks)} tasks one by one:\n" + "\n".join(cleaned_tasks) + "\n\n" + final_task
 
         # 极限效率版标记指令
         from datetime import datetime
         final_task += f"\n\nCURRENT TIME: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
         final_task += "\nCRITICAL PERFORMANCE & SYNC RULES:\n"
-        final_task += "1. ACTION-TASK MAPPING: For EVERY sub-task that requires an action (click, input, select), you MUST call 'mark_task_complete(task_id=...)' in the SAME STEP as that action. DO NOT skip any task ID. Example: After clicking a button for task 8, immediately call mark_task_complete(task_id=8). IF YOU PERFORM MULTIPLE ACTIONS IN ONE STEP, YOU MUST CALL mark_task_complete FOR EACH CORRESPONDING TASK.\n"
+        final_task += "1. ACTION-TASK MAPPING: Mark tasks as complete as you finish them. Don't forget.\n"
         final_task += "2. NO JAVASCRIPT IN INPUT: When a task asks for a timestamp, YOU MUST compute the final string yourself (e.g., 'V8.01734892400').\n"
         final_task += "   - DO NOT output 'Date.now()' or '{{...}}' strings. Use the CURRENT TIME provided above to estimate a timestamp.\n"
         final_task += "3. DROPDOWN & MODAL ISOLATION: If an action (clicking a button/dropdown) triggers a UI change (modal opens/dropdown expands), YOU MUST STOP and WAIT for the next step to see the new elements. DO NOT attempt to interact with newly appeared elements (like dropdown options) in the same step as the click that opened them.\n"
@@ -825,9 +943,10 @@ class BaseBrowserAgent:
         final_task += "5. RETRY LOGIC: If a previous 'save' or 'submit' failed (e.g., error toast), RE-VERIFY all fields. Re-select dropdowns and re-input text to ensure the form is complete. Often errors are caused by missing project selection.\n"
         final_task += "6. DO NOT REPEAT: If a task is complete, mark it and MOVE ON. Don't re-confirm unless the system requires it.\n"
         final_task += "7. VERIFICATION: Task 15/16 usually require checking the list. Ensure you are on the correct page and the new data is visible before marking complete.\n"
+        final_task += "8. PERSISTENCE: Continue executing until the entire list of sub-tasks is completed. Do not stop early.\n"
         
-        if 'qwen' in self.model_name.lower() or 'deepseek' in self.model_name.lower():
-            final_task += "8. EXTREMELY MINIMIZE output tokens for speed. Keep responses as short as possible while maintaining accuracy.\n"
+        if 'qwen' in self.model_name.lower() or 'deepseek' in self.model_name.lower() or 'glm' in self.model_name.lower():
+            final_task += "8. EXTREMELY MINIMIZE output tokens for speed. Keep responses as short as possible while maintaining accuracy. RETURN ONLY RAW JSON. NO MARKDOWN.\n"
 
         # 核心修复: 清理 task 长文本中的 URL，防止中文标点紧贴 URL 导致 browser-use 解析错误
         # 例如 "http://localhost:3000，" -> "http://localhost:3000 "
@@ -857,9 +976,11 @@ class BaseBrowserAgent:
 
         # Callback helper - 添加任务标记跟踪
         last_processed_step = 0
-        last_marked_task_id = 0  # 跟踪上一次标记的任务ID
+        # REMOVED: last_marked_task_id = 0  <-- Now using state['last_marked_task_id']
+        
         async def on_step_end(agent_instance):
-            nonlocal last_processed_step, last_marked_task_id
+            nonlocal last_processed_step
+            # Use state['last_marked_task_id'] instead of nonlocal
 
             if should_stop:
                 do_stop = await should_stop() if asyncio.iscoroutinefunction(should_stop) else should_stop()
@@ -889,22 +1010,38 @@ class BaseBrowserAgent:
                             if 'mark_task_complete' in action_dict:
                                 step_has_task_complete = True
                                 step_marked_task_id = action_dict['mark_task_complete'].get('task_id')
-                                last_marked_task_id = step_marked_task_id
+                                # Update shared state if valid
+                                if step_marked_task_id and int(step_marked_task_id) > state['last_marked_task_id']:
+                                    state['last_marked_task_id'] = int(step_marked_task_id)
                                 break
 
                         # 检查这一步是否有实际操作（非mark_task_complete的操作）
                         has_real_action = False
                         for action in actions:
-                            action_dict = action.model_dump() if hasattr(action, 'model_dump') else getattr(action, '_action_dict', {})
+                            action_dict = {}
+                            if hasattr(action, 'model_dump'):
+                                action_dict = action.model_dump(exclude_none=True)
+                            elif hasattr(action, '__dict__'):
+                                action_dict = action.__dict__
+                                
                             for key in action_dict.keys():
-                                if key not in ['mark_task_complete', 'done']:
+                                if key not in ['mark_task_complete', 'done', '_action_dict', '_dict']:
                                     has_real_action = True
                                     break
                             if has_real_action:
                                 break
 
                         action_str = " | ".join([self._format_action(a) for a in actions])
-                        log_content = f"\n[Step {i+1}]\n执行: {action_str}\n"
+                        
+                        # 获取 thinking
+                        thinking = ""
+                        if hasattr(step, 'model_output') and hasattr(step.model_output, 'thinking'):
+                            thinking = step.model_output.thinking
+                            
+                        log_content = f"\n[Step {i+1}]\n"
+                        if thinking:
+                            log_content += f"思考: {thinking}\n"
+                        log_content += f"执行: {action_str}\n"
 
                         if callback:
                             if asyncio.iscoroutinefunction(callback): await callback({'type': 'log', 'content': log_content})
@@ -914,31 +1051,53 @@ class BaseBrowserAgent:
                         # 且planned_tasks中下一个未标记的任务ID应该被标记
                         if has_real_action and not step_has_task_complete and planned_tasks:
                             # 找出下一个应该标记的任务ID
-                            next_expected_task_id = last_marked_task_id + 1
+                            next_expected_task_id = state['last_marked_task_id'] + 1
                             if next_expected_task_id <= len(planned_tasks):
                                 # 检查这个任务是否还没有被标记
                                 task_already_marked = False
-                                for task in planned_tasks:
-                                    if task['id'] == next_expected_task_id and task.get('status') == 'completed':
-                                        task_already_marked = True
-                                        break
-
-                                if not task_already_marked:
-                                    # 自动补充标记这个任务
-                                    logger.warning(f"⚠️ Auto-fixing: Step {i+1} had actions but no mark_task_complete. Auto-marking task {next_expected_task_id} as completed.")
-                                    data = {'task_id': int(next_expected_task_id), 'status': 'completed'}
-                                    if asyncio.iscoroutinefunction(callback):
-                                        await callback(data)
-                                    else:
-                                        callback(data)
-                                    last_marked_task_id = next_expected_task_id
+                                # 在回调之外我们无法直接访问任务状态，所以只能根据 last_marked_task_id 推断
+                                # 假设之前的任务都已经标记完成了
+                                
+                                # 自动补充标记这个任务
+                                logger.warning(f"⚠️ Auto-fixing: Step {i+1} had actions but no mark_task_complete. Auto-marking task {next_expected_task_id} as completed.")
+                                data = {'task_id': int(next_expected_task_id), 'status': 'completed'}
+                                if asyncio.iscoroutinefunction(callback):
+                                    await callback(data)
+                                else:
+                                    callback(data)
+                                state['last_marked_task_id'] = next_expected_task_id
+                        
+                        # 特殊修复：如果Agent在Thinking中说任务完成了，但没有调用mark_task_complete，强制标记所有剩余任务
+                        if thinking and any(w in thinking.lower() for w in ['complete', 'done', 'finished', 'success']) and not has_real_action:
+                             if planned_tasks and state['last_marked_task_id'] < len(planned_tasks):
+                                 logger.warning(f"⚠️ Auto-fixing: Agent thinks it's done. Marking remaining tasks as completed.")
+                                 for task_id in range(state['last_marked_task_id'] + 1, len(planned_tasks) + 1):
+                                     data = {'task_id': int(task_id), 'status': 'completed'}
+                                     if asyncio.iscoroutinefunction(callback):
+                                         await callback(data)
+                                     else:
+                                         callback(data)
+                                 state['last_marked_task_id'] = len(planned_tasks)
 
                     except Exception as e:
                         logger.warning(f"⚠️ Error in on_step_end processing: {e}")
                 last_processed_step = len(history)
 
+        # Monkey Patch agent.step to ensure callback is called
+        if hasattr(agent, 'step'):
+            _original_step = agent.step
+            async def _patched_step(*args, **kwargs):
+                result = await _original_step(*args, **kwargs)
+                try:
+                    await on_step_end(agent)
+                except Exception as e:
+                    logger.warning(f"Callback error in patched step: {e}")
+                return result
+            agent.step = _patched_step
+            logger.info("✅ Monkey patched agent.step for real-time logging")
+
         try:
-            # Try to pass callback
+            # Try to pass callback just in case
             import inspect
             sig = inspect.signature(agent.run)
             if 'on_step_end' in sig.parameters:
@@ -950,6 +1109,12 @@ class BaseBrowserAgent:
         except Exception as e:
             logger.error(f"Agent execution error: {e}")
             raise
+        finally:
+            # Ensure final logs are flushed
+            try:
+                await on_step_end(agent)
+            except:
+                pass
 
         # 在任务结束时检查不一致的任务状态
         history = getattr(agent, 'history', [])

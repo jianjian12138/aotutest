@@ -304,6 +304,14 @@ const navigateToExecutions = () => {
 </script>
 
 <style scoped>
+/* 页面特定样式 */
+.page-container {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-width: 100%; /* 新增：覆盖全局样式的 max-width: 1600px，确保铺满 */
+}
 .cicd-dashboard {
   padding: 20px;
   max-width: 1400px;

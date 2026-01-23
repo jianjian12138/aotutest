@@ -116,8 +116,8 @@ class DocumentUploadSerializer(serializers.ModelSerializer):
         return super().create(validated_data)
 
 
-class TestCaseGenerationRequestSerializer(serializers.Serializer):
-    """测试用例生成请求序列化器"""
+class RequirementBasedTestCaseGenerationSerializer(serializers.Serializer):
+    """基于需求的测试用例生成请求序列化器"""
     requirement_ids = serializers.ListField(
         child=serializers.IntegerField(),
         help_text="需求ID列表"
@@ -137,6 +137,15 @@ class TestCaseGenerationRequestSerializer(serializers.Serializer):
         max_value=50,
         default=10,
         help_text="生成测试用例数量"
+    )
+    knowledge_base_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        required=False,
+        help_text="关联知识库文档ID列表"
+    )
+    prompt_config_id = serializers.IntegerField(
+        required=False,
+        help_text="提示词配置ID"
     )
 
 
@@ -270,3 +279,12 @@ class TestCaseGenerationRequestSerializer(serializers.Serializer):
     use_writer_model = serializers.BooleanField(default=True, help_text="是否使用编写模型")
     use_reviewer_model = serializers.BooleanField(default=True, help_text="是否使用评审模型")
     project = serializers.IntegerField(required=False, allow_null=True, help_text="关联项目ID")
+    knowledge_base_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        required=False,
+        help_text="关联知识库文档ID列表"
+    )
+    prompt_config_id = serializers.IntegerField(
+        required=False,
+        help_text="提示词配置ID"
+    )

@@ -37,6 +37,7 @@ urlpatterns = [
     path('api/', include('apps.midscene.urls')),
     path('api/', include('apps.strix_security.urls')),
     path('api/cicd/', include('apps.cicd.urls')),
+    path('api/scheduler/', include('apps.scheduler.urls')),
 ]
 
 if settings.DEBUG:

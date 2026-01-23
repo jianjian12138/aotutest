@@ -78,8 +78,10 @@ vanna>=0.1.63
 # 性能测试 - Locust 集成
 locust>=2.28.0
 
-# Midscene.js AI 驱动的 UI 自动化
-# 注意：Midscene.js 可能需要通过 API 调用，无需直接安装 Python 包
-
-# 安全测试 - Strix 集成
-# 注意：Strix 可能需要通过 API 调用，无需直接安装 Python 包
+# 其它依赖 (Added for Py3.11 compatibility and missing deps)
+django-celery-results>=2.5.1
+chromadb>=0.4.0
+langchain>=0.1.0
+langchain-community>=0.0.10
+python-jenkins>=1.8.0
+langchain-text-splitters>=0.0.1

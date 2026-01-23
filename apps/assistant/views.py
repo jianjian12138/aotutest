@@ -298,13 +298,20 @@ class KnowledgeGraphViewSet(viewsets.ModelViewSet):
         doc = serializer.save(created_by=self.request.user)
         if doc.file:
             try:
-                doc.content = doc.file.read().decode('utf-8')
-                doc.save()
-            except:
+                # 确保读取文件内容并保存到 content 字段
+                doc.file.seek(0)
+                file_content = doc.file.read().decode('utf-8', errors='ignore')
+                doc.content = file_content
+                doc.save(update_fields=['content'])
+            except Exception as e:
+                print(f"Failed to read file content: {e}")
                 pass
         
         # 触发知识图谱处理
-        KnowledgeGraphService.process_document(doc.id)
+        try:
+            KnowledgeGraphService.process_document(doc.id)
+        except Exception as e:
+            print(f"Failed to process document in KG: {e}")
 
     @action(detail=False, methods=['get'])
     def graph_data(self, request):

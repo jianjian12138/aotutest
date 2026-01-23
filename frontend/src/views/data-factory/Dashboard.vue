@@ -1,5 +1,12 @@
 <template>
-  <div class="dashboard-container">
+  <div class="dashboard-container">   
+    <el-card shadow="hover" class="page-card">
+      <template #header>
+        <div class="card-header page-header" style="margin-bottom: 0;">
+          <h2 class="page-title">数据工厂数据看板</h2>
+        </div>
+      </template>
+    </el-card>
     <!-- 数据概览 -->
     <div class="stats-section">
       <el-row :gutter="20">
@@ -315,6 +322,13 @@ onMounted(() => {
 </script>
 
 <style scoped>
+/* 页面特定样式 */
+.page-container {
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  max-width: 100%; /* 新增：覆盖全局样式的 max-width: 1600px，确保铺满 */
+}
 .dashboard-container {
   width: 100%;
 }

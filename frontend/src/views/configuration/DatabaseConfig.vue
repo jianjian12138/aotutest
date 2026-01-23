@@ -1,17 +1,19 @@
 <template>
-  <div class="config-container">
-    <el-card shadow="hover" class="page-card">
-      <template #header>
-        <div class="card-header">
-          <h2 class="page-title">数据库配置 (Data Factory)</h2>
-          <el-button type="primary" @click="handleCreateConfig">
-            <el-icon><Plus /></el-icon>
-            新建配置
-          </el-button>
-        </div>
-      </template>
-      
-      <div class="content">
+  <div class="page-container">
+    <div class="page-header">
+      <h3 class="page-title">数据库配置</h3>
+      <div class="header-actions">
+        <el-button type="primary" @click="handleCreateConfig">
+          <el-icon><Plus /></el-icon>
+          新建配置
+        </el-button>
+      </div>
+    </div>
+
+    <div class="main-content">
+      <div class="card-container">
+        <p class="description-text">Data Factory 数据库连接配置</p>
+
         <!-- 搜索和筛选 -->
         <div class="search-filter">
           <el-input
@@ -41,7 +43,8 @@
         <el-table
           v-loading="loading"
           :data="filteredConfigs"
-          style="width: 100%"
+          style="width: 100%; flex: 1;"
+          height="100%"
           border
           stripe
           :default-sort="{ prop: 'name', order: 'ascending' }"
@@ -114,7 +117,7 @@
           />
         </div>
       </div>
-    </el-card>
+    </div>
   </div>
 
   <!-- 查看配置对话框 -->
@@ -469,35 +472,73 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.config-container {
-  width: 100%;
+.page-container {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  background-color: var(--el-bg-color-page);
+  max-width: 100%; /* 新增：覆盖全局样式的 max-width: 1600px，确保铺满 */
 }
 
-.page-card {
-  margin-bottom: 20px;
-}
-
-.card-header {
+.page-header {
+  flex-shrink: 0;
+  padding: 16px 24px;
+  background: #fff;
+  border-bottom: 1px solid var(--el-border-color-light);
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
 
 .page-title {
-  margin: 0;
-  font-size: 20px;
+  font-size: 24px;
   font-weight: 600;
+  color: var(--el-text-color-primary);
+  display: flex;
+  align-items: center;
+  margin: 0;
 }
 
-.content {
-  padding: 20px 0;
+.page-title::before {
+  content: '';
+  width: 4px;
+  height: 16px;
+  background-color: var(--el-color-primary);
+  margin-right: 8px;
+  border-radius: 2px;
+}
+
+.description-text {
+  margin-top: 0;
+  margin-bottom: 16px;
+  font-size: 13px;
+  color: var(--el-text-color-secondary);
+}
+
+.main-content {
+  flex: 1;
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.card-container {
+  flex: 1;
+  background: #fff;
+  border-radius: 4px;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  overflow: hidden;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
 }
 
 .search-filter {
-  display: flex;
-  gap: 16px;
   margin-bottom: 20px;
-  align-items: center;
+  display: flex;
+  gap: 15px;
 }
 
 .search-input {
@@ -505,12 +546,16 @@ onMounted(() => {
 }
 
 .filter-select {
-  width: 180px;
+  width: 150px;
 }
 
 .pagination-container {
+  margin-top: 20px;
   display: flex;
   justify-content: flex-end;
-  margin-top: 20px;
+}
+
+.view-dialog-content {
+  padding: 10px;
 }
 </style>

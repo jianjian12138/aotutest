@@ -229,10 +229,45 @@ class AIService:
         }
     
     @staticmethod
-    async def generate_test_cases(requirement: BusinessRequirement, test_level: str, test_priority: str, count: int) -> List[Dict[str, Any]]:
+    async def generate_test_cases(requirement: BusinessRequirement, test_level: str, test_priority: str, count: int, knowledge_base_ids: List[int] = None, prompt_config_id: int = None) -> List[Dict[str, Any]]:
         """生成测试用例 - 大模型A"""
         # 模拟AI生成过程
         await asyncio.sleep(1)
+        
+        # 1. 准备 RAG 上下文
+        context = ""
+        if knowledge_base_ids:
+            from apps.assistant.models import KnowledgeDocument
+            try:
+                # 简单实现：获取文档的前 2000 个字符作为上下文
+                docs = KnowledgeDocument.objects.filter(id__in=knowledge_base_ids)
+                for doc in docs:
+                    context += f"\n--- 参考文档: {doc.title} ---\n{doc.content[:2000]}...\n"
+                logger.info(f"已加载 {len(docs)} 个知识库文档作为上下文")
+            except Exception as e:
+                logger.error(f"加载知识库文档失败: {e}")
+
+        # 2. 准备提示词模板
+        prompt_template = ""
+        if prompt_config_id:
+            from apps.requirement_analysis.models import PromptConfig
+            try:
+                prompt_config = PromptConfig.objects.get(id=prompt_config_id)
+                prompt_template = prompt_config.content
+                logger.info(f"使用提示词配置: {prompt_config.name}")
+            except Exception as e:
+                logger.error(f"加载提示词配置失败: {e}")
+        
+        # 模拟构建最终 Prompt (实际场景中会发给 LLM)
+        full_prompt = f"""
+        基于以下需求生成测试用例:
+        需求名称: {requirement.requirement_name}
+        需求描述: {requirement.description}
+        
+        {context}
+        
+        {prompt_template if prompt_template else "请生成覆盖正常、异常和边界场景的测试用例。"}
+        """
         
         # 生成唯一case_id的辅助函数
         def generate_unique_case_id(req, base_index):
@@ -258,11 +293,16 @@ class AIService:
         for i in range(count):
             case_id = generate_unique_case_id(requirement, existing_count + i + 1)
             
+            # 增强模拟生成逻辑：如果使用了知识库，在用例中体现
+            rag_note = ""
+            if knowledge_base_ids:
+                rag_note = " [基于知识库增强]"
+            
             # 根据需求类型生成不同的测试用例
             if "登录" in requirement.requirement_name:
                 test_cases.append({
                     "case_id": case_id,
-                    "title": f"验证用户使用有效凭证登录系统的认证流程和权限获取",
+                    "title": f"验证用户使用有效凭证登录系统的认证流程和权限获取{rag_note}",
                     "priority": test_priority,
                     "precondition": "系统正常运行，测试用户账号已创建",
                     "test_steps": "1. 打开登录页面\n2. 输入有效的用户名和密码\n3. 点击登录按钮\n4. 检查登录结果和页面跳转",
@@ -271,7 +311,7 @@ class AIService:
             elif "数据" in requirement.requirement_name:
                 test_cases.append({
                     "case_id": case_id,
-                    "title": f"测试数据录入功能在各种输入场景下的验证机制和保存结果",
+                    "title": f"测试数据录入功能在各种输入场景下的验证机制和保存结果{rag_note}",
                     "priority": test_priority,
                     "precondition": "系统正常运行，用户已登录具备数据操作权限",
                     "test_steps": "1. 进入数据录入页面\n2. 填写必填字段信息\n3. 提交数据\n4. 验证数据保存结果",
@@ -280,7 +320,7 @@ class AIService:
             elif "报告" in requirement.requirement_name:
                 test_cases.append({
                     "case_id": case_id,
-                    "title": f"验证报告生成功能在不同格式和数据量下的处理能力和输出质量",
+                    "title": f"验证报告生成功能在不同格式和数据量下的处理能力和输出质量{rag_note}",
                     "priority": test_priority, 
                     "precondition": "系统正常运行，存在可用于生成报告的数据",
                     "test_steps": "1. 进入报告生成页面\n2. 选择报告类型和参数\n3. 点击生成报告\n4. 检查生成的报告内容和格式",
@@ -289,7 +329,7 @@ class AIService:
             else:
                 test_cases.append({
                     "case_id": case_id,
-                    "title": f"验证{requirement.requirement_name}功能的基本操作流程和预期结果",
+                    "title": f"验证{requirement.requirement_name}功能的基本操作流程和预期结果{rag_note}",
                     "priority": test_priority,
                     "precondition": "系统正常运行，用户已登录",
                     "test_steps": f"1. 访问{requirement.requirement_name}功能\n2. 执行主要操作步骤\n3. 验证操作结果",
@@ -427,7 +467,7 @@ class RequirementAnalysisService:
             raise e
     
     @classmethod
-    async def generate_test_cases_for_requirements(cls, requirement_ids: List[int], test_level: str, test_priority: str, test_case_count: int) -> List[GeneratedTestCase]:
+    async def generate_test_cases_for_requirements(cls, requirement_ids: List[int], test_level: str, test_priority: str, test_case_count: int, knowledge_base_ids: List[int] = None, prompt_config_id: int = None) -> List[GeneratedTestCase]:
         """为需求生成测试用例"""
         generated_cases = []
         
@@ -437,7 +477,9 @@ class RequirementAnalysisService:
                 
                 # 调用AI生成测试用例
                 test_cases_data = await AIService.generate_test_cases(
-                    requirement, test_level, test_priority, test_case_count
+                    requirement, test_level, test_priority, test_case_count,
+                    knowledge_base_ids=knowledge_base_ids,
+                    prompt_config_id=prompt_config_id
                 )
                 
                 # 保存生成的测试用例

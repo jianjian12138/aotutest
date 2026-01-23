@@ -1,62 +1,69 @@
 <template>
-  <div class="request-history">
-    <div class="header">
-      <h3>请求历史</h3>
-      <div class="filters">
-        <el-input
-          v-model="searchText"
-          placeholder="搜索请求"
-          style="width: 200px"
-          clearable
-          @input="loadHistory"
-        />
-        <el-button 
-          type="danger" 
-          :disabled="selectedIds.length === 0"
-          @click="handleBatchDelete"
-        >
-          批量删除
-        </el-button>
-        <el-button @click="clearHistory" type="danger" plain>
-          清空历史
-        </el-button>
+  <div class="page-container">
+    <div class="page-header">
+      <h3 class="page-title">请求历史</h3>
+    </div>
+    
+    <div class="main-content">
+      <div class="card-container">
+        <div class="filters">           
+          <el-input
+            v-model="searchText"
+            placeholder="搜索请求"
+            style="width: 200px"
+            clearable
+            @input="loadHistory"
+          />
+          <el-button 
+            type="danger" 
+            :disabled="selectedIds.length === 0"
+            @click="handleBatchDelete"
+          >
+            批量删除
+          </el-button>
+          <el-button @click="clearHistory" type="danger" plain>
+            清空历史
+          </el-button>
+        </div>
+
+        <el-tabs v-model="activeTab" @tab-change="onTabChange" class="history-tabs">
+          <el-tab-pane label="HTTP请求" name="HTTP">
+            <HistoryTable 
+              :data="httpHistory" 
+              :loading="loading"
+              @view-detail="viewDetail"
+              @retry-request="retryRequest"
+              @selection-change="handleSelectionChange"
+              @delete-item="handleDelete"
+            />
+          </el-tab-pane>
+          <el-tab-pane label="WebSocket请求" name="WEBSOCKET">
+            <HistoryTable 
+              :data="websocketHistory" 
+              :loading="loading"
+              @view-detail="viewDetail"
+              @retry-request="retryRequest"
+              @selection-change="handleSelectionChange"
+              @delete-item="handleDelete"
+            />
+          </el-tab-pane>
+        </el-tabs>
+
+        <!-- 分页 -->
+        <div class="pagination-container">
+          <el-pagination
+            v-model:current-page="currentPage"
+            v-model:page-size="pageSize"
+            :page-sizes="[10, 20, 50, 100]"
+            :total="total"
+            layout="total, sizes, prev, pager, next, jumper"
+            @size-change="handleSizeChange"
+            @current-change="handleCurrentChange"
+            class="pagination"
+          />
+        </div>
       </div>
     </div>
-
-    <el-tabs v-model="activeTab" @tab-change="onTabChange">
-      <el-tab-pane label="HTTP请求" name="HTTP">
-        <HistoryTable 
-          :data="httpHistory" 
-          :loading="loading"
-          @view-detail="viewDetail"
-          @retry-request="retryRequest"
-          @selection-change="handleSelectionChange"
-          @delete-item="handleDelete"
-        />
-      </el-tab-pane>
-      <el-tab-pane label="WebSocket请求" name="WEBSOCKET">
-        <HistoryTable 
-          :data="websocketHistory" 
-          :loading="loading"
-          @view-detail="viewDetail"
-          @retry-request="retryRequest"
-          @selection-change="handleSelectionChange"
-          @delete-item="handleDelete"
-        />
-      </el-tab-pane>
-    </el-tabs>
-
-    <!-- 分页 -->
-    <el-pagination
-      v-model:current-page="currentPage"
-      v-model:page-size="pageSize"
-      :page-sizes="[10, 20, 50, 100]"
-      :total="total"
-      layout="total, sizes, prev, pager, next, jumper"
-      @size-change="handleSizeChange"
-      @current-change="handleCurrentChange"
-      class="pagination"
-    />
 
     <!-- 详情对话框 -->
     <el-dialog
@@ -385,35 +392,99 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.request-history {
-  padding: 20px;
-  height: 100%;
+/* 页面特定样式 */
+.page-container {
+  padding: 0;
   display: flex;
   flex-direction: column;
+  max-width: 100%; /* 新增：覆盖全局样式的 max-width: 1600px，确保铺满 */
 }
 
-.header {
+.page-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
+  padding: 15px 20px;
+  border-bottom: 1px solid #e6e6e6;
+  background: white;
+  flex-shrink: 0;
 }
 
-.header h3 {
+.page-title {
   margin: 0;
+  font-size: 24px;
+  font-weight: 600;
   color: #303133;
+  position: relative;
+  padding-left: 16px;
+}
+
+.page-title::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 20px;
+  background: var(--primary-color, #409eff);
+  border-radius: 2px;
+}
+
+.main-content {
+  flex: 1;
+  overflow: hidden;
+  padding: 0;
+  display: flex;
+}
+
+.card-container {
+  flex: 1;
+  width: 100%;
+  background-color: #fff;
+  padding: 20px;
+  box-shadow: 0 1px 4px rgba(0, 21, 41, 0.08);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .filters {
   display: flex;
   gap: 10px;
   align-items: center;
+  margin-bottom: 20px;
+  flex-shrink: 0;
 }
 
-.pagination {
+.history-tabs {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.history-tabs :deep(.el-tabs__header) {
+  margin: 0 0 15px 0;
+}
+
+.history-tabs :deep(.el-tabs__content) {
+  flex: 1;
+  overflow: hidden;
+  padding: 0;
+}
+
+.history-tabs :deep(.el-tab-pane) {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.pagination-container {
   margin-top: 20px;
   display: flex;
-  justify-content: center;
+  justify-content: flex-end;
+  flex-shrink: 0;
 }
 
 .history-detail {

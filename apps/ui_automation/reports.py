@@ -321,9 +321,17 @@ class AIExecutionReportGenerator:
 
         # 先从 steps_completed 中提取信息
         for step in steps_completed:
+            # 提取 action 描述
+            action_val = step.get('action', '')
+            action_desc = ''
+            if isinstance(action_val, dict):
+                action_desc = action_val.get('description') or action_val.get('type') or json.dumps(action_val, ensure_ascii=False)
+            else:
+                action_desc = str(action_val)
+
             detailed_steps.append({
                 'step_number': step.get('step_number', 0),
-                'action': step.get('action', ''),
+                'action': action_desc,
                 'element': step.get('element', ''),
                 'status': step.get('status', 'completed'),
                 'timestamp': step.get('timestamp', ''),
@@ -410,11 +418,21 @@ class AIExecutionReportGenerator:
         all_steps = []
         if steps_completed:
             for i, step in enumerate(steps_completed):
-                action_desc = step.get('action', '')
+                # 优先使用 description，其次是 action (如果它是字符串)，再次是 thinking
+                action_desc = step.get('description', '')
+                if not action_desc:
+                    action_val = step.get('action', '')
+                    if isinstance(action_val, dict):
+                        # 如果 action 是字典，尝试提取有意义的描述
+                        action_desc = action_val.get('description') or action_val.get('type') or str(action_val)
+                    else:
+                        action_desc = str(action_val)
+                
                 if not action_desc:
                     thinking = step.get('thinking', '')
                     element = step.get('element', '')
                     action_desc = f"{thinking} {element}".strip() or f"步骤 {i + 1}"
+                
                 all_steps.append({
                     'step_number': step.get('step_number', i + 1),
                     'action': action_desc

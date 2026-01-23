@@ -1,226 +1,230 @@
 <template>
-  <div class="notification-management">
-    <!-- 顶部标题 -->
-    <div class="header">
-      <h3>通知管理</h3>
+  <div class="page-container">
+    <div class="page-header">
+      <h3 class="page-title">通知列表</h3>
     </div>
 
-    <!-- Tab页 -->
-    <el-tabs v-model="activeTab" class="notification-tabs">
-      <!-- 通知列表Tab -->
-      <el-tab-pane label="通知列表" name="list">
-        <div class="tab-content">
-          <!-- 筛选条件 -->
-          <div class="filters">
-            <el-row :gutter="20">
-              <el-col :span="6">
-                <el-input
-                  v-model="filters.task_name"
-                  placeholder="搜索任务名称"
-                  clearable
-                />
-              </el-col>
-              <el-col :span="6">
-                <el-date-picker
-                  v-model="filters.date_range"
-                  type="daterange"
-                  range-separator="至"
-                  start-placeholder="开始日期"
-                  end-placeholder="结束日期"
-                  value-format="YYYY-MM-DD"
-                />
-              </el-col>
-              <el-col :span="6">
-                <el-button type="primary" @click="loadNotifications">
-                  <el-icon><Search /></el-icon>
-                  搜索
-                </el-button>
-                <el-button @click="resetFilters">
-                  <el-icon><Refresh /></el-icon>
-                  重置
-                </el-button>
-              </el-col>
-            </el-row>
-          </div>
-
-          <!-- 通知列表 -->
-          <el-table
-            :data="notifications"
-            v-loading="loading"
-            style="width: 100%"
-          >
-            <el-table-column prop="task_name" label="任务名称" min-width="120" />
-            <el-table-column prop="notify_time" label="通知时间" min-width="140">
-              <template #default="{ row }">
-                {{ formatDateTime(row.notify_time) }}
-              </template>
-            </el-table-column>
-            <el-table-column prop="recipients" label="收件人" min-width="120">
-              <template #default="{ row }">
-                <span v-if="row.notify_type === 'EMAIL'">
-                  {{ row.recipients.join(', ') }}
-                </span>
-                <span v-else-if="row.notify_type === 'WEBHOOK'">
-                  Webhook机器人
-                </span>
-              </template>
-            </el-table-column>
-            <el-table-column prop="status" label="状态" width="80">
-              <template #default="{ row }">
-                <el-tag :type="row.status === 'SUCCESS' ? 'success' : 'danger'">
-                  {{ row.status === 'SUCCESS' ? '成功' : '失败' }}
-                </el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column label="操作" width="100">
-              <template #default="{ row }">
-                <el-button
-                  type="primary"
-                  size="small"
-                  @click="showNotificationDetail(row)"
-                >
-                  查看详情
-                </el-button>
-              </template>
-            </el-table-column>
-          </el-table>
-
-          <!-- 分页 -->
-          <div class="pagination">
-            <el-pagination
-              v-model:current-page="pagination.current"
-              v-model:page-size="pagination.size"
-              :total="pagination.total"
-              :page-sizes="[10, 20, 50, 100]"
-              layout="total, sizes, prev, pager, next, jumper"
-              @size-change="loadNotifications"
-              @current-change="loadNotifications"
-            />
-          </div>
-        </div>
-      </el-tab-pane>
-
-      <!-- 通知配置Tab -->
-      <el-tab-pane label="通知配置" name="config">
-        <div class="tab-content">
-          <!-- 邮箱配置 -->
-          <div class="config-section">
-            <h4>邮箱配置</h4>
-            <el-card>
-              <div class="config-form">
-                <el-form :model="emailConfig" label-width="120px">
-                  <el-form-item label="发件人邮箱" required>
+    <div class="main-content">
+      <div class="card-container">
+        <!-- Tab页 -->
+        <el-tabs v-model="activeTab" class="notification-tabs">
+          <!-- 通知列表Tab -->
+          <el-tab-pane label="通知列表" name="list">
+            <div class="tab-content">
+              <!-- 筛选条件 -->
+              <div class="filters">
+                <el-row :gutter="20">
+                  <el-col :span="6">
                     <el-input
-                      v-model="emailConfig.sender_email"
-                      placeholder="请输入发件人邮箱"
+                      v-model="filters.task_name"
+                      placeholder="搜索任务名称"
+                      clearable
                     />
-                  </el-form-item>
-                  <el-form-item label="SMTP服务器" required>
-                    <el-input
-                      v-model="emailConfig.smtp_host"
-                      placeholder="例如：smtp.qq.com"
+                  </el-col>
+                  <el-col :span="6">
+                    <el-date-picker
+                      v-model="filters.date_range"
+                      type="daterange"
+                      range-separator="至"
+                      start-placeholder="开始日期"
+                      end-placeholder="结束日期"
+                      value-format="YYYY-MM-DD"
                     />
-                  </el-form-item>
-                  <el-form-item label="SMTP端口" required>
-                    <el-input-number
-                      v-model="emailConfig.smtp_port"
-                      :min="1"
-                      :max="65535"
-                    />
-                  </el-form-item>
-                  <el-form-item label="授权码" required>
-                    <el-input
-                      v-model="emailConfig.smtp_password"
-                      type="password"
-                      placeholder="请输入邮箱授权码"
-                    />
-                  </el-form-item>
-                  <el-form-item>
-                    <el-button type="primary" @click="saveEmailConfig">
-                      保存配置
+                  </el-col>
+                  <el-col :span="6">
+                    <el-button type="primary" @click="loadNotifications">
+                      <el-icon><Search /></el-icon>
+                      搜索
                     </el-button>
-                    <el-button @click="testEmailConfig">
-                      测试连接
+                    <el-button @click="resetFilters">
+                      <el-icon><Refresh /></el-icon>
+                      重置
                     </el-button>
-                  </el-form-item>
-                </el-form>
+                  </el-col>
+                </el-row>
               </div>
-            </el-card>
-          </div>
 
-          <!-- 收件人管理 -->
-          <div class="config-section">
-            <h4>收件人管理</h4>
-            <el-card>
-              <div class="recipient-header">
-                <el-button type="primary" @click="showAddRecipientDialog">
-                  <el-icon><Plus /></el-icon>
-                  新增收件人
-                </el-button>
-              </div>
-              <el-table :data="recipients" style="width: 100%">
-                <el-table-column prop="name" label="姓名" width="120" />
-                <el-table-column prop="email" label="邮箱地址" min-width="200" />
-                <el-table-column label="操作" width="120">
+              <!-- 通知列表 -->
+              <el-table
+                :data="notifications"
+                v-loading="loading"
+                style="width: 100%; flex: 1;"
+                height="100%"
+              >
+                <el-table-column prop="task_name" label="任务名称" min-width="120" />
+                <el-table-column prop="notify_time" label="通知时间" min-width="140">
                   <template #default="{ row }">
-                    <el-button
-                      type="danger"
-                      size="small"
-                      @click="deleteRecipient(row)"
-                    >
-                      删除
-                    </el-button>
+                    {{ formatDateTime(row.notify_time) }}
                   </template>
                 </el-table-column>
-              </el-table>
-            </el-card>
-          </div>
-
-          <!-- Webhook配置 -->
-          <div class="config-section">
-            <h4>Webhook机器人配置</h4>
-            <el-card>
-              <div class="webhook-header">
-                <el-button type="primary" @click="showAddWebhookDialog">
-                  <el-icon><Plus /></el-icon>
-                  新增Webhook
-                </el-button>
-              </div>
-              <el-table :data="webhooks" style="width: 100%">
-                <el-table-column prop="name" label="名称" width="120" />
-                <el-table-column prop="platform" label="平台" width="100">
+                <el-table-column prop="recipients" label="收件人" min-width="120">
                   <template #default="{ row }">
-                    <el-tag :type="getPlatformTagType(row.platform)">
-                      {{ getPlatformName(row.platform) }}
+                    <span v-if="row.notify_type === 'EMAIL'">
+                      {{ row.recipients.join(', ') }}
+                    </span>
+                    <span v-else-if="row.notify_type === 'WEBHOOK'">
+                      Webhook机器人
+                    </span>
+                  </template>
+                </el-table-column>
+                <el-table-column prop="status" label="状态" width="80">
+                  <template #default="{ row }">
+                    <el-tag :type="row.status === 'SUCCESS' ? 'success' : 'danger'">
+                      {{ row.status === 'SUCCESS' ? '成功' : '失败' }}
                     </el-tag>
                   </template>
                 </el-table-column>
-                <el-table-column prop="webhook_url" label="Webhook地址" min-width="200" />
-                <el-table-column prop="enabled" label="状态" width="80">
-                  <template #default="{ row }">
-                    <el-switch
-                      v-model="row.enabled"
-                      @change="toggleWebhookStatus(row)"
-                    />
-                  </template>
-                </el-table-column>
-                <el-table-column label="操作" width="120">
+                <el-table-column label="操作" width="100">
                   <template #default="{ row }">
                     <el-button
-                      type="danger"
+                      type="primary"
                       size="small"
-                      @click="deleteWebhook(row)"
+                      @click="showNotificationDetail(row)"
                     >
-                      删除
+                      查看详情
                     </el-button>
                   </template>
                 </el-table-column>
               </el-table>
-            </el-card>
-          </div>
-        </div>
-      </el-tab-pane>
-    </el-tabs>
+
+              <!-- 分页 -->
+              <div class="pagination">
+                <el-pagination
+                  v-model:current-page="pagination.current"
+                  v-model:page-size="pagination.size"
+                  :total="pagination.total"
+                  :page-sizes="[10, 20, 50, 100]"
+                  layout="total, sizes, prev, pager, next, jumper"
+                  @size-change="loadNotifications"
+                  @current-change="loadNotifications"
+                />
+              </div>
+            </div>
+          </el-tab-pane>
+
+          <!-- 通知配置Tab -->
+          <el-tab-pane label="通知配置" name="config">
+            <div class="tab-content scrollable-content">
+              <!-- 邮箱配置 -->
+              <div class="config-section">
+                <h4>邮箱配置</h4>
+                <el-card>
+                  <div class="config-form">
+                    <el-form :model="emailConfig" label-width="120px">
+                      <el-form-item label="发件人邮箱" required>
+                        <el-input
+                          v-model="emailConfig.sender_email"
+                          placeholder="请输入发件人邮箱"
+                        />
+                      </el-form-item>
+                      <el-form-item label="SMTP服务器" required>
+                        <el-input
+                          v-model="emailConfig.smtp_host"
+                          placeholder="例如：smtp.qq.com"
+                        />
+                      </el-form-item>
+                      <el-form-item label="SMTP端口" required>
+                        <el-input-number
+                          v-model="emailConfig.smtp_port"
+                          :min="1"
+                          :max="65535"
+                        />
+                      </el-form-item>
+                      <el-form-item label="授权码" required>
+                        <el-input
+                          v-model="emailConfig.smtp_password"
+                          type="password"
+                          placeholder="请输入邮箱授权码"
+                        />
+                      </el-form-item>
+                      <el-form-item>
+                        <el-button type="primary" @click="saveEmailConfig">
+                          保存配置
+                        </el-button>
+                        <el-button @click="testEmailConfig">
+                          测试连接
+                        </el-button>
+                      </el-form-item>
+                    </el-form>
+                  </div>
+                </el-card>
+              </div>
+
+              <!-- 收件人管理 -->
+              <div class="config-section">
+                <h4>收件人管理</h4>
+                <el-card>
+                  <div class="recipient-header">
+                    <el-button type="primary" @click="showAddRecipientDialog">
+                      <el-icon><Plus /></el-icon>
+                      新增收件人
+                    </el-button>
+                  </div>
+                  <el-table :data="recipients" style="width: 100%">
+                    <el-table-column prop="name" label="姓名" width="120" />
+                    <el-table-column prop="email" label="邮箱地址" min-width="200" />
+                    <el-table-column label="操作" width="120">
+                      <template #default="{ row }">
+                        <el-button
+                          type="danger"
+                          size="small"
+                          @click="deleteRecipient(row)"
+                        >
+                          删除
+                        </el-button>
+                      </template>
+                    </el-table-column>
+                  </el-table>
+                </el-card>
+              </div>
+
+              <!-- Webhook配置 -->
+              <div class="config-section">
+                <h4>Webhook机器人配置</h4>
+                <el-card>
+                  <div class="webhook-header">
+                    <el-button type="primary" @click="showAddWebhookDialog">
+                      <el-icon><Plus /></el-icon>
+                      新增Webhook
+                    </el-button>
+                  </div>
+                  <el-table :data="webhooks" style="width: 100%">
+                    <el-table-column prop="name" label="名称" width="120" />
+                    <el-table-column prop="platform" label="平台" width="100">
+                      <template #default="{ row }">
+                        <el-tag :type="getPlatformTagType(row.platform)">
+                          {{ getPlatformName(row.platform) }}
+                        </el-tag>
+                      </template>
+                    </el-table-column>
+                    <el-table-column prop="webhook_url" label="Webhook地址" min-width="200" />
+                    <el-table-column prop="enabled" label="状态" width="80">
+                      <template #default="{ row }">
+                        <el-switch
+                          v-model="row.enabled"
+                          @change="toggleWebhookStatus(row)"
+                        />
+                      </template>
+                    </el-table-column>
+                    <el-table-column label="操作" width="120">
+                      <template #default="{ row }">
+                        <el-button
+                          type="danger"
+                          size="small"
+                          @click="deleteWebhook(row)"
+                        >
+                          删除
+                        </el-button>
+                      </template>
+                    </el-table-column>
+                  </el-table>
+                </el-card>
+              </div>
+            </div>
+          </el-tab-pane>
+        </el-tabs>
+      </div>
+    </div>
 
     <!-- 通知详情对话框 -->
     <el-dialog
@@ -577,29 +581,100 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.notification-management {
-  padding: 20px;
-  background: #f5f7fa;
-  min-height: 100%;
+/* 页面特定样式 */
+.page-container {
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  max-width: 100%; /* 新增：覆盖全局样式的 max-width: 1600px，确保铺满 */
 }
 
-.header {
-  margin-bottom: 20px;
-}
-
-.header h3 {
-  margin: 0;
-  color: #303133;
-}
-
-.notification-tabs {
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 20px;
+  border-bottom: 1px solid #e6e6e6;
   background: white;
-  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.page-title {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+  color: #303133;
+  position: relative;
+  padding-left: 16px;
+}
+
+.page-title::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 20px;
+  background: var(--primary-color, #409eff);
+  border-radius: 2px;
+}
+
+.main-content {
+  flex: 1;
+  overflow: hidden;
+  padding: 0;
+  display: flex;
+}
+
+.card-container {
+  flex: 1;
+  width: 100%;
+  background-color: #fff;
+  padding: 20px;
+  box-shadow: 0 1px 4px rgba(0, 21, 41, 0.08);
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
 }
 
+.notification-tabs {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.notification-tabs :deep(.el-tabs__header) {
+  margin: 0;
+  padding: 0 20px;
+  border-bottom: 1px solid #e4e7ed;
+  background-color: #fff;
+}
+
+.notification-tabs :deep(.el-tabs__content) {
+  flex: 1;
+  overflow: hidden;
+  padding: 0;
+}
+
+.notification-tabs :deep(.el-tab-pane) {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
 .tab-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
   padding: 20px;
+  height: 100%;
+  overflow: hidden;
+}
+
+.scrollable-content {
+  overflow-y: auto;
 }
 
 .filters {
@@ -607,12 +682,14 @@ onMounted(() => {
   background: #f8f9fa;
   padding: 20px;
   border-radius: 8px;
+  flex-shrink: 0;
 }
 
 .pagination {
   margin-top: 20px;
   display: flex;
   justify-content: flex-end;
+  flex-shrink: 0;
 }
 
 .config-section {

@@ -18,5 +18,5 @@ router.register(r'integration-logs', WHartTestIntegrationLogViewSet, basename='w
 router.register(r'dashboard', WHartTestDashboardViewSet, basename='wharttest-dashboard')
 
 urlpatterns = [
-    path('', include(router.urls)),
+    path('wharttest/', include(router.urls)),
 ]

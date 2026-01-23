@@ -67,6 +67,7 @@
             <el-select v-model="scriptFramework" size="small" style="width: 120px; margin-left: 10px">
               <el-option label="Playwright" value="playwright" />
               <el-option label="Selenium" value="selenium" />
+              <el-option label="Airtest" value="airtest" />
             </el-select>
           </div>
           <div class="toolbar-right">
@@ -183,7 +184,8 @@ import {
   createTestScript,
   getElementTree,
   getElementGroupTree,
-  validateElementLocator
+  validateElementLocator,
+  formatTestScript
 } from '@/api/ui_automation'
 
 // 响应式数据
@@ -406,7 +408,7 @@ const generateScriptName = () => {
   const currentProject = projects.value.find(p => p.id === projectId.value)
   const projectName = currentProject?.name || 'Script'
   const language = scriptLanguage.value === 'javascript' ? 'JS' : 'Python'
-  const framework = scriptFramework.value === 'playwright' ? 'Playwright' : 'Selenium'
+  const framework = scriptFramework.value === 'playwright' ? 'Playwright' : (scriptFramework.value === 'selenium' ? 'Selenium' : 'Airtest')
   const date = new Date()
   const dateStr = `${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, '0')}${String(date.getDate()).padStart(2, '0')}`
 
@@ -473,7 +475,7 @@ const validateElement = async (element) => {
   }
 }
 
-const formatCode = () => {
+const formatCode = async () => {
   // 简单的代码格式化
   try {
     if (scriptLanguage.value === 'javascript') {
@@ -486,10 +488,22 @@ const formatCode = () => {
       scriptContent.value = formatted
       addLog('info', '代码格式化完成')
     } else {
-      addLog('info', '当前语言的格式化功能开发中...')
+      addLog('info', '正在格式化代码...')
+      const response = await formatTestScript({
+        code: scriptContent.value,
+        language: scriptLanguage.value
+      })
+      
+      const formattedCode = response.data?.code || response.code
+      if (formattedCode) {
+        scriptContent.value = formattedCode
+        addLog('info', '代码格式化完成')
+      }
     }
   } catch (error) {
-    addLog('error', '代码格式化失败')
+    console.error('代码格式化失败:', error)
+    addLog('error', '代码格式化失败: ' + (error.response?.data?.error || error.message))
+    ElMessage.error('代码格式化失败')
   }
 }
 
@@ -579,7 +593,7 @@ onMounted(async () => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 20px;
+  padding: 15px 20px;
   border-bottom: 1px solid #e6e6e6;
   background: white;
 }

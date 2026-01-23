@@ -10,16 +10,16 @@ export default defineConfig({
     },
   },
   server: {
-    port: 4545,
+    port: 5566,
     host: '0.0.0.0',
     proxy: {
       '^/api/': {
-        target: 'http://localhost:5566',
+        target: 'http://localhost:4545',
         changeOrigin: true,
         secure: false,
       },
       '^/media/': {
-        target: 'http://localhost:5566',
+        target: 'http://localhost:4545',
         changeOrigin: true,
         secure: false,
       },

@@ -1,47 +1,49 @@
 <template>
-  <div class="report-view">
-    <div class="header">
-      <h3>测试报告</h3>
-      <div class="actions">
+  <div class="page-container">
+    <div class="page-header">
+      <h3 class="page-title">测试报告</h3>
+      <div class="header-actions">
         <el-button type="primary" @click="refreshReports">刷新报告</el-button>
         <el-button @click="openAllureReport">查看Allure报告说明</el-button>
       </div>
     </div>
     
-    <div class="content">
-      <el-table :data="reports" v-loading="loading" style="width: 100%">
-        <el-table-column prop="id" label="ID" width="80" />
-        <el-table-column prop="test_suite_name" label="测试套件" min-width="200" />
-        <el-table-column prop="status" label="状态" width="120">
-          <template #default="scope">
-            <el-tag :type="getStatusType(scope.row.status)">
-              {{ getStatusText(scope.row.status) }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column prop="total_requests" label="总请求数" width="100" />
-        <el-table-column prop="passed_requests" label="通过数" width="100">
-          <template #default="scope">
-            <span style="color: #67c23a">{{ scope.row.passed_requests }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column prop="failed_requests" label="失败数" width="100">
-          <template #default="scope">
-            <span style="color: #f56c6c">{{ scope.row.failed_requests }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column prop="executed_by.username" label="执行者" width="120" />
-        <el-table-column prop="created_at" label="执行时间" width="180">
-          <template #default="scope">
-            {{ formatDate(scope.row.created_at) }}
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="150">
-          <template #default="scope">
-            <el-button link type="primary" @click="viewReportDetail(scope.row)">生成并查看报告</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
+    <div class="main-content">
+      <div class="card-container">
+        <el-table :data="reports" v-loading="loading" style="width: 100%; flex: 1;" height="100%">
+          <el-table-column prop="id" label="ID" width="80" />
+          <el-table-column prop="test_suite_name" label="测试套件" min-width="200" />
+          <el-table-column prop="status" label="状态" width="120">
+            <template #default="scope">
+              <el-tag :type="getStatusType(scope.row.status)">
+                {{ getStatusText(scope.row.status) }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="total_requests" label="总请求数" width="100" />
+          <el-table-column prop="passed_requests" label="通过数" width="100">
+            <template #default="scope">
+              <span style="color: #67c23a">{{ scope.row.passed_requests }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column prop="failed_requests" label="失败数" width="100">
+            <template #default="scope">
+              <span style="color: #f56c6c">{{ scope.row.failed_requests }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column prop="executed_by.username" label="执行者" width="120" />
+          <el-table-column prop="created_at" label="执行时间" width="180">
+            <template #default="scope">
+              {{ formatDate(scope.row.created_at) }}
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="150">
+            <template #default="scope">
+              <el-button link type="primary" @click="viewReportDetail(scope.row)">生成并查看报告</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
     </div>
   </div>
 </template>
@@ -127,27 +129,67 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.report-view {
-  padding: 20px;
-  height: 100%;
+/* 页面特定样式 */
+.page-container {
+  padding: 0;
   display: flex;
   flex-direction: column;
+
+  max-width: 100%; /* 新增：覆盖全局样式的 max-width: 1600px，确保铺满 */
 }
 
-.header {
+.page-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
+  padding: 15px 20px;
+  border-bottom: 1px solid #e6e6e6;
+  background: white;
+  flex-shrink: 0;
 }
 
-.header h3 {
+.page-title {
   margin: 0;
+  font-size: 24px;
+  font-weight: 600;
   color: #303133;
+  position: relative;
+  padding-left: 16px;
 }
 
-.content {
+.page-title::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 20px;
+  background: var(--primary-color, #409eff);
+  border-radius: 2px;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.main-content {
   flex: 1;
-  overflow: auto;
+  overflow: hidden;
+  padding: 0;
+  display: flex;
+}
+
+.card-container {
+  flex: 1;
+  width: 100%;
+  background-color: #fff;
+  padding: 20px;
+  box-shadow: 0 1px 4px rgba(0, 21, 41, 0.08);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 </style>

@@ -2,8 +2,8 @@
   <div class="reports">
     <el-card shadow="hover">
       <template #header>
-        <div class="card-header">
-          <h2>测试报告</h2>
+        <div class="card-header page-header" style="margin-bottom: 0;">
+          <h2 class="page-title">测试报告</h2>
           <el-button type="primary" @click="handleGenerateReport">
             <el-icon><Plus /></el-icon>
             生成报告
@@ -111,20 +111,57 @@
           v-model:page-size="pagination.pageSize"
           :page-sizes="[10, 20, 50, 100]"
           layout="total, sizes, prev, pager, next, jumper"
-          :total="totalReports"
+          :total="pagination.total"
           @size-change="handleSizeChange"
           @current-change="handleCurrentChange"
         />
       </div>
+
+      <!-- 报告详情对话框 -->
+      <el-dialog
+        v-model="detailVisible"
+        title="报告详情"
+        width="700px"
+      >
+        <el-descriptions border :column="1">
+          <el-descriptions-item label="报告名称">{{ currentReport.name }}</el-descriptions-item>
+          <el-descriptions-item label="报告类型">
+            <el-tag :type="getTypeTagType(currentReport.type)">
+              {{ getTypeText(currentReport.type) }}
+            </el-tag>
+          </el-descriptions-item>
+          <el-descriptions-item label="状态">
+            <el-tag :type="getStatusTagType(currentReport.status)">
+              {{ getStatusText(currentReport.status) }}
+            </el-tag>
+          </el-descriptions-item>
+          <el-descriptions-item label="关联任务ID">{{ currentReport.scan_task_id }}</el-descriptions-item>
+          <el-descriptions-item label="漏洞数量">{{ currentReport.vulnerability_count }}</el-descriptions-item>
+          <el-descriptions-item label="生成时间">{{ currentReport.generated_at }}</el-descriptions-item>
+          <el-descriptions-item label="详细结果">
+            <div style="max-height: 300px; overflow-y: auto;">
+              <pre>{{ JSON.stringify(currentReport.result, null, 2) }}</pre>
+            </div>
+          </el-descriptions-item>
+        </el-descriptions>
+        <template #footer>
+          <span class="dialog-footer">
+            <el-button @click="detailVisible = false">关闭</el-button>
+            <el-button type="primary" @click="handleDownloadReport(currentReport)">下载</el-button>
+          </span>
+        </template>
+      </el-dialog>
     </el-card>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElNotification } from 'element-plus'
 import { Search, View, Download, Share, Plus } from '@element-plus/icons-vue'
+import { getSecurityReports, getSecurityReportDetail, downloadSecurityReport } from '@/api/security'
+import api from '@/utils/api'
 
 const router = useRouter()
 
@@ -134,65 +171,42 @@ const reportTypeFilter = ref('')
 const dateRange = ref([])
 
 // 分页
-const pagination = ref({
+const pagination = reactive({
   currentPage: 1,
-  pageSize: 20
+  pageSize: 20,
+  total: 0
 })
-const totalReports = ref(25)
 
-// 报告数据
-const reports = ref([
-  {
-    id: 1,
-    name: '电商网站安全扫描报告',
-    type: 'scan',
-    status: 'completed',
-    generated_by: 'admin',
-    generated_at: '2026-01-10 15:45:00',
-    scan_task_id: 1,
-    vulnerability_count: 15
-  },
-  {
-    id: 2,
-    name: '测试网站快速扫描报告',
-    type: 'scan',
-    status: 'completed',
-    generated_by: 'testuser',
-    generated_at: '2026-01-11 09:30:00',
-    scan_task_id: 2,
-    vulnerability_count: 8
-  },
-  {
-    id: 3,
-    name: '内部系统安全合规报告',
-    type: 'compliance',
-    status: 'completed',
-    generated_by: 'admin',
-    generated_at: '2026-01-11 16:00:00',
-    scan_task_id: 3,
-    vulnerability_count: 5
-  },
-  {
-    id: 4,
-    name: 'API服务漏洞报告',
-    type: 'vulnerability',
-    status: 'completed',
-    generated_by: 'testuser',
-    generated_at: '2026-01-12 10:20:00',
-    scan_task_id: 4,
-    vulnerability_count: 12
-  },
-  {
-    id: 5,
-    name: '管理后台安全审计报告',
-    type: 'scan',
-    status: 'completed',
-    generated_by: 'admin',
-    generated_at: '2026-01-12 15:45:00',
-    scan_task_id: 5,
-    vulnerability_count: 7
+// 数据
+const reports = ref([])
+const loading = ref(false)
+
+// 详情对话框
+const detailVisible = ref(false)
+const currentReport = ref({})
+
+// 获取报告列表
+const fetchData = async () => {
+  loading.value = true
+  try {
+    const params = {
+      page: pagination.currentPage,
+      page_size: pagination.pageSize,
+      search: searchQuery.value,
+      type: reportTypeFilter.value,
+      start_date: dateRange.value?.[0],
+      end_date: dateRange.value?.[1]
+    }
+    // Using security executions as reports
+    const response = await getSecurityReports(params)
+    reports.value = response.results
+    pagination.total = response.count
+  } catch (error) {
+    ElMessage.error('获取报告列表失败')
+  } finally {
+    loading.value = false
   }
-])
+}
 
 // 获取报告类型标签类型
 const getTypeTagType = (type) => {
@@ -236,7 +250,8 @@ const getStatusText = (status) => {
 
 // 搜索
 const handleSearch = () => {
-  ElMessage.info('搜索功能开发中')
+  pagination.currentPage = 1
+  fetchData()
 }
 
 // 处理行点击
@@ -245,42 +260,79 @@ const handleRowClick = (row) => {
 }
 
 // 查看报告
-const handleViewReport = (row) => {
-  router.push(`/strix-security/reports/${row.id}`)
+const handleViewReport = async (row) => {
+  try {
+    const response = await getSecurityReportDetail(row.id)
+    currentReport.value = response
+    detailVisible.value = true
+  } catch (error) {
+    ElMessage.error('获取报告详情失败')
+  }
 }
 
 // 下载报告
-const handleDownloadReport = (row) => {
-  ElNotification({
-    title: '提示',
-    message: `开始下载报告：${row.name}`,
-    type: 'success'
-  })
+const handleDownloadReport = async (row) => {
+  try {
+    ElNotification({
+      title: '提示',
+      message: `开始下载报告：${row.name || row.id}`,
+      type: 'info'
+    })
+    
+    const response = await downloadSecurityReport(row.id)
+    
+    // 创建下载链接
+    const url = window.URL.createObjectURL(new Blob([response]))
+    const link = document.createElement('a')
+    link.href = url
+    link.setAttribute('download', `security_report_${row.id}.pdf`) // 假设是PDF
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    
+    ElMessage.success('下载成功')
+  } catch (error) {
+    ElMessage.error('下载失败')
+  }
 }
 
 // 分享报告
 const handleShareReport = (row) => {
-  ElMessage.success('报告分享功能开发中')
+  // 复制报告链接到剪贴板
+  const reportUrl = `${window.location.origin}/security/reports/${row.id}`
+  navigator.clipboard.writeText(reportUrl).then(() => {
+    ElMessage.success('报告链接已复制到剪贴板')
+  }).catch(() => {
+    ElMessage.error('复制链接失败')
+  })
 }
 
 // 生成报告
 const handleGenerateReport = () => {
-  ElMessage.success('报告生成功能开发中')
+  ElMessage.info('请在扫描任务中执行扫描以生成报告')
+  router.push('/security/scan-tasks')
 }
 
 // 分页变化
 const handleSizeChange = (size) => {
-  pagination.value.pageSize = size
+  pagination.pageSize = size
+  fetchData()
 }
 
 const handleCurrentChange = (current) => {
-  pagination.value.currentPage = current
+  pagination.currentPage = current
+  fetchData()
 }
+
+onMounted(() => {
+  fetchData()
+})
 </script>
 
 <style scoped>
+
 .reports {
-  padding: 20px;
+  padding: 0px;
 }
 
 .card-header {

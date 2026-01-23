@@ -1,22 +1,19 @@
 <template>
-  <div class="cicd-config">
+  <div class="page-container">
     <div class="page-header">
-      <h1>🛠️ CI/CD 配置</h1>
-      <p>配置 Jenkins、GitLab 等 CI/CD 服务器连接信息</p>
+      <h3 class="page-title">CI/CD 配置</h3>
+      <div class="header-actions">
+        <el-button type="primary" @click="showAddDialog = true">
+          <el-icon><Plus /></el-icon> 添加服务器
+        </el-button>
+      </div>
     </div>
 
     <div class="main-content">
-      <el-card class="config-card">
-        <template #header>
-          <div class="card-header">
-            <h2>服务器列表</h2>
-            <el-button type="primary" @click="showAddDialog = true">
-              <el-icon><Plus /></el-icon> 添加服务器
-            </el-button>
-          </div>
-        </template>
-
-        <el-table :data="servers" style="width: 100%" v-loading="loading">
+      <div class="card-container">
+        <p class="description-text">配置 Jenkins、GitLab 等 CI/CD 服务器连接信息</p>
+        
+        <el-table :data="servers" style="width: 100%; flex: 1;" v-loading="loading">
           <el-table-column prop="name" label="名称" width="180" />
           <el-table-column prop="server_type" label="类型" width="120">
             <template #default="scope">
@@ -40,7 +37,7 @@
             </template>
           </el-table-column>
         </el-table>
-      </el-card>
+      </div>
     </div>
 
     <!-- 添加/编辑对话框 -->
@@ -193,20 +190,65 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.cicd-config {
-  padding: 20px;
-  max-width: 1200px;
-  margin: 0 auto;
+.page-container {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  background-color: var(--el-bg-color-page);
+   max-width: 100%; /* 新增：覆盖全局样式的 max-width: 1600px，确保铺满 */
 }
 
 .page-header {
-  text-align: center;
-  margin-bottom: 30px;
-}
-
-.card-header {
+  flex-shrink: 0;
+  padding: 16px 24px;
+  background: #fff;
+  border-bottom: 1px solid var(--el-border-color-light);
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+.page-title {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+  display: flex;
+  align-items: center;
+}
+
+.page-title::before {
+  content: '';
+  width: 4px;
+  height: 16px;
+  background-color: var(--el-color-primary);
+  margin-right: 8px;
+  border-radius: 2px;
+}
+
+.page-description {
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--el-text-color-secondary);
+  padding-left: 12px;
+}
+
+.main-content {
+  flex: 1;
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.card-container {
+  flex: 1;
+  background: #fff;
+  border-radius: 4px;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  overflow: hidden;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
 }
 </style>

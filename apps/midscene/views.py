@@ -2,11 +2,13 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action, api_view
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.pagination import PageNumberPagination
 from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters
 from django.db import models
+from django.conf import settings
 from django.utils import timezone
 import requests
 import time
@@ -35,7 +37,7 @@ logger = logging.getLogger(__name__)
 User = get_user_model()
 
 
-class StandardPagination(viewsets.ModelViewSet.pagination_class):
+class StandardPagination(PageNumberPagination):
     """标准分页类"""
     page_size = 20
     page_size_query_param = 'page_size'
@@ -96,96 +98,90 @@ class MidsceneTaskViewSet(viewsets.ModelViewSet):
             task.status = 'RUNNING'
             task.save()
             
-            # 调用Midscene API执行任务
-            headers = {
-                'Authorization': f'Bearer {task.config.api_key}',
-                'Content-Type': 'application/json'
-            }
+            # 准备执行环境
+            script_path = os.path.join(settings.BASE_DIR, 'scripts', 'midscene_runner.js')
+            output_dir = os.path.join(settings.MEDIA_ROOT, 'midscene_screenshots')
+            if not os.path.exists(output_dir):
+                os.makedirs(output_dir)
             
-            payload = {
-                'natural_language': task.natural_language,
-                'name': task.name,
-                'description': task.description or ''
-            }
+            # 构建 Node.js 命令
+            # 注意：需要确保 node 在环境变量中，或者指定完整路径
+            # 这里的 cwd 设置为 frontend 目录，因为 node_modules 在那里
+            frontend_dir = os.path.join(settings.BASE_DIR, 'frontend')
+            node_modules_path = os.path.join(frontend_dir, 'node_modules')
             
-            try:
-                # 实际调用Midscene API
-                response = requests.post(
-                    f'{task.config.base_url}/tasks/execute',
-                    headers=headers,
-                    json=payload,
-                    timeout=30
-                )
-                
-                if response.status_code == 200:
-                    result = response.json()
-                    task.task_id = result.get('task_id')
-                    
-                    # 轮询任务状态，直到完成或超时
-                    max_retries = 60  # 最多轮询60次
-                    retry_interval = 5  # 每5秒轮询一次
-                    
-                    for _ in range(max_retries):
-                        status_response = requests.get(
-                            f'{task.config.base_url}/tasks/{task.task_id}/status',
-                            headers=headers,
-                            timeout=10
-                        )
-                        
-                        if status_response.status_code == 200:
-                            status_data = status_response.json()
-                            task_status = status_data.get('status')
-                            
-                            if task_status in ['SUCCESS', 'FAILED', 'STOPPED']:
-                                task.status = task_status
-                                task.result = status_data.get('result', {})
-                                task.logs = status_data.get('logs', '')
-                                task.end_time = timezone.now()
-                                task.save()
-                                break
-                            
-                            # 任务仍在运行，继续轮询
-                            time.sleep(retry_interval)
-                        else:
-                            # 状态查询失败，退出轮询
-                            break
-                    else:
-                        # 轮询超时
-                        task.status = 'FAILED'
-                        task.logs = '任务执行超时'
-                        task.end_time = timezone.now()
-                        task.save()
-                else:
-                    # API调用失败
-                    task.status = 'FAILED'
-                    task.logs = f'API调用失败: {response.status_code} - {response.text}'
-                    task.end_time = timezone.now()
-                    task.save()
-            except requests.exceptions.RequestException as e:
-                # 网络请求异常，使用模拟数据
-                logger.warning(f"Midscene API调用失败，使用模拟数据: {str(e)}")
-                
-                # 模拟执行结果
-                task.status = 'SUCCESS'
-                task.task_id = f'midscene-task-{uuid.uuid4().hex[:8]}'
-                task.result = {
-                    'steps': [
-                        {'action': '打开浏览器', 'status': 'success'},
-                        {'action': '导航到网址', 'status': 'success'},
-                        {'action': '输入搜索关键词', 'status': 'success'},
-                        {'action': '点击搜索按钮', 'status': 'success'}
-                    ],
-                    'screenshot_url': f'{task.config.base_url}/screenshots/{task.task_id}',
-                    'video_url': f'{task.config.base_url}/videos/{task.task_id}',
-                    'duration': 15.2
-                }
-                task.logs = '模拟Midscene执行日志...'
+            # 设置 NODE_PATH 环境变量，以便脚本能找到 frontend/node_modules 下的依赖
+            env = os.environ.copy()
+            env['NODE_PATH'] = node_modules_path + os.pathsep + env.get('NODE_PATH', '')
+            
+            cmd = [
+                'node', 
+                script_path, 
+                task.natural_language, 
+                output_dir, 
+                str(task.id)
+            ]
+            
+            logger.info(f"开始执行Midscene任务: {' '.join(cmd)}")
+            
+            process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                cwd=frontend_dir, # 在 frontend 目录下运行
+                env=env # 使用包含 NODE_PATH 的环境变量
+            )
+            
+            stdout, stderr = process.communicate()
+            
+            if process.returncode != 0:
+                logger.error(f"Midscene执行失败: {stderr}")
+                task.status = 'FAILED'
+                task.logs = stderr or "未知错误"
                 task.end_time = timezone.now()
                 task.save()
+                return Response({'error': '执行失败', 'details': stderr}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+            # 解析输出
+            # 输出可能包含多行 JSON，我们需要找到最后一行 type='result' 的
+            lines = stdout.strip().split('\n')
+            result_data = {}
+            logs = []
+            
+            for line in lines:
+                try:
+                    data = json.loads(line)
+                    if data.get('type') == 'log':
+                        logs.append(f"[{data.get('level', 'info').upper()}] {data.get('message')}")
+                    elif data.get('type') == 'result':
+                        result_data = data
+                except json.JSONDecodeError:
+                    logs.append(line)
+            
+            task.logs = '\n'.join(logs)
+            
+            if result_data.get('status') == 'success':
+                task.status = 'SUCCESS'
+                task.result = {
+                    'screenshot_url': result_data.get('screenshot_url'),
+                    'video_url': result_data.get('video_url'),
+                    'steps': [] # 暂时简化
+                }
+            else:
+                task.status = 'FAILED'
+                task.result = {
+                    'error': result_data.get('error'),
+                    'screenshot_url': result_data.get('screenshot_url')
+                }
+                
+            task.end_time = timezone.now()
+            task.save()
             
             return Response(MidsceneTaskSerializer(task).data)
+
         except Exception as e:
-            logger.error(f"执行Midscene任务失败: {str(e)}")
+            logger.error(f"执行Midscene任务异常: {str(e)}")
             task.status = 'FAILED'
             task.logs = str(e)
             task.end_time = timezone.now()
@@ -223,7 +219,7 @@ class MidsceneTaskViewSet(viewsets.ModelViewSet):
         try:
             config = MidsceneConfig.objects.get(id=config_id, is_active=True)
             
-            # 创建并执行任务
+            # 创建任务
             task = MidsceneTask.objects.create(
                 config=config,
                 name=name,
@@ -232,19 +228,80 @@ class MidsceneTaskViewSet(viewsets.ModelViewSet):
                 created_by=request.user
             )
             
-            # 模拟执行
-            time.sleep(2)
+            # 准备执行环境
+            script_path = os.path.join(settings.BASE_DIR, 'scripts', 'midscene_runner.js')
+            output_dir = os.path.join(settings.MEDIA_ROOT, 'midscene_screenshots')
+            if not os.path.exists(output_dir):
+                os.makedirs(output_dir)
             
-            task.status = 'SUCCESS'
-            task.task_id = f'midscene-task-{uuid.uuid4().hex[:8]}'
-            task.result = {
-                'steps': [
-                    {'action': '执行自然语言指令', 'status': 'success'},
-                    {'action': '完成任务', 'status': 'success'}
-                ],
-                'duration': 10.5
-            }
-            task.logs = '快速执行任务日志...'
+            # 构建 Node.js 命令
+            frontend_dir = os.path.join(settings.BASE_DIR, 'frontend')
+            node_modules_path = os.path.join(frontend_dir, 'node_modules')
+            
+            # 设置 NODE_PATH 环境变量
+            env = os.environ.copy()
+            env['NODE_PATH'] = node_modules_path + os.pathsep + env.get('NODE_PATH', '')
+            
+            cmd = [
+                'node', 
+                script_path, 
+                task.natural_language, 
+                output_dir, 
+                str(task.id)
+            ]
+            
+            logger.info(f"开始快速执行Midscene任务: {' '.join(cmd)}")
+            
+            process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                cwd=frontend_dir, # 在 frontend 目录下运行
+                env=env
+            )
+            
+            stdout, stderr = process.communicate()
+            
+            if process.returncode != 0:
+                logger.error(f"Midscene执行失败: {stderr}")
+                task.status = 'FAILED'
+                task.logs = stderr or "未知错误"
+                task.end_time = timezone.now()
+                task.save()
+                return Response({'error': '执行失败', 'details': stderr}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+            # 解析输出
+            lines = stdout.strip().split('\n')
+            result_data = {}
+            logs = []
+            
+            for line in lines:
+                try:
+                    data = json.loads(line)
+                    if data.get('type') == 'log':
+                        logs.append(f"[{data.get('level', 'info').upper()}] {data.get('message')}")
+                    elif data.get('type') == 'result':
+                        result_data = data
+                except json.JSONDecodeError:
+                    logs.append(line)
+            
+            task.logs = '\n'.join(logs)
+            
+            if result_data.get('status') == 'success':
+                task.status = 'SUCCESS'
+                task.result = {
+                    'screenshot_url': result_data.get('screenshot_url'),
+                    'video_url': result_data.get('video_url'),
+                    'steps': [] 
+                }
+            else:
+                task.status = 'FAILED'
+                task.result = {
+                    'error': result_data.get('error'),
+                    'screenshot_url': result_data.get('screenshot_url')
+                }
+                
             task.end_time = timezone.now()
             task.save()
             
@@ -253,10 +310,16 @@ class MidsceneTaskViewSet(viewsets.ModelViewSet):
             return Response({'error': '有效的Midscene配置不存在'}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
             logger.error(f"快速执行Midscene任务失败: {str(e)}")
+            # 如果任务已创建，更新其状态
+            if 'task' in locals():
+                task.status = 'FAILED'
+                task.logs = str(e)
+                task.end_time = timezone.now()
+                task.save()
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
-class MidsceneExecutionLogViewSet(viewsets.ReadOnlyModelViewSet):
+class MidsceneExecutionLogViewSet(viewsets.ModelViewSet):
     """Midscene.js执行日志视图集"""
     queryset = MidsceneExecutionLog.objects.all()
     serializer_class = MidsceneExecutionLogSerializer
@@ -267,6 +330,7 @@ class MidsceneExecutionLogViewSet(viewsets.ReadOnlyModelViewSet):
     ordering_fields = ['created_at', 'log_level']
     ordering = ['-created_at']
     pagination_class = StandardPagination
+    http_method_names = ['get', 'delete', 'head', 'options']
 
 
 class MidsceneDashboardViewSet(viewsets.ViewSet):

@@ -1,20 +1,27 @@
 <template>
   <div class="element-manager">
-    <div class="element-layout">
+    <div class="page-header">
+      <h1 class="page-title">UI元素管理</h1>
+      <div class="header-actions">
+        <el-select v-model="selectedProject" placeholder="选择项目" style="width: 200px" @change="onProjectChange">
+          <el-option
+            v-for="project in projects"
+            :key="project.id"
+            :label="project.name"
+            :value="project.id"
+          />
+        </el-select>
+      </div>
+    </div>
+
+    <div class="main-content">
       <!-- 左侧页面树 -->
-      <div class="sidebar">
-        <div class="sidebar-header">
-          <el-select v-model="selectedProject" placeholder="选择项目" @change="onProjectChange">
-            <el-option
-              v-for="project in projects"
-              :key="project.id"
-              :label="project.name"
-              :value="project.id"
-            />
-          </el-select>
-          <div class="header-actions">
+      <div class="left-panel">
+        <div class="panel-header">
+          <h3>页面结构</h3>
+          <div class="panel-actions">
             <el-button type="primary" size="small" @click="showCreatePageDialog = true" title="创建页面">
-              <el-icon><Folder /></el-icon>
+              <el-icon><FolderAdd /></el-icon>
             </el-button>
             <el-button type="success" size="small" @click="createEmptyElement" title="添加元素">
               <el-icon><Plus /></el-icon>
@@ -70,7 +77,7 @@
       </div>
 
       <!-- 右侧元素详情 -->
-      <div class="main-content">
+      <div class="right-panel">
         <div v-if="!selectedElement" class="empty-state">
           <el-empty description="请选择一个元素查看详情，或点击上方绿色按钮创建新元素">
             <el-button type="primary" @click="createEmptyElement">创建新元素</el-button>
@@ -1187,39 +1194,57 @@ const updatePage = async () => {
 }
 </script>
 
-<style scoped>
+<style lang="scss" scoped>
 .element-manager {
   height: 100vh;
   display: flex;
   flex-direction: column;
 }
 
-.element-layout {
+.page-header {
   display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 20px;
+  border-bottom: 1px solid #e6e6e6;
+  background: white;
+
+  .page-title {
+    margin: 0;
+    font-size: 24px;
+  }
+}
+
+.main-content {
   flex: 1;
+  display: flex;
   overflow: hidden;
 }
 
-.sidebar {
+.left-panel {
   width: 300px;
-  border-right: 1px solid #e4e7ed;
+  border-right: 1px solid #e6e6e6;
+  background: white;
   display: flex;
   flex-direction: column;
-  background: #f5f7fa;
 }
 
-.sidebar-header {
+.panel-header {
   padding: 15px;
-  border-bottom: 1px solid #e4e7ed;
+  border-bottom: 1px solid #e6e6e6;
   display: flex;
+  justify-content: space-between;
   align-items: center;
-  gap: 10px;
+
+  h3 {
+    margin: 0;
+    font-size: 16px;
+  }
 }
 
-.header-actions {
+.panel-actions {
   display: flex;
   gap: 5px;
-  margin-left: auto;
 }
 
 .page-tree {
@@ -1250,10 +1275,13 @@ const updatePage = async () => {
   color: #409eff;
 }
 
-.main-content {
+.right-panel {
   flex: 1;
   overflow: auto;
   padding: 20px;
+  background: white;
+  display: flex;
+  flex-direction: column;
 }
 
 .empty-state {

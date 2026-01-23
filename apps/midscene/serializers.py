@@ -31,6 +31,9 @@ class MidsceneConfigSerializer(serializers.ModelSerializer):
 class MidsceneTaskSerializer(serializers.ModelSerializer):
     """Midscene.js任务序列化器"""
     config = MidsceneConfigSerializer(read_only=True)
+    config_id = serializers.PrimaryKeyRelatedField(
+        queryset=MidsceneConfig.objects.all(), source='config', write_only=True
+    )
     created_by = UserSerializer(read_only=True)
 
     class Meta:

@@ -1,7 +1,7 @@
 <template>
-  <div class="review-list">
-    <div class="header">
-      <h1>用例评审</h1>
+  <div class="page-container">
+    <div class="page-header">
+      <h1 class="page-title">用例评审</h1>
       <div class="header-actions">
         <el-button type="primary" @click="createReview">
           <el-icon><Plus /></el-icon>
@@ -10,7 +10,8 @@
       </div>
     </div>
 
-    <div class="filter-bar">
+    <div class="card-container">
+      <div class="filter-bar">
       <el-form :inline="true" :model="filters">
         <el-form-item label="项目">
           <el-select v-model="filters.project" placeholder="请选择项目" clearable @change="fetchReviews" style="width: 200px;">
@@ -113,7 +114,7 @@
       </el-table-column>
     </el-table>
 
-    <div class="pagination">
+    <div class="pagination-container">
       <el-pagination
         v-model:current-page="pagination.page"
         v-model:page-size="pagination.size"
@@ -123,6 +124,7 @@
         @size-change="handleSizeChange"
         @current-change="handleCurrentChange"
       />
+    </div>
     </div>
 
     <!-- 评审对话框 -->
@@ -361,22 +363,53 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.review-list {
-  padding: 20px;
+/* 页面特定样式 */
+.page-container {
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+
+  max-width: 100%; /* 新增：覆盖全局样式的 max-width: 1600px，确保铺满 */
 }
 
-.header {
+.page-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
+  padding: 15px 20px;
+  border-bottom: 1px solid #e6e6e6;
+  background: white;
+  flex-shrink: 0;
 }
 
-.header h1 {
+.page-title {
   margin: 0;
-  font-size: 20px;
+  font-size: 24px;
   font-weight: 600;
   color: #303133;
+  position: relative;
+  padding-left: 16px;
+}
+
+.page-title::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 20px;
+  background: var(--primary-color, #409eff);
+  border-radius: 2px;
+}
+
+.header-actions {
+  display: flex;
+  gap: 15px;
+}
+
+.review-list {
+  padding: 20px;
 }
 
 .header-actions {

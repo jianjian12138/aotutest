@@ -1,11 +1,12 @@
 <template>
   <div class="config">
-    <el-card shadow="hover">
+    <el-card shadow="hover" class="page-card">
       <template #header>
-        <div class="card-header">
-          <h2>配置管理</h2>
+        <div class="card-header page-header" style="margin-bottom: 0;">
+          <h2 class="page-title">配置管理</h2>
         </div>
       </template>
+    </el-card>
       
       <!-- 配置选项卡 -->
       <el-tabs v-model="activeTab" type="border-card" style="margin-bottom: 20px;">
@@ -143,7 +144,7 @@
           重置
         </el-button>
       </div>
-    </el-card>
+    
   </div>
 </template>
 
@@ -198,7 +199,7 @@ const handleResetConfig = () => {
 
 <style scoped>
 .config {
-  padding: 20px;
+  padding: 0px;
 }
 
 .card-header {

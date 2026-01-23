@@ -2,8 +2,8 @@
   <div class="wharttest-integration-log-management">
     <el-card shadow="hover">
       <template #header>
-        <div class="card-header">
-          <h2>WHartTest 集成日志管理</h2>
+        <div class="card-header page-header" style="margin-bottom: 0;">
+          <h2 class="page-title">集成日志管理</h2>
         </div>
       </template>
       
@@ -49,7 +49,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import api from '@/utils/api'
+import { getWHartTestIntegrationLogs } from '@/api/wharttest'
 
 const logs = ref([])
 const currentPage = ref(1)
@@ -59,14 +59,12 @@ const total = ref(0)
 // 从API获取日志数据
 const fetchLogs = async () => {
   try {
-    const response = await api.get('/integration-logs/', {
-      params: {
-        page: currentPage.value,
-        page_size: pageSize.value
-      }
+    const response = await getWHartTestIntegrationLogs({
+      page: currentPage.value,
+      page_size: pageSize.value
     })
-    logs.value = response.data.results || []
-    total.value = response.data.count || 0
+    logs.value = response.data.results || response.results || []
+    total.value = response.data.count || response.count || 0
   } catch (error) {
     console.error('获取日志数据失败:', error)
     ElMessage.error('获取日志数据失败')
@@ -97,7 +95,7 @@ onMounted(() => {
 
 <style scoped lang="scss">
 .wharttest-integration-log-management {
-  padding: 20px;
+  padding: 0;
   background-color: #f5f7fa;
   min-height: 100vh;
 }
@@ -110,7 +108,7 @@ onMounted(() => {
   
   h2 {
     margin: 0;
-    font-size: 20px;
+    font-size: 24px;
     font-weight: 600;
     color: #2c3e50;
   }

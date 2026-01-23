@@ -8,7 +8,7 @@ router.register(r'sessions', AssistantSessionViewSet, basename='assistant-sessio
 router.register(r'chat', ChatViewSet, basename='chat')
 router.register(r'config/dify', DifyConfigViewSet, basename='dify-config')
 router.register(r'config/workflow', AIWorkflowConfigViewSet, basename='workflow-config')
-router.register(r'knowledge/graph', KnowledgeGraphViewSet, basename='knowledge-graph')
+router.register(r'api/documents', KnowledgeGraphViewSet, basename='knowledge-documents')
 
 urlpatterns = [
     path('', include(router.urls)),

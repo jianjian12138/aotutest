@@ -1,162 +1,155 @@
 <template>
-  <div class="test-case-container">
-    <el-card shadow="hover" class="page-card">
-      <template #header>
-        <div class="card-header">
-          <h2 class="page-title">测试用例</h2>
-          <div class="header-actions">
-            <el-button 
-              v-if="selectedTestCases.length > 0" 
-              type="danger" 
-              @click="batchDeleteTestCases"
-              :disabled="isDeleting">
-              <el-icon><Delete /></el-icon>
-              批量删除 ({{ selectedTestCases.length }})
-            </el-button>
-            <el-button type="success" @click="exportToExcel">
-              <el-icon><Download /></el-icon>
-              导出Excel
-            </el-button>
-            <el-button type="primary" @click="$router.push('/ai-generation/testcases/create')">
-              <el-icon><Plus /></el-icon>
-              新建用例
-            </el-button>
-          </div>
-        </div>
-      </template>
-      
-      <div class="content">
-        <!-- 搜索和筛选 -->
-        <div class="search-filter">
-          <el-row :gutter="20">
-            <el-col :span="5">
-              <el-input
-                v-model="searchText"
-                placeholder="搜索用例标题"
-                clearable
-                @input="handleSearch"
-                class="search-input"
-              >
-                <template #prefix>
-                  <el-icon><Search /></el-icon>
-                </template>
-              </el-input>
-            </el-col>
-            <el-col :span="4">
-              <el-select v-model="projectFilter" placeholder="关联项目" clearable @change="handleFilter" class="filter-select">
-                <el-option
-                  v-for="project in projects"
-                  :key="project.id"
-                  :label="project.name"
-                  :value="project.id"
-                />
-              </el-select>
-            </el-col>
-            <el-col :span="3">
-              <el-select v-model="priorityFilter" placeholder="优先级筛选" clearable @change="handleFilter" class="filter-select">
-                <el-option label="低" value="low" />
-                <el-option label="中" value="medium" />
-                <el-option label="高" value="high" />
-                <el-option label="紧急" value="critical" />
-              </el-select>
-            </el-col>
-            <el-col :span="3">
-              <el-select v-model="statusFilter" placeholder="状态筛选" clearable @change="handleFilter" class="filter-select">
-                <el-option label="草稿" value="draft" />
-                <el-option label="激活" value="active" />
-                <el-option label="废弃" value="deprecated" />
-              </el-select>
-            </el-col>
-          </el-row>
-        </div>
-        
-        <!-- 测试用例表格 -->
-        <el-table 
-          :data="testcases" 
-          v-loading="loading" 
-          style="width: 100%"
-          @selection-change="handleSelectionChange"
-          border
-          stripe
-        >
-          <el-table-column type="selection" width="55" />
-          <el-table-column type="index" label="序号" width="80" :index="getSerialNumber" />
-          <el-table-column prop="title" label="用例标题" min-width="250">
-            <template #default="{ row }">
-              <el-link @click="goToTestCase(row.id)" type="primary">
-                {{ row.title }}
-              </el-link>
-            </template>
-          </el-table-column>
-          <el-table-column prop="project.name" label="关联项目" width="150">
-            <template #default="{ row }">
-              {{ row.project?.name || '-' }}
-            </template>
-          </el-table-column>
-          <el-table-column prop="versions" label="关联版本" width="200">
-            <template #default="{ row }">
-              <div v-if="row.versions && row.versions.length > 0" class="version-tags">
-                <el-tag 
-                  v-for="version in row.versions.slice(0, 2)" 
-                  :key="version.id" 
-                  size="small" 
-                  :type="version.is_baseline ? 'warning' : 'info'"
-                  class="version-tag"
-                >
-                  {{ version.name }}
-                </el-tag>
-                <el-tooltip v-if="row.versions.length > 2" :content="getVersionsTooltip(row.versions)">
-                  <el-tag size="small" type="info" class="version-tag">
-                    +{{ row.versions.length - 2 }}
-                  </el-tag>
-                </el-tooltip>
-              </div>
-              <span v-else class="no-version">未关联版本</span>
-            </template>
-          </el-table-column>
-          <el-table-column prop="priority" label="优先级" width="100">
-            <template #default="{ row }">
-              <el-tag :class="`priority-tag ${row.priority}`">{{ getPriorityText(row.priority) }}</el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column prop="status" label="状态" width="100">
-            <template #default="{ row }">
-              <el-tag :type="getStatusType(row.status)">{{ getStatusText(row.status) }}</el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column prop="test_type" label="测试类型" width="120">
-            <template #default="{ row }">
-              {{ getTypeText(row.test_type) }}
-            </template>
-          </el-table-column>
-          <el-table-column prop="author.username" label="作者" width="120" />
-          <el-table-column prop="created_at" label="创建时间" width="180">
-            <template #default="{ row }">
-              {{ formatDate(row.created_at) }}
-            </template>
-          </el-table-column>
-          <el-table-column label="操作" width="150" fixed="right">
-            <template #default="{ row }">
-              <el-button size="small" @click="editTestCase(row)">编辑</el-button>
-              <el-button size="small" type="danger" @click="deleteTestCase(row)">删除</el-button>
-            </template>
-          </el-table-column>
-        </el-table>
-        
-        <!-- 分页 -->
-        <div class="pagination-container">
-          <el-pagination
-            v-model:current-page="currentPage"
-            v-model:page-size="pageSize"
-            :page-sizes="[10, 20, 50, 100]"
-            layout="total, sizes, prev, pager, next, jumper"
-            :total="total"
-            @size-change="handleSizeChange"
-            @current-change="handleCurrentChange"
-          />
-        </div>
+  <div class="page-container">
+    <div class="page-header">
+      <h1 class="page-title">测试用例</h1>
+      <div class="header-actions">
+        <el-button 
+          v-if="selectedTestCases.length > 0" 
+          type="danger" 
+          @click="batchDeleteTestCases"
+          :disabled="isDeleting">
+          <el-icon><Delete /></el-icon>
+          批量删除 ({{ selectedTestCases.length }})
+        </el-button>
+        <el-button type="success" @click="exportToExcel">
+          <el-icon><Download /></el-icon>
+          导出Excel
+        </el-button>
+        <el-button type="primary" @click="$router.push('/ai-generation/testcases/create')">
+          <el-icon><Plus /></el-icon>
+          新建用例
+        </el-button>
       </div>
-    </el-card>
+    </div>
+    
+    <div class="card-container">
+      <!-- 搜索和筛选 -->
+      <div class="filter-bar">
+        <el-row :gutter="20">
+          <el-col :span="5">
+            <el-input
+              v-model="searchText"
+              placeholder="搜索用例标题"
+              clearable
+              @input="handleSearch"
+            >
+              <template #prefix>
+                <el-icon><Search /></el-icon>
+              </template>
+            </el-input>
+          </el-col>
+          <el-col :span="4">
+            <el-select v-model="projectFilter" placeholder="关联项目" clearable @change="handleFilter">
+              <el-option
+                v-for="project in projects"
+                :key="project.id"
+                :label="project.name"
+                :value="project.id"
+              />
+            </el-select>
+          </el-col>
+          <el-col :span="3">
+            <el-select v-model="priorityFilter" placeholder="优先级筛选" clearable @change="handleFilter">
+              <el-option label="低" value="low" />
+              <el-option label="中" value="medium" />
+              <el-option label="高" value="high" />
+              <el-option label="紧急" value="critical" />
+            </el-select>
+          </el-col>
+          <el-col :span="3">
+            <el-select v-model="statusFilter" placeholder="状态筛选" clearable @change="handleFilter">
+              <el-option label="草稿" value="draft" />
+              <el-option label="激活" value="active" />
+              <el-option label="废弃" value="deprecated" />
+            </el-select>
+          </el-col>
+        </el-row>
+      </div>
+      
+      <!-- 测试用例表格 -->
+      <el-table 
+        :data="testcases" 
+        v-loading="loading" 
+        style="width: 100%"
+        @selection-change="handleSelectionChange"
+      >
+        <el-table-column type="selection" width="55" />
+        <el-table-column type="index" label="序号" width="80" :index="getSerialNumber" />
+        <el-table-column prop="title" label="用例标题" min-width="250">
+          <template #default="{ row }">
+            <el-link @click="goToTestCase(row.id)" type="primary">
+              {{ row.title }}
+            </el-link>
+          </template>
+        </el-table-column>
+        <el-table-column prop="project.name" label="关联项目" width="150">
+          <template #default="{ row }">
+            {{ row.project?.name || '-' }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="versions" label="关联版本" width="200">
+          <template #default="{ row }">
+            <div v-if="row.versions && row.versions.length > 0" class="version-tags">
+              <el-tag 
+                v-for="version in row.versions.slice(0, 2)" 
+                :key="version.id" 
+                size="small" 
+                :type="version.is_baseline ? 'warning' : 'info'"
+                class="version-tag"
+              >
+                {{ version.name }}
+              </el-tag>
+              <el-tooltip v-if="row.versions.length > 2" :content="getVersionsTooltip(row.versions)">
+                <el-tag size="small" type="info" class="version-tag">
+                  +{{ row.versions.length - 2 }}
+                </el-tag>
+              </el-tooltip>
+            </div>
+            <span v-else class="no-version">未关联版本</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="priority" label="优先级" width="100">
+          <template #default="{ row }">
+            <el-tag :class="`priority-tag ${row.priority}`">{{ getPriorityText(row.priority) }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="status" label="状态" width="100">
+          <template #default="{ row }">
+            <el-tag :type="getStatusType(row.status)">{{ getStatusText(row.status) }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="test_type" label="测试类型" width="120">
+          <template #default="{ row }">
+            {{ getTypeText(row.test_type) }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="author.username" label="作者" width="120" />
+        <el-table-column prop="created_at" label="创建时间" width="180">
+          <template #default="{ row }">
+            {{ formatDate(row.created_at) }}
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="150" fixed="right">
+          <template #default="{ row }">
+            <el-button size="small" @click="editTestCase(row)">编辑</el-button>
+            <el-button size="small" type="danger" @click="deleteTestCase(row)">删除</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+      
+      <!-- 分页 -->
+      <div class="pagination-container">
+        <el-pagination
+          v-model:current-page="currentPage"
+          v-model:page-size="pageSize"
+          :page-sizes="[10, 20, 50, 100]"
+          layout="total, sizes, prev, pager, next, jumper"
+          :total="total"
+          @size-change="handleSizeChange"
+          @current-change="handleCurrentChange"
+        />
+      </div>
+    </div>
   </div>
 </template>
 
@@ -500,63 +493,50 @@ onMounted(() => {
 </script>
 
 <style lang="scss" scoped>
-.test-case-container {
-  width: 100%;
-}
-
-.page-card {
-  margin-bottom: 20px;
-}
-
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.page-title {
-  margin: 0;
-  font-size: 20px;
-  font-weight: 600;
-}
-
-.content {
-  padding: 20px 0;
-}
-
-.search-filter {
-  display: flex;
-  gap: 16px;
-  margin-bottom: 20px;
-  align-items: center;
-}
-
-.search-input {
-  width: 300px;
-}
-
-.filter-select {
-  width: 180px;
-}
-
-.pagination-container {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 20px;
-}
-
-.header-actions {
-  display: flex;
-  gap: 10px;
-}
-
 .priority-tag {
   &.low { color: #67c23a; }
   &.medium { color: #e6a23c; }
   &.high { color: #f56c6c; }
   &.critical { color: #f56c6c; font-weight: bold; }
 }
+/* 页面特定样式 */
+.page-container {
+  padding: 0;
+  display: flex;
+  flex-direction: column;
 
+  max-width: 100%; /* 新增：覆盖全局样式的 max-width: 1600px，确保铺满 */
+}
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 20px;
+  border-bottom: 1px solid #e6e6e6;
+  background: white;
+  flex-shrink: 0;
+}
+
+.page-title {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+  color: #303133;
+  position: relative;
+  padding-left: 16px;
+}
+
+.page-title::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 20px;
+  background: var(--primary-color, #409eff);
+  border-radius: 2px;
+}
 .version-tags {
   display: flex;
   flex-wrap: wrap;

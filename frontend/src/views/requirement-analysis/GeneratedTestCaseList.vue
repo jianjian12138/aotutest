@@ -1,9 +1,10 @@
 <template>
-  <div class="generated-testcase-list">
+  <div class="page-container">
     <div class="page-header">
-      <h2>AI生成用例记录</h2>
+      <h1 class="page-title">AI生成用例记录</h1>
     </div>
 
+    <div class="card-container">
     <div class="filters-section">
       <div class="filter-card">
         <div class="filter-group">
@@ -201,6 +202,7 @@
           <button class="jump-btn" @click="jumpToPage">跳转</button>
         </div>
       </div>
+    </div>
     </div>
 
     <!-- 测试用例详情弹窗 -->
@@ -996,28 +998,57 @@ export default {
 </script>
 
 <style scoped>
+/* 页面特定样式 */
+.page-container {
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  
+  max-width: 100%; /* 新增：覆盖全局样式的 max-width: 1600px，确保铺满 */
+}
+
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 20px;
+  border-bottom: 1px solid #e6e6e6;
+  background: white;
+  flex-shrink: 0;
+}
+
+.page-title {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+  color: #303133;
+  position: relative;
+  padding-left: 16px;
+}
+
+.page-title::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 20px;
+  background: var(--primary-color, #409eff);
+  border-radius: 2px;
+}
+
+.header-actions {
+  display: flex;
+  gap: 15px;
+}
 .generated-testcase-list {
   padding: 20px;
   max-width: 1400px;
   margin: 0 auto;
 }
 
-.page-header {
-  text-align: center;
-  margin-bottom: 15px; /* 进一步减少底部边距 */
-}
-
-.page-header h2 {
-  font-size: 1.6rem; /* H2标题适合的字体大小 */
-  color: #2c3e50;
-  margin-bottom: 0; /* 移除底部边距 */
-  margin-top: 5px; /* 减少顶部边距 */
-}
-
-.page-header p {
-  color: #666;
-  font-size: 1.1rem;
-}
+/* .page-header styles removed to match ProjectList.vue global styles */
 
 /* 过滤器部分 */
 .filters-section {

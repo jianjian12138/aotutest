@@ -78,7 +78,7 @@ class PerformanceTestSuiteSerializer(serializers.ModelSerializer):
     project = PerformanceProjectSerializer(read_only=True)
     environment = PerformanceEnvironmentSerializer(read_only=True, allow_null=True)
     created_by = UserSerializer(read_only=True)
-    test_suite_requests = PerformanceTestSuiteRequestSerializer(many=True, read_only=True)
+    test_suite_requests = PerformanceTestSuiteRequestSerializer(many=True, read_only=True, source='performancetestsuiterequest_set')
 
     class Meta:
         model = PerformanceTestSuite

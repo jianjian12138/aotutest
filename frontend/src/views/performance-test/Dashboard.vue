@@ -1,5 +1,12 @@
 <template>
   <div class="dashboard-container">
+        <el-card shadow="hover" class="page-card">
+      <template #header>
+        <div class="card-header page-header" style="margin-bottom: 0;">
+          <h2 class="page-title">数据看板</h2>
+        </div>
+      </template>
+    </el-card>
     <!-- 数据概览 -->
     <div class="stats-section">
       <el-row :gutter="20">
@@ -235,14 +242,14 @@ const loadDashboardData = async () => {
     ])
 
     // 更新统计数据
-    const summary = summaryRes.data
-    projectCount.value = summary.total_projects || 5
-    collectionCount.value = summary.total_collections || 12
-    requestCount.value = summary.total_requests || 89
-    executionCount.value = summary.total_executions || 23
+    const summary = summaryRes.data || summaryRes
+    projectCount.value = summary.total_projects || 0
+    collectionCount.value = summary.total_collections || 0 // 注意：后端返回字段可能是 total_collections
+    requestCount.value = summary.total_requests || 0
+    executionCount.value = summary.total_executions || 0 // 注意：后端返回字段可能是 total_executions
     
     // 更新最近执行记录
-    recentExecutions.value = executionsRes.data.results || []
+    recentExecutions.value = executionsRes.data?.results || executionsRes.results || []
     
     // 如果没有执行记录，添加模拟记录
     if (recentExecutions.value.length === 0) {
@@ -379,6 +386,13 @@ onMounted(() => {
 </script>
 
 <style scoped>
+/* 页面特定样式 */
+.page-container {
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  max-width: 100%; /* 新增：覆盖全局样式的 max-width: 1600px，确保铺满 */
+}
 .dashboard-container {
   width: 100%;
 }

@@ -163,6 +163,15 @@ export function deleteTestScript(id) {
   })
 }
 
+// 格式化测试脚本代码
+export function formatTestScript(data) {
+  return request({
+    url: '/ui-automation/test-scripts/format_code/',
+    method: 'post',
+    data
+  })
+}
+
 // 测试套件相关API
 
 // 获取测试套件列表
@@ -1056,5 +1065,60 @@ export function exportAIExecutionReportPDF(id, params = {}) {
     method: 'get',
     params,
     responseType: 'blob'
+  })
+}
+
+// ==================== 设备管理相关API ====================
+
+// 获取设备列表
+export function getDeviceList(params) {
+  return request({
+    url: '/ui-automation/devices/',
+    method: 'get',
+    params
+  })
+}
+
+// 刷新设备列表
+export function refreshDeviceList() {
+  return request({
+    url: '/ui-automation/devices/refresh/',
+    method: 'get'
+  })
+}
+
+// 连接远程设备
+export function connectRemoteDevice(ip, port) {
+  return request({
+    url: '/ui-automation/devices/connect_remote/',
+    method: 'post',
+    data: { ip, port }
+  })
+}
+
+// 断开设备连接
+export function disconnectDevice(device) {
+  return request({
+    url: `/ui-automation/devices/${device.id}/disconnect/`,
+    method: 'post'
+  })
+}
+
+// ==================== 调试文件相关API ====================
+
+// 获取调试文件列表
+export function getDebugFiles() {
+  return request({
+    url: '/ui-automation/debug-files/',
+    method: 'get'
+  })
+}
+
+// 获取调试文件内容
+export function getDebugFileContent(url) {
+  return request({
+    url: '/ui-automation/debug-files/content/',
+    method: 'get',
+    params: { url }
   })
 }

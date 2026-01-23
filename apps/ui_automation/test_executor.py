@@ -109,6 +109,8 @@ class TestExecutor:
             # 根据引擎选择执行方式
             if self.engine == 'playwright':
                 self.run_with_playwright()
+            elif self.engine == 'airtest':
+                self.run_with_airtest()
             else:
                 self.run_with_selenium()
 
@@ -175,6 +177,7 @@ class TestExecutor:
                 'id': test_case.id,
                 'name': test_case.name,
                 'project_id': self.test_suite.project.id,
+                'project_config': self.test_suite.project.debug_config,  # 添加项目配置
                 'steps': []
             }
 
@@ -190,6 +193,7 @@ class TestExecutor:
                     'wait_time': step.wait_time,
                     'assert_type': step.assert_type,
                     'assert_value': step.assert_value,
+                    'enable_debug_capture': getattr(step, 'enable_debug_capture', False),  # 添加调试采集开关
                     'element': None
                 }
 
@@ -387,7 +391,7 @@ class TestExecutor:
                 step_data['_just_switched_tab'] = just_switched_tab
                 just_switched_tab = False  # 重置标志
                 
-                step_result = self.execute_step_playwright(step_data)
+                step_result = self.execute_step_playwright(step_data, project_config=case_data.get('project_config'))
                 
                 # Debug: Log which page we're using
                 print(f"📄 步骤 {step_data['step_number']} 执行完成")
@@ -570,11 +574,108 @@ class TestExecutor:
         result['end_time'] = datetime.now().isoformat()
         return result
 
-    def execute_step_playwright(self, step_data):
-        """使用 Playwright 执行单个步骤（同步版本）
+    def _capture_debug_data(self, page, step_data, project_config=None, timing="after"):
+        """采集调试数据"""
+        captured_data = {}
+        try:
+            # 1. 检查是否开启全局采集
+            if not project_config or not project_config.get('enable_debug_capture', False):
+                return None
+            
+            # 2. 检查步骤是否开启采集
+            if not step_data.get('enable_debug_capture', False):
+                return None
 
+            # 3. 检查时机配置
+            debug_config = project_config.get('debug_config', {})
+            if not debug_config.get(f'enable_{timing}', False):
+                return None
+
+            items = debug_config.get(f'{timing}_items', [])
+            if not items:
+                return None
+
+            import os
+            import json
+            import time
+            from django.conf import settings
+            
+            # 创建调试数据目录
+            # 结构: media/debug_data/project_id/case_id/
+            project_id = self.project.id
+            case_id = step_data.get('test_case')
+            step_name = step_data.get('name', 'unknown_step')
+            
+            # 使用 MEDIA_ROOT
+            relative_dir = os.path.join('debug_data', str(project_id), str(case_id))
+            base_dir = os.path.join(settings.MEDIA_ROOT, relative_dir)
+            os.makedirs(base_dir, exist_ok=True)
+            
+            timestamp = int(time.time() * 1000)
+            file_prefix = f"{step_name}_{timing}_{timestamp}"
+            
+            data = {}
+            
+            # 采集各项数据
+            if "annotated" in items:
+                pass
+                
+            if "dom" in items:
+                try:
+                    data["dom"] = page.content()
+                except:
+                    pass
+            
+            if "dropdown" in items:
+                pass
+                
+            if "elements" in items:
+                pass
+
+            if "iframes" in items:
+                try:
+                    data["iframes"] = [frame.url for frame in page.frames]
+                except:
+                    pass
+                    
+            if "text_candidates" in items:
+                try:
+                    data["text_candidates"] = page.evaluate("() => document.body.innerText")
+                except:
+                    pass
+            
+            if "logs" in items:
+                pass
+
+            # 保存JSON数据
+            if data:
+                json_filename = f"{file_prefix}.json"
+                json_path = os.path.join(base_dir, json_filename)
+                with open(json_path, 'w', encoding='utf-8') as f:
+                    json.dump(data, f, ensure_ascii=False, indent=2)
+                captured_data['data_file'] = os.path.join(settings.MEDIA_URL, relative_dir, json_filename).replace('\\', '/')
+                    
+            # 截图作为额外文件
+            screenshot_filename = f"{file_prefix}.png"
+            screenshot_path = os.path.join(base_dir, screenshot_filename)
+            try:
+                page.screenshot(path=screenshot_path)
+                captured_data['screenshot'] = os.path.join(settings.MEDIA_URL, relative_dir, screenshot_filename).replace('\\', '/')
+            except:
+                pass
+            
+            return captured_data
+
+        except Exception as e:
+            print(f"Error capturing debug data: {e}")
+            return None
+
+    def execute_step_playwright(self, step_data, project_config=None):
+        """使用 Playwright 执行单个步骤（同步版本）
+        
         Args:
             step_data: 预先准备的步骤数据字典
+            project_config: 项目配置，用于调试采集
             
         Note:
             使用 self.current_page 作为当前活动页面
@@ -583,12 +684,16 @@ class TestExecutor:
         start_time = time.time()
 
         step_result = {
+            'id': step_data['id'],
             'step_number': step_data['step_number'],
             'action_type': step_data['action_type'],
             'description': step_data['description'],
             'success': False,
             'error': None
         }
+        
+        # 步骤前采集
+        self._capture_debug_data(self.current_page, step_data, project_config, timing='before')
 
         try:
             # 获取元素定位器
@@ -1170,6 +1275,13 @@ class TestExecutor:
             print(f"   异常类型: {error_type}")
             print(f"   错误信息: {error_str[:500]}")  # 限制长度避免刷屏
 
+        # 步骤后采集
+        after_data = self._capture_debug_data(self.current_page, step_data, project_config, timing='after')
+        if after_data:
+            if 'debug_data' not in step_result:
+                step_result['debug_data'] = {}
+            step_result['debug_data']['after'] = after_data
+
         return step_result
 
     def run_with_selenium(self):
@@ -1632,6 +1744,260 @@ class TestExecutor:
             service = ChromeService(ChromeDriverManager().install())
             driver = webdriver.Chrome(service=service, options=options)
 
+        return driver
+
+    def run_with_airtest(self):
+        """使用 Airtest 执行测试"""
+        start_time = time.time()
+        passed = 0
+        failed = 0
+        skipped = 0
+
+        # 检查 Airtest 是否可用
+        try:
+            from airtest.core.api import auto_setup
+            from airtest_selenium.proxy import WebChrome
+        except ImportError as e:
+            error_msg = (
+                "Airtest 模块未正确安装。\n\n"
+                "请确保已安装: pip install airtest airtest-selenium\n"
+                f"详细错误: {str(e)}"
+            )
+            print(f"❌ {error_msg}")
+            
+            if self.execution:
+                self.update_execution_result(
+                    status='FAILED',
+                    failed=len(self.test_cases),
+                    error_msg=error_msg
+                )
+            return
+
+        # 预先获取所有测试用例的步骤数据
+        test_cases_data = []
+        for test_case in self.test_cases:
+            case_data = {
+                'id': test_case.id,
+                'name': test_case.name,
+                'project_id': self.test_suite.project.id,
+                'steps': []
+            }
+
+            steps = test_case.steps.select_related('element', 'element__locator_strategy').order_by('step_number')
+            for step in steps:
+                step_data = {
+                    'id': step.id,
+                    'step_number': step.step_number,
+                    'action_type': step.action_type,
+                    'description': step.description,
+                    'input_value': step.input_value,
+                    'wait_time': step.wait_time,
+                    'assert_type': step.assert_type,
+                    'assert_value': step.assert_value,
+                    'element': None
+                }
+
+                if step.element:
+                    step_data['element'] = {
+                        'id': step.element.id,
+                        'name': step.element.name,
+                        'locator_value': step.element.locator_value,
+                        'locator_strategy': step.element.locator_strategy.name if step.element.locator_strategy else 'css'
+                    }
+
+                case_data['steps'].append(step_data)
+
+            test_cases_data.append(case_data)
+
+        # 预先创建所有测试用例执行记录
+        case_executions = {}
+        for case_data in test_cases_data:
+            case_execution = TestCaseExecution.objects.create(
+                test_case_id=case_data['id'],
+                project_id=case_data['project_id'],
+                test_suite=self.test_suite,
+                execution_source='suite',
+                status='pending',
+                engine=self.engine,
+                browser=self.browser,
+                headless=self.headless,
+                created_by=self.executed_by
+            )
+            case_executions[case_data['id']] = case_execution
+
+        # Airtest 初始化
+        import os
+        log_dir = os.path.join('logs', 'airtest', f'exec_{self.execution.id if self.execution else int(time.time())}')
+        os.makedirs(log_dir, exist_ok=True)
+        # 初始化 Airtest
+        auto_setup(__file__, logdir=log_dir, devices=[])
+
+        print(f"准备执行 {len(test_cases_data)} 个测试用例 (Airtest)")
+        
+        driver = None
+        try:
+            driver = self.create_airtest_driver()
+            print(f"✓ Airtest 浏览器已启动\n")
+        except Exception as e:
+            print(f"✗ Airtest 浏览器启动失败: {str(e)}")
+            for case_data in test_cases_data:
+                self.results.append({
+                    'test_case_id': case_data['id'],
+                    'test_case_name': case_data['name'],
+                    'status': 'failed',
+                    'steps': [],
+                    'error': f"浏览器启动失败: {str(e)}",
+                    'start_time': datetime.now().isoformat(),
+                    'end_time': datetime.now().isoformat(),
+                    'screenshots': []
+                })
+                failed += 1
+            
+            for case_result in self.results:
+                case_execution = case_executions[case_result['test_case_id']]
+                case_execution.status = 'failed'
+                case_execution.finished_at = timezone.now()
+                case_execution.execution_time = 0
+                case_execution.error_message = case_result['error']
+                case_execution.save()
+            
+            duration = time.time() - start_time
+            self.update_execution_result('FAILED', 0, len(test_cases_data), 0, duration)
+            return
+
+        # 执行测试用例
+        for i, case_data in enumerate(test_cases_data, 1):
+            print(f"\n{'='*60}")
+            print(f"正在执行第 {i}/{len(test_cases_data)} 个用例: {case_data['name']}")
+            print(f"{'='*60}")
+            
+            case_execution = case_executions[case_data['id']]
+            case_execution.started_at = timezone.now()
+            case_execution.status = 'running'
+            case_execution.save()
+
+            try:
+                # 清理浏览器状态
+                if i > 1:
+                    try:
+                        driver.delete_all_cookies()
+                        driver.execute_script("window.localStorage.clear();")
+                        driver.execute_script("window.sessionStorage.clear();")
+                    except:
+                        pass
+                
+                # 导航
+                if self.test_suite.project.base_url:
+                    try:
+                        print(f"正在导航到: {self.test_suite.project.base_url}")
+                        driver.get(self.test_suite.project.base_url)
+                        
+                        # 等待页面加载
+                        try:
+                            WebDriverWait(driver, 10).until(
+                                lambda d: d.execute_script("return document.readyState") == "complete"
+                            )
+                        except:
+                            pass
+
+                        time.sleep(2)
+                        print(f"✓ 成功导航到: {self.test_suite.project.base_url}")
+                    except Exception as e:
+                        print(f"✗ 导航失败: {str(e)}")
+                        self.results.append({
+                            'test_case_id': case_data['id'],
+                            'test_case_name': case_data['name'],
+                            'status': 'failed',
+                            'steps': [],
+                            'error': f"导航到基础URL失败: {str(e)}",
+                            'start_time': datetime.now().isoformat(),
+                            'end_time': datetime.now().isoformat(),
+                            'screenshots': []
+                        })
+                        failed += 1
+                        continue
+
+                # 复用 Selenium 执行逻辑 (WebChrome 兼容 Selenium WebDriver)
+                case_result = self.execute_test_case_selenium_no_db(driver, case_data)
+                self.results.append(case_result)
+                print(f"✓ 用例执行完成，状态: {case_result['status']}")
+                
+                # 更新执行记录
+                case_execution.status = case_result['status']
+                case_execution.finished_at = timezone.now()
+                case_execution.execution_time = (case_execution.finished_at - case_execution.started_at).total_seconds()
+                case_execution.execution_logs = json.dumps(case_result['steps'], ensure_ascii=False)
+                if case_result['error']:
+                    case_execution.error_message = case_result['error']
+                if case_result.get('screenshots'):
+                    case_execution.screenshots = case_result['screenshots']
+                case_execution.save()
+
+                if case_result['status'] == 'passed':
+                    passed += 1
+                elif case_result['status'] == 'failed':
+                    failed += 1
+                else:
+                    skipped += 1
+
+            except Exception as e:
+                print(f"✗ 用例执行出现异常: {str(e)}")
+                self.results.append({
+                    'test_case_id': case_data['id'],
+                    'test_case_name': case_data['name'],
+                    'status': 'failed',
+                    'steps': [],
+                    'error': f"用例执行异常: {str(e)}",
+                    'start_time': datetime.now().isoformat(),
+                    'end_time': datetime.now().isoformat(),
+                    'screenshots': []
+                })
+                failed += 1
+                
+                case_execution.status = 'failed'
+                case_execution.finished_at = timezone.now()
+                case_execution.execution_time = (case_execution.finished_at - case_execution.started_at).total_seconds()
+                case_execution.error_message = f"用例执行异常: {str(e)}"
+                case_execution.save()
+        
+        # 关闭浏览器
+        if driver:
+            try:
+                print(f"\n{'='*60}")
+                print(f"正在关闭浏览器...")
+                driver.quit()
+                print(f"✓ 浏览器已关闭")
+                print(f"{'='*60}\n")
+            except Exception as e:
+                print(f"✗ 关闭浏览器时出错: {str(e)}")
+
+        duration = time.time() - start_time
+        status = 'SUCCESS' if failed == 0 else 'FAILED'
+        self.update_execution_result(status, passed, failed, skipped, duration)
+
+    def create_airtest_driver(self):
+        """创建 Airtest WebChrome"""
+        from airtest_selenium.proxy import WebChrome
+        from selenium.webdriver.chrome.options import Options
+        from webdriver_manager.chrome import ChromeDriverManager
+        from selenium.webdriver.chrome.service import Service as ChromeService
+        
+        options = Options()
+        if self.headless:
+            options.add_argument('--headless')
+        
+        options.add_argument('--disable-gpu')
+        options.add_argument('--no-sandbox')
+        options.add_argument('--disable-dev-shm-usage')
+        options.add_argument('--window-size=1920,1080')
+        options.add_argument('--disable-blink-features=AutomationControlled')
+        
+        # 安装驱动
+        driver_path = ChromeDriverManager().install()
+        
+        # 创建 WebChrome 实例
+        # 注意：WebChrome 构造函数参数可能与 Selenium 不同，通常接受 chrome_options
+        driver = WebChrome(executable_path=driver_path, chrome_options=options)
         return driver
 
     def execute_test_case_selenium_no_db(self, driver, case_data):

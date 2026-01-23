@@ -101,7 +101,7 @@
                       v-for="element in filteredElements"
                       :key="element.id"
                       class="element-item"
-                      draggable
+                      :draggable="true"
                       @dragstart="handleDragStart($event, element)"
                     >
                       <el-icon class="element-icon">
@@ -464,7 +464,10 @@ const selectCanvasElement = (poElement) => {
 }
 
 const handleDragStart = (event, element) => {
-  event.dataTransfer.setData('element', JSON.stringify(element))
+  if (event.dataTransfer) {
+    event.dataTransfer.setData('element', JSON.stringify(element))
+    event.dataTransfer.effectAllowed = 'copy'
+  }
 }
 
 const handleDrop = (event) => {
@@ -739,8 +742,10 @@ onMounted(async () => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 20px;
+  padding: 15px 20px;
   border-bottom: 1px solid #e6e6e6;
+  background: white;        /* 背景色为白色 */
+  flex-shrink: 0; 
 }
 
 .page-title {
@@ -780,6 +785,7 @@ onMounted(async () => {
   border-bottom: 1px solid #e6e6e6;
   background-color: #fafafa;
 }
+
 
 .page-object-list {
   flex: 1;
@@ -889,6 +895,7 @@ onMounted(async () => {
   margin-bottom: 8px;
   cursor: grab;
   transition: all 0.3s;
+  user-select: none; /* 防止拖动时选中文字 */
 }
 
 .element-item:hover {

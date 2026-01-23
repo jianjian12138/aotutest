@@ -2,8 +2,8 @@
   <div class="sql-generation-container">
     <el-card shadow="hover" class="main-card">
       <template #header>
-        <div class="card-header">
-          <span>SQL 生成</span>
+        <div class="card-header page-header" style="margin-bottom: 0;">
+          <h2 class="page-title">SQL 生成</h2>
           <div class="header-actions">
             <el-button type="primary" size="small" @click="generateSqlAction">
               <el-icon><ChatDotRound /></el-icon>
@@ -724,9 +724,16 @@ watch(saveQueryDialogVisible, (newVal) => {
 </script>
 
 <style scoped>
+/* 页面特定样式 */
+.page-container {
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  max-width: 100%; /* 新增：覆盖全局样式的 max-width: 1600px，确保铺满 */
+}
 .sql-generation-container {
   width: 100%;
-  padding: 0 20px;
+  padding: 0;
 }
 
 .main-card {

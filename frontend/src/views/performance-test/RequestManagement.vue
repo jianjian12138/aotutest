@@ -2,8 +2,8 @@
   <div class="request-management">
     <el-card shadow="hover">
       <template #header>
-        <div class="card-header">
-          <h2>请求管理</h2>
+        <div class="card-header page-header" style="margin-bottom: 0;">
+          <h2 class="page-title">请求管理</h2>
           <el-button type="primary" @click="handleCreateRequest">
             <el-icon><Plus /></el-icon>
             新建请求
@@ -80,7 +80,11 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="collection_name" label="所属集合" width="150" />
+        <el-table-column prop="collection_name" label="所属集合" width="150">
+          <template #default="scope">
+            {{ collections.find(c => c.id === scope.row.collection)?.name || scope.row.collection }}
+          </template>
+        </el-table-column>
         <el-table-column prop="timeout" label="超时时间(ms)" width="120" />
         <el-table-column prop="created_by" label="创建人" width="120" />
         <el-table-column prop="created_at" label="创建时间" width="180" />
@@ -110,7 +114,7 @@
           v-model:page-size="pagination.pageSize"
           :page-sizes="[10, 20, 50, 100]"
           layout="total, sizes, prev, pager, next, jumper"
-          :total="totalRequests"
+          :total="pagination.total"
           @size-change="handleSizeChange"
           @current-change="handleCurrentChange"
         />
@@ -184,10 +188,11 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElNotification, ElMessageBox } from 'element-plus'
 import { Plus, Search, View, EditPen, Delete } from '@element-plus/icons-vue'
+import api from '@/utils/api'
 
 const router = useRouter()
 
@@ -197,87 +202,55 @@ const methodFilter = ref('')
 const collectionFilter = ref('')
 
 // 分页
-const pagination = ref({
+const pagination = reactive({
   currentPage: 1,
-  pageSize: 20
+  pageSize: 20,
+  total: 0
 })
-const totalRequests = ref(89)
 
-// 集合列表（用于筛选和创建）
-const collections = ref([
-  { id: 1, name: '用户相关接口' },
-  { id: 2, name: '商品相关接口' },
-  { id: 3, name: '订单相关接口' },
-  { id: 4, name: 'API基础接口' }
-])
+// 数据
+const requests = ref([])
+const collections = ref([])
+const loading = ref(false)
 
-// 请求数据
-const requests = ref([
-  {
-    id: 1,
-    name: '用户登录',
-    url: 'https://api.example.com/login',
-    method: 'POST',
-    collection_id: 1,
-    collection_name: '用户相关接口',
-    timeout: 5000,
-    created_by: 'admin',
-    created_at: '2026-01-10 14:30:00',
-    updated_at: '2026-01-10 14:30:00'
-  },
-  {
-    id: 2,
-    name: '获取用户信息',
-    url: 'https://api.example.com/user/info',
-    method: 'GET',
-    collection_id: 1,
-    collection_name: '用户相关接口',
-    timeout: 3000,
-    created_by: 'testuser',
-    created_at: '2026-01-11 09:15:00',
-    updated_at: '2026-01-11 09:15:00'
-  },
-  {
-    id: 3,
-    name: '创建商品',
-    url: 'https://api.example.com/products',
-    method: 'POST',
-    collection_id: 2,
-    collection_name: '商品相关接口',
-    timeout: 5000,
-    created_by: 'admin',
-    created_at: '2026-01-05 16:00:00',
-    updated_at: '2026-01-08 10:30:00'
-  },
-  {
-    id: 4,
-    name: '获取商品列表',
-    url: 'https://api.example.com/products',
-    method: 'GET',
-    collection_id: 2,
-    collection_name: '商品相关接口',
-    timeout: 3000,
-    created_by: 'testuser',
-    created_at: '2026-01-12 10:00:00',
-    updated_at: '2026-01-12 10:00:00'
-  },
-  {
-    id: 5,
-    name: '创建订单',
-    url: 'https://api.example.com/orders',
-    method: 'POST',
-    collection_id: 3,
-    collection_name: '订单相关接口',
-    timeout: 5000,
-    created_by: 'admin',
-    created_at: '2026-01-10 14:30:00',
-    updated_at: '2026-01-10 14:30:00'
+// 获取集合列表
+const fetchCollections = async () => {
+  try {
+    const response = await api.get('/performance-testing/collections/', {
+      params: { page_size: 100 }
+    })
+    collections.value = response.data.results
+  } catch (error) {
+    console.error('获取集合列表失败:', error)
   }
-])
+}
+
+// 获取请求列表
+const fetchRequests = async () => {
+  loading.value = true
+  try {
+    const params = {
+      page: pagination.currentPage,
+      page_size: pagination.pageSize,
+      search: searchQuery.value,
+      method: methodFilter.value,
+      collection: collectionFilter.value
+    }
+    const response = await api.get('/performance-testing/requests/', { params })
+    requests.value = response.data.results
+    pagination.total = response.data.count
+  } catch (error) {
+    ElMessage.error('获取请求列表失败')
+  } finally {
+    loading.value = false
+  }
+}
 
 // 对话框
 const dialogVisible = ref(false)
-const form = ref({
+const dialogType = ref('create')
+const form = reactive({
+  id: null,
   name: '',
   collection_id: '',
   method: 'GET',
@@ -300,12 +273,13 @@ const getMethodTagType = (method) => {
 
 // 搜索
 const handleSearch = () => {
-  ElMessage.info('搜索功能开发中')
+  pagination.currentPage = 1
+  fetchRequests()
 }
 
 // 处理行点击
 const handleRowClick = (row) => {
-  handleViewRequest(row)
+  // handleViewRequest(row)
 }
 
 // 查看请求
@@ -315,11 +289,15 @@ const handleViewRequest = (row) => {
 
 // 编辑请求
 const handleEditRequest = (row) => {
-  ElNotification({
-    title: '提示',
-    message: `开始编辑请求：${row.name}`,
-    type: 'success'
-  })
+  dialogType.value = 'edit'
+  form.id = row.id
+  form.name = row.name
+  form.collection_id = row.collection
+  form.method = row.method
+  form.url = row.url
+  form.timeout = row.timeout
+  form.description = row.description
+  dialogVisible.value = true
 }
 
 // 删除请求
@@ -328,8 +306,14 @@ const handleDeleteRequest = (row) => {
     confirmButtonText: '确定',
     cancelButtonText: '取消',
     type: 'warning'
-  }).then(() => {
-    ElMessage.success('请求删除成功')
+  }).then(async () => {
+    try {
+      await api.delete(`/performance-testing/requests/${row.id}/`)
+      ElMessage.success('请求删除成功')
+      fetchRequests()
+    } catch (error) {
+      ElMessage.error('删除失败')
+    }
   }).catch(() => {
     // 取消删除
   })
@@ -337,36 +321,76 @@ const handleDeleteRequest = (row) => {
 
 // 新建请求
 const handleCreateRequest = () => {
+  dialogType.value = 'create'
+  form.id = null
+  form.name = ''
+  form.collection_id = collectionFilter.value || (collections.value.length > 0 ? collections.value[0].id : '')
+  form.method = 'GET'
+  form.url = ''
+  form.timeout = 3000
+  form.description = ''
   dialogVisible.value = true
-  form.value = {
-    name: '',
-    collection_id: '',
-    method: 'GET',
-    url: '',
-    timeout: 3000,
-    description: ''
-  }
 }
 
 // 提交表单
-const submitForm = () => {
-  ElMessage.success('请求创建成功')
-  dialogVisible.value = false
+const submitForm = async () => {
+  if (!form.name || !form.url || !form.collection_id) {
+    ElMessage.warning('请填写必要信息')
+    return
+  }
+  
+  try {
+    const data = {
+      name: form.name,
+      collection: form.collection_id,
+      method: form.method,
+      url: form.url,
+      timeout: form.timeout,
+      description: form.description
+    }
+    
+    if (dialogType.value === 'create') {
+      await api.post('/performance-testing/requests/', data)
+      ElMessage.success('请求创建成功')
+    } else {
+      await api.put(`/performance-testing/requests/${form.id}/`, data)
+      ElMessage.success('请求更新成功')
+    }
+    dialogVisible.value = false
+    fetchRequests()
+  } catch (error) {
+    ElMessage.error(dialogType.value === 'create' ? '创建失败' : '更新失败')
+  }
 }
 
 // 分页变化
 const handleSizeChange = (size) => {
-  pagination.value.pageSize = size
+  pagination.pageSize = size
+  fetchRequests()
 }
 
 const handleCurrentChange = (current) => {
-  pagination.value.currentPage = current
+  pagination.currentPage = current
+  fetchRequests()
 }
+
+onMounted(() => {
+  fetchCollections()
+  fetchRequests()
+})
 </script>
 
 <style scoped>
-.request-management {
+/* 页面特定样式 */
+.page-container {
   padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-width: 100%; /* 新增：覆盖全局样式的 max-width: 1600px，确保铺满 */
+}
+.request-management {
+  padding: 0;
 }
 
 .card-header {

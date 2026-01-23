@@ -2,8 +2,8 @@
   <div class="test-suite-management">
     <el-card shadow="hover">
       <template #header>
-        <div class="card-header">
-          <h2>测试套件管理</h2>
+        <div class="card-header page-header" style="margin-bottom: 0;">
+          <h2 class="page-title">测试套件管理</h2>
           <el-button type="primary" @click="handleCreateTestSuite">
             <el-icon><Plus /></el-icon>
             新建测试套件
@@ -86,16 +86,16 @@
       
       <!-- 分页 -->
       <div class="pagination">
-        <el-pagination
-          v-model:current-page="pagination.currentPage"
-          v-model:page-size="pagination.pageSize"
-          :page-sizes="[10, 20, 50, 100]"
-          layout="total, sizes, prev, pager, next, jumper"
-          :total="totalTestSuites"
-          @size-change="handleSizeChange"
-          @current-change="handleCurrentChange"
-        />
-      </div>
+          <el-pagination
+            v-model:current-page="pagination.currentPage"
+            v-model:page-size="pagination.pageSize"
+            :page-sizes="[10, 20, 50, 100]"
+            layout="total, sizes, prev, pager, next, jumper"
+            :total="pagination.total"
+            @size-change="handleSizeChange"
+            @current-change="handleCurrentChange"
+          />
+        </div>
     </el-card>
     
     <!-- 新建测试套件对话框 -->
@@ -138,10 +138,11 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElNotification, ElMessageBox } from 'element-plus'
 import { Plus, Search, View, EditPen, VideoPlay, Delete } from '@element-plus/icons-vue'
+import api from '@/utils/api'
 
 const router = useRouter()
 
@@ -150,75 +151,54 @@ const searchQuery = ref('')
 const projectFilter = ref('')
 
 // 分页
-const pagination = ref({
+const pagination = reactive({
   currentPage: 1,
-  pageSize: 20
+  pageSize: 20,
+  total: 0
 })
-const totalTestSuites = ref(18)
 
-// 项目列表（用于筛选和创建）
-const projects = ref([
-  { id: 1, name: '电商网站性能测试' },
-  { id: 2, name: 'API服务性能测试' },
-  { id: 3, name: '管理后台性能测试' },
-  { id: 4, name: '移动端APP性能测试' }
-])
+// 数据
+const testSuites = ref([])
+const projects = ref([])
+const loading = ref(false)
 
-// 测试套件数据
-const testSuites = ref([
-  {
-    id: 1,
-    name: '用户登录性能测试',
-    description: '测试用户登录接口的性能表现',
-    project_id: 1,
-    project_name: '电商网站性能测试',
-    collection_count: 1,
-    request_count: 5,
-    created_by: 'admin',
-    created_at: '2026-01-10 14:30:00',
-    updated_at: '2026-01-10 14:30:00'
-  },
-  {
-    id: 2,
-    name: '商品浏览性能测试',
-    description: '测试商品浏览相关接口的性能',
-    project_id: 1,
-    project_name: '电商网站性能测试',
-    collection_count: 2,
-    request_count: 12,
-    created_by: 'testuser',
-    created_at: '2026-01-11 09:15:00',
-    updated_at: '2026-01-11 09:15:00'
-  },
-  {
-    id: 3,
-    name: '订单流程性能测试',
-    description: '测试完整订单流程的性能表现',
-    project_id: 1,
-    project_name: '电商网站性能测试',
-    collection_count: 3,
-    request_count: 20,
-    created_by: 'admin',
-    created_at: '2026-01-05 16:00:00',
-    updated_at: '2026-01-08 10:30:00'
-  },
-  {
-    id: 4,
-    name: 'API基础性能测试',
-    description: '测试API服务的基础性能指标',
-    project_id: 2,
-    project_name: 'API服务性能测试',
-    collection_count: 1,
-    request_count: 42,
-    created_by: 'testuser',
-    created_at: '2026-01-12 10:00:00',
-    updated_at: '2026-01-12 10:00:00'
+// 获取项目列表
+const fetchProjects = async () => {
+  try {
+    const response = await api.get('/performance-testing/projects/', {
+      params: { page_size: 100 }
+    })
+    projects.value = response.data.results
+  } catch (error) {
+    console.error('获取项目列表失败:', error)
   }
-])
+}
+
+// 获取测试套件列表
+const fetchTestSuites = async () => {
+  loading.value = true
+  try {
+    const params = {
+      page: pagination.currentPage,
+      page_size: pagination.pageSize,
+      search: searchQuery.value,
+      project: projectFilter.value
+    }
+    const response = await api.get('/performance-testing/test-suites/', { params })
+    testSuites.value = response.data.results
+    pagination.total = response.data.count
+  } catch (error) {
+    ElMessage.error('获取测试套件列表失败')
+  } finally {
+    loading.value = false
+  }
+}
 
 // 对话框
 const dialogVisible = ref(false)
-const form = ref({
+const dialogType = ref('create')
+const form = reactive({
+  id: null,
   name: '',
   project_id: '',
   description: ''
@@ -226,12 +206,13 @@ const form = ref({
 
 // 搜索
 const handleSearch = () => {
-  ElMessage.info('搜索功能开发中')
+  pagination.currentPage = 1
+  fetchTestSuites()
 }
 
 // 处理行点击
 const handleRowClick = (row) => {
-  handleViewTestSuite(row)
+  // handleViewTestSuite(row)
 }
 
 // 查看测试套件
@@ -241,11 +222,12 @@ const handleViewTestSuite = (row) => {
 
 // 编辑测试套件
 const handleEditTestSuite = (row) => {
-  ElNotification({
-    title: '提示',
-    message: `开始编辑测试套件：${row.name}`,
-    type: 'success'
-  })
+  dialogType.value = 'edit'
+  form.id = row.id
+  form.name = row.name
+  form.project_id = row.project
+  form.description = row.description
+  dialogVisible.value = true
 }
 
 // 运行测试套件
@@ -254,9 +236,14 @@ const handleRunTestSuite = (row) => {
     confirmButtonText: '确定',
     cancelButtonText: '取消',
     type: 'info'
-  }).then(() => {
-    ElMessage.success(`测试套件 ${row.name} 开始运行`)
-    router.push(`/performance-test/executions/create?test_suite_id=${row.id}`)
+  }).then(async () => {
+    try {
+      await api.post(`/performance-testing/test-suites/${row.id}/run/`)
+      ElMessage.success(`测试套件 ${row.name} 开始运行`)
+      // router.push(`/performance-test/executions/create?test_suite_id=${row.id}`)
+    } catch (error) {
+      ElMessage.error('运行失败')
+    }
   }).catch(() => {
     // 取消运行
   })
@@ -268,8 +255,14 @@ const handleDeleteTestSuite = (row) => {
     confirmButtonText: '确定',
     cancelButtonText: '取消',
     type: 'warning'
-  }).then(() => {
-    ElMessage.success('测试套件删除成功')
+  }).then(async () => {
+    try {
+      await api.delete(`/performance-testing/test-suites/${row.id}/`)
+      ElMessage.success('测试套件删除成功')
+      fetchTestSuites()
+    } catch (error) {
+      ElMessage.error('删除失败')
+    }
   }).catch(() => {
     // 取消删除
   })
@@ -277,33 +270,70 @@ const handleDeleteTestSuite = (row) => {
 
 // 新建测试套件
 const handleCreateTestSuite = () => {
+  dialogType.value = 'create'
+  form.id = null
+  form.name = ''
+  form.project_id = projectFilter.value || (projects.value.length > 0 ? projects.value[0].id : '')
+  form.description = ''
   dialogVisible.value = true
-  form.value = {
-    name: '',
-    project_id: '',
-    description: ''
-  }
 }
 
 // 提交表单
-const submitForm = () => {
-  ElMessage.success('测试套件创建成功')
-  dialogVisible.value = false
+const submitForm = async () => {
+  if (!form.name || !form.project_id) {
+    ElMessage.warning('请填写必要信息')
+    return
+  }
+  
+  try {
+    const data = {
+      name: form.name,
+      project: form.project_id,
+      description: form.description
+    }
+    
+    if (dialogType.value === 'create') {
+      await api.post('/performance-testing/test-suites/', data)
+      ElMessage.success('测试套件创建成功')
+    } else {
+      await api.put(`/performance-testing/test-suites/${form.id}/`, data)
+      ElMessage.success('测试套件更新成功')
+    }
+    dialogVisible.value = false
+    fetchTestSuites()
+  } catch (error) {
+    ElMessage.error(dialogType.value === 'create' ? '创建失败' : '更新失败')
+  }
 }
 
 // 分页变化
 const handleSizeChange = (size) => {
-  pagination.value.pageSize = size
+  pagination.pageSize = size
+  fetchTestSuites()
 }
 
 const handleCurrentChange = (current) => {
-  pagination.value.currentPage = current
+  pagination.currentPage = current
+  fetchTestSuites()
 }
+
+onMounted(() => {
+  fetchProjects()
+  fetchTestSuites()
+})
 </script>
 
 <style scoped>
-.test-suite-management {
+/* 页面特定样式 */
+.page-container {
   padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-width: 100%; /* 新增：覆盖全局样式的 max-width: 1600px，确保铺满 */
+}
+.test-suite-management {
+  padding: 0;
 }
 
 .card-header {

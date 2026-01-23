@@ -1,29 +1,27 @@
 <template>
-  <div class="user-management">
-    <el-card shadow="hover" class="page-card">
-      <template #header>
-        <div class="card-header">
-          <h2 class="page-title">用户管理</h2>
-          <div class="header-actions">
-            <el-input
-              v-model="searchKeyword"
-              placeholder="搜索用户名/邮箱"
-              clearable
-              style="width: 300px; margin-right: 10px"
-              @input="handleSearch"
-            >
-              <template #prefix>
-                <el-icon><Search /></el-icon>
-              </template>
-            </el-input>
-            <el-button type="primary" @click="showAddDialog = true">
-              <el-icon><Plus /></el-icon>
-              新增用户
-            </el-button>
-          </div>
-        </div>
-      </template>
-      
+  <div class="page-container">
+    <div class="page-header">
+      <h1 class="page-title">用户管理</h1>
+      <div class="header-actions">
+        <el-input
+          v-model="searchKeyword"
+          placeholder="搜索用户名/邮箱"
+          clearable
+          style="width: 300px; margin-right: 10px"
+          @input="handleSearch"
+        >
+          <template #prefix>
+            <el-icon><Search /></el-icon>
+          </template>
+        </el-input>
+        <el-button type="primary" @click="showAddDialog = true">
+          <el-icon><Plus /></el-icon>
+          新增用户
+        </el-button>
+      </div>
+    </div>
+    
+    <div class="card-container">
       <div class="content">
         <!-- 用户列表 -->
         <el-table 
@@ -81,7 +79,7 @@
           />
         </div>
       </div>
-    </el-card>
+    </div>
 
     <!-- 新增用户对话框 -->
     <el-dialog
@@ -444,28 +442,53 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.user-management {
-  width: 100%;
+/* 页面特定样式 */
+.page-container {
+  height: 100vh;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  max-width: 100%; /* 新增：覆盖全局样式的 max-width: 1600px，确保铺满 */
 }
 
-.page-card {
-  margin-bottom: 20px;
-}
-
-.card-header {
+.page-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  padding: 15px 20px;
+  border-bottom: 1px solid #e6e6e6;
+  background: white;
+  flex-shrink: 0;
 }
 
 .page-title {
   margin: 0;
-  font-size: 20px;
+  font-size: 24px;
   font-weight: 600;
+  color: #303133;
+  position: relative;
+  padding-left: 16px;
+}
+
+.page-title::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 20px;
+  background: var(--primary-color, #409eff);
+  border-radius: 2px;
+}
+
+.header-actions {
+  display: flex;
+  gap: 15px;
 }
 
 .content {
-  padding: 20px 0;
+  padding: 0;
 }
 
 .pagination-container {

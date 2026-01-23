@@ -2,7 +2,7 @@
   <div class="table-metadata-container">
     <el-card shadow="hover" class="page-card">
       <template #header>
-        <div class="card-header">
+        <div class="card-header page-header" style="margin-bottom: 0;">
           <h2 class="page-title">表元数据管理</h2>
           <el-button type="primary" @click="handleRefreshMetadata" :loading="refreshing">
             <el-icon><Refresh /></el-icon>
@@ -359,7 +359,7 @@ onMounted(() => {
 
 .page-title {
   margin: 0;
-  font-size: 20px;
+  font-size: 24px;
   font-weight: 600;
 }
 

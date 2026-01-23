@@ -1,5 +1,16 @@
 <template>
-  <div class="test-report">
+  <div class="page-container">
+    <div class="page-header">
+      <h1 class="page-title">AI测试报告</h1>
+      <div class="header-actions">
+        <el-button type="primary" @click="exportReport">
+          <el-icon><Download /></el-icon>
+          导出报告
+        </el-button>
+      </div>
+    </div>
+
+    <div class="card-container">
     <!-- 筛选栏 -->
     <div class="filter-bar">
       <div class="left-filters">
@@ -11,12 +22,6 @@
           <el-option label="最近14天" :value="14"></el-option>
           <el-option label="最近30天" :value="30"></el-option>
         </el-select>
-      </div>
-      <div class="right-actions">
-        <el-button type="primary" @click="exportReport">
-          <el-icon><Download /></el-icon>
-          导出报告
-        </el-button>
       </div>
     </div>
 
@@ -138,6 +143,7 @@
           <div class="chart-body" ref="workloadChartRef"></div>
         </div>
       </div>
+    </div>
     </div>
   </div>
 </template>
@@ -420,6 +426,50 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+/* 页面特定样式 */
+.page-container {
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+
+  max-width: 100%; /* 新增：覆盖全局样式的 max-width: 1600px，确保铺满 */
+}
+
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 20px;
+  border-bottom: 1px solid #e6e6e6;
+  background: white;
+  flex-shrink: 0;
+}
+
+.page-title {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+  color: #303133;
+  position: relative;
+  padding-left: 16px;
+}
+
+.page-title::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 20px;
+  background: var(--primary-color, #409eff);
+  border-radius: 2px;
+}
+
+.header-actions {
+  display: flex;
+  gap: 15px;
+}
 .test-report {
   padding: 20px;
   background-color: #f5f7fa;

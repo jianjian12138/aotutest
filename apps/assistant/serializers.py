@@ -1,22 +1,20 @@
 from rest_framework import serializers
-from .models import AssistantSession, AssistantMessage, DifyConfig, ChatMessage, AIWorkflowConfig, KnowledgeDocument, KnowledgeEntity, KnowledgeRelationship
+from .models import (
+    AssistantSession,
+    AssistantMessage,
+    DifyConfig,
+    ChatMessage,
+    KnowledgeDocument,
+    KnowledgeEntity,
+    KnowledgeRelationship,
+    AIWorkflowConfig
+)
 
 
 class DifyConfigSerializer(serializers.ModelSerializer):
     class Meta:
         model = DifyConfig
         fields = ['id', 'api_url', 'api_key', 'is_active', 'created_at', 'updated_at']
-        extra_kwargs = {
-            'api_key': {'write_only': True}  # Don't expose API key in responses
-        }
-
-
-class AIWorkflowConfigSerializer(serializers.ModelSerializer):
-    provider_display = serializers.CharField(source='get_provider_display', read_only=True)
-    
-    class Meta:
-        model = AIWorkflowConfig
-        fields = ['id', 'name', 'provider', 'provider_display', 'api_url', 'api_key', 'workflow_id', 'additional_config', 'is_active', 'created_at', 'updated_at']
         extra_kwargs = {
             'api_key': {'write_only': True}  # Don't expose API key in responses
         }
@@ -54,21 +52,16 @@ class AssistantSessionCreateSerializer(serializers.ModelSerializer):
         return super().create(validated_data)
 
 
+class AIWorkflowConfigSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AIWorkflowConfig
+        fields = '__all__'
+
+
 class KnowledgeDocumentSerializer(serializers.ModelSerializer):
-    size = serializers.SerializerMethodField()
-    
     class Meta:
         model = KnowledgeDocument
-        fields = ['id', 'title', 'type', 'created_at', 'updated_at', 'file', 'size', 'content']
-        read_only_fields = ['created_by', 'created_at', 'updated_at']
-
-    def get_size(self, obj):
-        if obj.file:
-            try:
-                return obj.file.size
-            except:
-                return 0
-        return len(obj.content) if obj.content else 0
+        fields = '__all__'
 
 
 class KnowledgeEntitySerializer(serializers.ModelSerializer):
@@ -78,9 +71,6 @@ class KnowledgeEntitySerializer(serializers.ModelSerializer):
 
 
 class KnowledgeRelationshipSerializer(serializers.ModelSerializer):
-    source_name = serializers.CharField(source='source.name', read_only=True)
-    target_name = serializers.CharField(source='target.name', read_only=True)
-    
     class Meta:
         model = KnowledgeRelationship
         fields = '__all__'

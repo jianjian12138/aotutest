@@ -201,11 +201,12 @@ class AIModelConfig(models.Model):
         ('writer', '测试用例编写专家'),
         ('reviewer', '测试评审专家'),
         ('browser_use_text', 'Browser Use - 文本模式'),
+        ('autoglm', 'AutoGLM - 移动端AI'),
     ]
     
     name = models.CharField(max_length=100, verbose_name='配置名称')
-    model_type = models.CharField(max_length=20, choices=MODEL_CHOICES, verbose_name='模型类型')
-    role = models.CharField(max_length=20, choices=ROLE_CHOICES, verbose_name='角色')
+    model_type = models.CharField(max_length=50, verbose_name='模型类型')  # 移除 choices 限制以支持自定义
+    role = models.CharField(max_length=50, verbose_name='角色')  # 移除 choices 限制以支持自定义
     api_key = models.CharField(max_length=200, verbose_name='API Key', blank=True, null=True)
     base_url = models.URLField(verbose_name='API Base URL')
     model_name = models.CharField(max_length=100, verbose_name='模型名称')

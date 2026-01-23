@@ -1,12 +1,17 @@
 <template>
-  <div class="ui-env-config">
+  <div class="page-container">
     <div class="page-header">
-      <h1>🖥️ UI自动化环境配置</h1>
-      <p>检测和管理浏览器驱动环境</p>
+      <h3 class="page-title">自动化环境配置</h3>
+      <div class="header-actions">
+        <!-- Actions if any -->
+      </div>
     </div>
 
     <div class="main-content">
-      <div class="check-section">
+      <div class="card-container scrollable-content">
+        <p class="description-text">检测和管理浏览器驱动环境</p>
+
+        <div class="check-section">
         <el-button type="primary" size="large" @click="checkEnvironment" :loading="checking">
           <el-icon><Refresh /></el-icon>
           检测环境
@@ -143,6 +148,7 @@
           </div>
         </div>
       </div>
+      </div>
     </div>
   </div>
 </template>
@@ -211,28 +217,80 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.ui-env-config {
-  padding: 20px;
-  max-width: 1200px;
-  margin: 0 auto;
+.page-container {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  background-color: var(--el-bg-color-page);
+  max-width: 100%; /* 新增：覆盖全局样式的 max-width: 1600px，确保铺满 */
 }
 
 .page-header {
-  text-align: center;
-  margin-bottom: 40px;
+  flex-shrink: 0;
+  padding: 16px 24px;
+  background: #fff;
+  border-bottom: 1px solid var(--el-border-color-light);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
-.page-header h1 {
-  font-size: 2.5rem;
-  color: #2c3e50;
-  margin-bottom: 10px;
+.page-title {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+  display: flex;
+  align-items: center;
+  margin: 0;
 }
 
-.page-header p {
-  color: #666;
-  font-size: 1.1rem;
+.page-title::before {
+  content: '';
+  width: 4px;
+  height: 16px;
+  background-color: var(--el-color-primary);
+  margin-right: 8px;
+  border-radius: 2px;
 }
 
+.header-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.main-content {
+  flex: 1;
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.card-container {
+  flex: 1;
+  background: #fff;
+  border-radius: 4px;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  overflow: hidden;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+}
+
+.scrollable-content {
+  overflow-y: auto;
+}
+
+.description-text {
+  margin-top: 0;
+  margin-bottom: 20px;
+  font-size: 13px;
+  color: var(--el-text-color-secondary);
+  text-align: left;
+}
+
+/* Custom styles below */
 .check-section {
   display: flex;
   flex-direction: column;

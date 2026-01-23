@@ -22,6 +22,10 @@ class UiProject(models.Model):
     end_date = models.DateField(null=True, blank=True, verbose_name='结束日期')
     owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name='owned_ui_projects', verbose_name='负责人')
     members = models.ManyToManyField(User, blank=True, related_name='ui_projects', verbose_name='团队成员')
+    
+    # 调试配置
+    debug_config = models.JSONField(default=dict, blank=True, verbose_name='调试配置', help_text='Playwright调试数据采集配置')
+    
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='创建时间')
     updated_at = models.DateTimeField(auto_now=True, verbose_name='更新时间')
 
@@ -189,6 +193,7 @@ class TestScript(models.Model):
     FRAMEWORK_CHOICES = [
         ('playwright', 'Playwright'),
         ('selenium', 'Selenium'),
+        ('airtest', 'Airtest'),
     ]
 
     project = models.ForeignKey(UiProject, on_delete=models.CASCADE, related_name='test_scripts', verbose_name='所属项目')
@@ -348,6 +353,7 @@ class ScriptStep(models.Model):
     wait_before = models.IntegerField(default=0, verbose_name='执行前等待(毫秒)')
     wait_after = models.IntegerField(default=0, verbose_name='执行后等待(毫秒)')
     retry_count = models.IntegerField(default=0, verbose_name='重试次数')
+    enable_debug_capture = models.BooleanField(default=False, verbose_name='启用调试采集')
 
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='创建时间')
     updated_at = models.DateTimeField(auto_now=True, verbose_name='更新时间')
@@ -637,6 +643,7 @@ class TestCaseStep(models.Model):
     assert_type = models.CharField(max_length=20, choices=ASSERT_TYPE_CHOICES, blank=True, verbose_name='断言类型')
     assert_value = models.TextField(blank=True, verbose_name='断言期望值')
     description = models.TextField(blank=True, verbose_name='步骤描述')
+    enable_debug_capture = models.BooleanField(default=False, verbose_name='启用调试采集')
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='创建时间')
 
     class Meta:
@@ -786,7 +793,7 @@ class UiScheduledTask(models.Model):
 
     # 执行配置
     engine = models.CharField(max_length=20, default='playwright', verbose_name='执行引擎',
-                             help_text='playwright或selenium')
+                             help_text='playwright, selenium或airtest')
     browser = models.CharField(max_length=20, default='chrome', verbose_name='浏览器类型')
     headless = models.BooleanField(default=False, verbose_name='无头模式')
 
@@ -1056,6 +1063,7 @@ class AICase(models.Model):
     name = models.CharField(max_length=200, verbose_name='用例名称')
     description = models.TextField(blank=True, null=True, verbose_name='描述')
     task_description = models.TextField(verbose_name='任务描述', help_text='自然语言任务描述')
+    execution_mode = models.CharField(max_length=20, choices=[('web', 'Web'), ('mobile', 'Mobile')], default='web', verbose_name='执行模式')
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='创建时间')
     updated_at = models.DateTimeField(auto_now=True, verbose_name='更新时间')
     created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, verbose_name='创建者')
@@ -1083,7 +1091,7 @@ class AIExecutionRecord(models.Model):
     ai_case = models.ForeignKey(AICase, on_delete=models.SET_NULL, null=True, blank=True, verbose_name='关联AI用例')
     case_name = models.CharField(max_length=200, verbose_name='用例名称快照')
     task_description = models.TextField(blank=True, default='', verbose_name='任务描述', help_text='用户输入的原始任务描述')
-    execution_mode = models.CharField(max_length=20, choices=[('text', '文本模式')], default='text', verbose_name='执行模式')
+    execution_mode = models.CharField(max_length=20, choices=[('text', '文本模式'), ('web', 'Web模式'), ('mobile', '移动端模式')], default='text', verbose_name='执行模式')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending', verbose_name='执行状态')
     start_time = models.DateTimeField(auto_now_add=True, verbose_name='开始时间')
     end_time = models.DateTimeField(null=True, blank=True, verbose_name='结束时间')
@@ -1103,4 +1111,43 @@ class AIExecutionRecord(models.Model):
 
     def __str__(self):
         return f"{self.case_name} - {self.get_status_display()}"
+
+
+class UiDevice(models.Model):
+    """UI自动化测试设备模型"""
+    PLATFORM_CHOICES = [
+        ('android', 'Android'),
+        ('ios', 'iOS'),
+    ]
+    
+    TYPE_CHOICES = [
+        ('real', '真机'),
+        ('emulator', '模拟器'),
+    ]
+    
+    STATUS_CHOICES = [
+        ('online', '在线'),
+        ('offline', '离线'),
+        ('busy', '忙碌'),
+        ('unauthorized', '未授权'),
+    ]
+
+    name = models.CharField(max_length=200, verbose_name='设备名称')
+    device_id = models.CharField(max_length=100, unique=True, verbose_name='设备ID', help_text='UDID或序列号')
+    platform = models.CharField(max_length=20, choices=PLATFORM_CHOICES, verbose_name='平台')
+    type = models.CharField(max_length=20, choices=TYPE_CHOICES, default='real', verbose_name='设备类型')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='offline', verbose_name='设备状态')
+    version = models.CharField(max_length=50, blank=True, verbose_name='系统版本')
+    remote_url = models.CharField(max_length=200, blank=True, null=True, verbose_name='远程连接URL')
+    last_online = models.DateTimeField(default=timezone.now, verbose_name='最后在线时间')
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='创建时间')
+
+    class Meta:
+        db_table = 'ui_devices'
+        verbose_name = '测试设备'
+        verbose_name_plural = '测试设备'
+        ordering = ['-status', '-last_online']
+
+    def __str__(self):
+        return f"{self.name} ({self.device_id})"
 

@@ -9,6 +9,8 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters
 from django.db import models
 from django.utils import timezone
+from django.conf import settings
+import os
 import logging
 import json
 import re
@@ -22,7 +24,7 @@ from .models import (
     TestCase, TestCaseStep, TestCaseExecution, OperationRecord,
     TestCase, TestCaseStep, TestCaseExecution, OperationRecord,
     UiScheduledTask, UiNotificationConfig, UiNotificationLog, UiTaskNotificationSetting,
-    AICase, AIExecutionRecord
+    AICase, AIExecutionRecord, UiDevice
 )
 from .serializers import (
     UiProjectSerializer, UiProjectCreateSerializer, UiProjectUpdateSerializer,
@@ -40,7 +42,7 @@ from .serializers import (
     TestCaseSerializer, TestCaseStepSerializer, TestCaseExecutionSerializer, TestCaseRunSerializer,
     OperationRecordSerializer,
     UiScheduledTaskSerializer, UiNotificationConfigSerializer, UiNotificationLogSerializer, UiTaskNotificationSettingSerializer,
-    AICaseSerializer, AIExecutionRecordSerializer
+    AICaseSerializer, AIExecutionRecordSerializer, UiDeviceSerializer
 )
 from .operation_logger import log_operation
 
@@ -625,6 +627,27 @@ class TestScriptViewSet(viewsets.ModelViewSet):
         ).distinct()
         return TestScript.objects.filter(project__in=accessible_projects)
 
+    @action(detail=False, methods=['post'])
+    def format_code(self, request):
+        """格式化代码"""
+        code = request.data.get('code', '')
+        language = request.data.get('language', 'python')
+
+        if not code:
+            return Response({'error': '代码不能为空'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if language == 'python':
+            try:
+                import black
+                formatted_code = black.format_str(code, mode=black.Mode())
+                return Response({'code': formatted_code})
+            except ImportError:
+                return Response({'error': '服务器未安装black格式化工具'}, status=status.HTTP_501_NOT_IMPLEMENTED)
+            except Exception as e:
+                return Response({'error': f'格式化失败: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        return Response({'code': code})
+
 
 class TestSuiteViewSet(viewsets.ModelViewSet):
     queryset = TestSuite.objects.all()
@@ -939,55 +962,70 @@ class TestCaseViewSet(viewsets.ModelViewSet):
         return TestCase.objects.filter(project__in=accessible_projects).select_related('project', 'created_by')
 
     def perform_create(self, serializer):
-        # 创建测试用例
-        instance = serializer.save(created_by=self.request.user)
+        from django.db import transaction
+        
+        try:
+            with transaction.atomic():
+                # 创建测试用例
+                instance = serializer.save(created_by=self.request.user)
 
-        # 记录操作
-        log_operation('create', 'test_case', instance.id, instance.name, self.request.user)
+                # 记录操作
+                log_operation('create', 'test_case', instance.id, instance.name, self.request.user)
 
-        # 处理步骤数据
-        steps_data = self.request.data.get('steps', [])
-        logger.info(f"创建测试用例 {instance.id} 的步骤数据: {len(steps_data)} 个步骤")
+                # 处理步骤数据
+                # 注意：如果前端未传steps字段，get返回None，不进行步骤处理
+                steps_data = self.request.data.get('steps')
+                logger.info(f"创建测试用例 {instance.id} 的步骤数据: {len(steps_data) if steps_data else 0} 个步骤")
 
-        if steps_data:
-            # 创建新步骤
-            created_count = 0
-            for i, step_data in enumerate(steps_data):
-                # 确保步骤数据结构正确
-                step_data = dict(step_data)  # 创建副本避免修改原数据
-                step_data['test_case'] = instance.id  # 使用测试用例ID
-                step_data['step_number'] = i + 1  # 确保步骤序号正确
+                if steps_data:
+                    # 创建新步骤
+                    created_count = 0
+                    for i, step_data in enumerate(steps_data):
+                        # 确保步骤数据结构正确
+                        if hasattr(step_data, 'dict'):
+                            step_data = step_data.dict()
+                        else:
+                            step_data = dict(step_data)
+                            
+                        step_data['test_case'] = instance.id  # 使用测试用例ID
+                        step_data['step_number'] = i + 1  # 确保步骤序号正确
 
-                # 处理元素ID
-                if 'element_id' in step_data:
-                    step_data['element'] = step_data.pop('element_id')
+                        # 处理元素ID
+                        if 'element_id' in step_data:
+                            step_data['element'] = step_data.pop('element_id')
 
-                # 移除只读字段
-                step_data.pop('id', None)
-                step_data.pop('element_name', None)
-                step_data.pop('element_locator', None)
-                step_data.pop('created_at', None)
-                step_data.pop('expanded', None)  # 前端UI状态字段
+                        # 移除只读字段
+                        step_data.pop('id', None)
+                        step_data.pop('element_name', None)
+                        step_data.pop('element_locator', None)
+                        step_data.pop('created_at', None)
+                        step_data.pop('expanded', None)  # 前端UI状态字段
 
-                # 使用模型直接创建，避免序列化器的复杂性
-                try:
-                    TestCaseStep.objects.create(
-                        test_case=instance,
-                        step_number=step_data.get('step_number', i + 1),
-                        action_type=step_data.get('action_type', 'click'),
-                        element_id=step_data.get('element') if step_data.get('element') else None,
-                        input_value=step_data.get('input_value', ''),
-                        wait_time=step_data.get('wait_time', 1000),
-                        assert_type=step_data.get('assert_type', ''),
-                        assert_value=step_data.get('assert_value', ''),
-                        description=step_data.get('description', '')
-                    )
-                    created_count += 1
-                except Exception as e:
-                    logger.error(f"创建步骤 {i+1} 失败: {str(e)}")
-                    logger.error(f"步骤数据: {step_data}")
+                        # 使用模型直接创建，避免序列化器的复杂性
+                        try:
+                            TestCaseStep.objects.create(
+                                test_case=instance,
+                                step_number=step_data.get('step_number', i + 1),
+                                action_type=step_data.get('action_type', 'click'),
+                                element_id=step_data.get('element') if step_data.get('element') else None,
+                                input_value=step_data.get('input_value', ''),
+                                wait_time=step_data.get('wait_time', 1000),
+                                assert_type=step_data.get('assert_type', ''),
+                                assert_value=step_data.get('assert_value', ''),
+                                description=step_data.get('description', ''),
+                                enable_debug_capture=step_data.get('enable_debug_capture', False)
+                            )
+                            created_count += 1
+                        except Exception as e:
+                            logger.error(f"创建步骤 {i+1} 失败: {str(e)}")
+                            logger.error(f"步骤数据: {step_data}")
+                            raise serializers.ValidationError(f"步骤 {i+1} 创建失败: {str(e)}")
 
-            logger.info(f"成功创建了 {created_count} 个新步骤")
+                    logger.info(f"成功创建了 {created_count} 个新步骤")
+                    
+        except Exception as e:
+            logger.error(f"创建测试用例失败: {str(e)}")
+            raise serializers.ValidationError(f"创建失败: {str(e)}")
 
     @action(detail=True, methods=['post'])
     def copy_case(self, request, pk=None):
@@ -1018,7 +1056,8 @@ class TestCaseViewSet(viewsets.ModelViewSet):
                     wait_time=step.wait_time,
                     assert_type=step.assert_type,
                     assert_value=step.assert_value,
-                    description=step.description
+                    description=step.description,
+                    enable_debug_capture=step.enable_debug_capture
                 ))
             
             if new_steps:
@@ -1035,60 +1074,80 @@ class TestCaseViewSet(viewsets.ModelViewSet):
             return Response({'error': f"复制失败: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def perform_update(self, serializer):
-        # 更新测试用例步骤
-        instance = serializer.save()
+        from django.db import transaction
+        
+        # 调试日志
+        logger.info(f"收到更新请求: {self.request.data}")
+        steps_data_raw = self.request.data.get('steps')
+        logger.info(f"raw steps: {steps_data_raw}, type: {type(steps_data_raw)}")
+        
+        try:
+            with transaction.atomic():
+                # 更新测试用例
+                instance = serializer.save()
 
-        # 记录操作
-        log_operation('edit', 'test_case', instance.id, instance.name, self.request.user)
+                # 记录操作
+                log_operation('edit', 'test_case', instance.id, instance.name, self.request.user)
 
-        # 处理步骤数据
-        steps_data = self.request.data.get('steps', [])
-        logger.info(f"更新测试用例 {instance.id} 的步骤数据: {len(steps_data)} 个步骤")
+                # 处理步骤数据
+                # 注意：如果前端未传steps字段，get返回None，不进行步骤处理
+                steps_data = self.request.data.get('steps')
+                logger.info(f"更新测试用例 {instance.id} 的步骤数据: {len(steps_data) if steps_data else 0} 个步骤")
 
-        if steps_data:
-            # 删除现有步骤
-            existing_steps_count = instance.steps.count()
-            instance.steps.all().delete()
-            logger.info(f"删除了 {existing_steps_count} 个现有步骤")
+                if steps_data is not None:
+                    # 删除现有步骤
+                    existing_steps_count = instance.steps.count()
+                    instance.steps.all().delete()
+                    logger.info(f"删除了 {existing_steps_count} 个现有步骤")
 
-            # 创建新步骤
-            created_count = 0
-            for i, step_data in enumerate(steps_data):
-                # 确保步骤数据结构正确
-                step_data = dict(step_data)  # 创建副本避免修改原数据
-                step_data['test_case'] = instance.id  # 使用测试用例ID
-                step_data['step_number'] = i + 1  # 确保步骤序号正确
+                    # 创建新步骤
+                    created_count = 0
+                    for i, step_data in enumerate(steps_data):
+                        # 确保步骤数据结构正确
+                        if hasattr(step_data, 'dict'):
+                            step_data = step_data.dict()
+                        else:
+                            step_data = dict(step_data)
+                            
+                        step_data['test_case'] = instance.id  # 使用测试用例ID
+                        step_data['step_number'] = i + 1  # 确保步骤序号正确
 
-                # 处理元素ID
-                if 'element_id' in step_data:
-                    step_data['element'] = step_data.pop('element_id')
+                        # 处理元素ID
+                        if 'element_id' in step_data:
+                            step_data['element'] = step_data.pop('element_id')
 
-                # 移除只读字段
-                step_data.pop('id', None)
-                step_data.pop('element_name', None)
-                step_data.pop('element_locator', None)
-                step_data.pop('created_at', None)
-                step_data.pop('expanded', None)  # 前端UI状态字段
+                        # 移除只读字段
+                        step_data.pop('id', None)
+                        step_data.pop('element_name', None)
+                        step_data.pop('element_locator', None)
+                        step_data.pop('created_at', None)
+                        step_data.pop('expanded', None)  # 前端UI状态字段
 
-                # 使用模型直接创建，避免序列化器的复杂性
-                try:
-                    TestCaseStep.objects.create(
-                        test_case=instance,
-                        step_number=step_data.get('step_number', i + 1),
-                        action_type=step_data.get('action_type', 'click'),
-                        element_id=step_data.get('element') if step_data.get('element') else None,
-                        input_value=step_data.get('input_value', ''),
-                        wait_time=step_data.get('wait_time', 1000),
-                        assert_type=step_data.get('assert_type', ''),
-                        assert_value=step_data.get('assert_value', ''),
-                        description=step_data.get('description', '')
-                    )
-                    created_count += 1
-                except Exception as e:
-                    logger.error(f"创建步骤 {i+1} 失败: {str(e)}")
-                    logger.error(f"步骤数据: {step_data}")
+                        # 使用模型直接创建，避免序列化器的复杂性
+                        try:
+                            TestCaseStep.objects.create(
+                                test_case=instance,
+                                step_number=step_data.get('step_number', i + 1),
+                                action_type=step_data.get('action_type', 'click'),
+                                element_id=step_data.get('element') if step_data.get('element') else None,
+                                input_value=step_data.get('input_value', ''),
+                                wait_time=step_data.get('wait_time', 1000),
+                                assert_type=step_data.get('assert_type', ''),
+                                assert_value=step_data.get('assert_value', ''),
+                                description=step_data.get('description', ''),
+                                enable_debug_capture=step_data.get('enable_debug_capture', False)
+                            )
+                            created_count += 1
+                        except Exception as e:
+                            logger.error(f"创建步骤 {i+1} 失败: {str(e)}")
+                            logger.error(f"步骤数据: {step_data}")
+                            raise serializers.ValidationError(f"步骤 {i+1} 创建失败: {str(e)}")
 
-            logger.info(f"成功创建了 {created_count} 个新步骤")
+                    logger.info(f"成功创建了 {created_count} 个新步骤")
+
+        except Exception as e:
+            logger.error(f"更新测试用例失败: {str(e)}")
+            raise serializers.ValidationError(f"更新失败: {str(e)}")
 
     def _generate_step_log(self, step, step_result='success'):
         """根据测试步骤生成执行日志"""
@@ -1324,6 +1383,7 @@ class TestCaseViewSet(viewsets.ModelViewSet):
 
             # 获取测试用例的所有步骤
             test_steps = list(test_case.steps.all().order_by('step_number'))
+            logger.info(f"执行测试用例 {test_case.id}: 找到 {len(test_steps)} 个步骤")
 
             # 预先获取所有步骤的数据,避免在异步上下文中访问ORM
             steps_data = []
@@ -1360,12 +1420,32 @@ class TestCaseViewSet(viewsets.ModelViewSet):
             execution_logs.append(f"测试用例 '{test_case.name}' 开始执行")
             execution_logs.append(f"执行时间: {timezone.now().strftime('%Y-%m-%d %H:%M:%S')}")
             execution_logs.append(f"执行引擎: {engine_type.upper()}")
-            execution_logs.append(f"浏览器: {request.data.get('browser', 'chrome').capitalize()}")
-            headless_mode = request.data.get('headless', False)
-            mode_text = "无头模式" if headless_mode else "有头模式"
-            execution_logs.append(f"执行模式: {mode_text}")
+            
+            # 获取设备信息 (针对Appium/Airtest)
+            device_id = request.data.get('device_id')
+            device_info = None
+            if device_id:
+                try:
+                    from .models import UiDevice
+                    device = UiDevice.objects.get(id=device_id)
+                    device_info = f"{device.name} ({device.device_id})"
+                except Exception as e:
+                    execution_logs.append(f"⚠ 指定设备ID {device_id} 未找到: {str(e)}")
+
+            if engine_type in ['airtest', 'appium']:
+                if device_info:
+                    execution_logs.append(f"执行设备: {device_info}")
+                else:
+                    execution_logs.append(f"执行设备: 自动连接")
+            else:
+                execution_logs.append(f"浏览器: {request.data.get('browser', 'chrome').capitalize()}")
+                headless_mode = request.data.get('headless', False)
+                mode_text = "无头模式" if headless_mode else "有头模式"
+                execution_logs.append(f"执行模式: {mode_text}")
+            
             execution_logs.append(f"执行用户: {request.user.username}")
-            execution_logs.append(f"项目基础URL: {test_case.project.base_url}")
+            if test_case.project.base_url and engine_type not in ['airtest', 'appium']:
+                execution_logs.append(f"项目基础URL: {test_case.project.base_url}")
             execution_logs.append("")
 
             # 截图列表
@@ -1378,6 +1458,11 @@ class TestCaseViewSet(viewsets.ModelViewSet):
             if engine_type == 'appium':
                 # Appium执行（暂时返回开发中提示）
                 execution_logs.append("========== Appium引擎执行 ==========")
+                if device_info:
+                    execution_logs.append(f"使用设备: {device_info}")
+                else:
+                    execution_logs.append("⚠ 未指定设备，将尝试自动连接")
+
                 execution_logs.append("✗ Appium引擎正在开发中，敬请期待")
                 execution_logs.append("")
                 execution_result['status'] = 'failed'
@@ -1390,6 +1475,153 @@ class TestCaseViewSet(viewsets.ModelViewSet):
                     'details': "Appium引擎目前处于开发阶段，尚未完全实现",
                     'description': '选择了Appium引擎'
                 })
+            elif engine_type == 'airtest':
+                # Airtest执行
+                execution_logs.append("========== Airtest引擎执行 ==========")
+                if device_info:
+                    execution_logs.append(f"使用设备: {device_info}")
+                else:
+                    execution_logs.append("⚠ 未指定设备，将尝试自动连接")
+
+                def run_airtest_test():
+                    """使用Airtest执行测试"""
+                    # 这里是Airtest的同步执行逻辑
+                    try:
+                        from airtest.core.api import auto_setup, connect_device, touch, text, sleep, exists, Template
+                        from airtest.core.error import AirtestError
+                        
+                        # 1. 连接设备
+                        execution_logs.append("========== 连接设备 ==========")
+                        dev = None
+                        if device_id:
+                            # 如果指定了设备ID（这里假设device_id存储的是ip:port或序列号）
+                            try:
+                                from .models import UiDevice
+                                db_device = UiDevice.objects.get(id=device_id)
+                                connect_str = f"android:///{db_device.device_id}"
+                                if db_device.platform == 'ios':
+                                    connect_str = f"ios:///{db_device.device_id}"
+                                
+                                execution_logs.append(f"正在连接设备: {connect_str}")
+                                dev = connect_device(connect_str)
+                            except Exception as e:
+                                execution_logs.append(f"✗ 指定设备连接失败: {str(e)}")
+                                return False
+                        
+                        if not dev:
+                            # 尝试自动连接第一个可用设备
+                            try:
+                                execution_logs.append("尝试自动连接本地Android设备...")
+                                dev = connect_device("android:///")
+                            except Exception as e:
+                                execution_logs.append(f"✗ 自动连接设备失败: {str(e)}")
+                                execution_result['status'] = 'failed'
+                                execution_result['error_message'] = f"无法连接到任何设备: {str(e)}"
+                                return False
+                        
+                        execution_logs.append(f"✓ 设备连接成功")
+                        
+                        # 2. 初始化Airtest
+                        # 设置日志目录
+                        import os
+                        log_dir = os.path.join(settings.MEDIA_ROOT, 'airtest_logs', str(execution.id))
+                        os.makedirs(log_dir, exist_ok=True)
+                        # 注意：已经通过connect_device连接了设备，这里不需要再传入devices参数
+                        # 传入devices参数会导致auto_setup尝试再次连接，且如果传入的是对象会报错
+                        auto_setup(__file__, logdir=log_dir)
+
+                        # 唤醒屏幕并解锁（如果可能）
+                        # 注意：某些设备对象可能没有wake方法或属性访问异常，这里做容错
+                        try:
+                            from airtest.core.android.android import Android
+                            if isinstance(dev, Android):
+                                execution_logs.append("尝试唤醒屏幕...")
+                                try:
+                                    dev.wake()
+                                except Exception as wake_err:
+                                    # 忽略特定的decode错误，这通常是adb返回格式问题，不影响实际唤醒
+                                    if "decode" not in str(wake_err):
+                                        logger.warning(f"唤醒屏幕失败: {wake_err}")
+                        except:
+                            pass
+                        
+                        # 3. 执行步骤
+                        if steps_data:
+                            execution_logs.append("========== 执行测试步骤 ==========")
+                            step_count = len(steps_data)
+                            
+                            for i, step_info in enumerate(steps_data, 1):
+                                execution_logs.append(f"========== 开始执行步骤 {i}/{step_count} ==========")
+                                
+                                step = step_info['step']
+                                action_type = step_info['action_type']
+                                description = step_info['description']
+                                element_data = step_info['element_data']
+                                input_value = step_info['input_value']
+                                wait_time = step_info['wait_time']
+                                
+                                execution_logs.append(f"步骤 {i}: {description or action_type}")
+                                
+                                try:
+                                    # 根据操作类型执行Airtest指令
+                                    if action_type == 'click':
+                                        if element_data and element_data['locator_strategy'] == 'IMAGE':
+                                            # 图片点击
+                                            img_path = os.path.join(settings.MEDIA_ROOT, element_data['locator_value'])
+                                            if os.path.exists(img_path):
+                                                execution_logs.append(f"  点击图片: {element_data['name']}")
+                                                touch(Template(img_path))
+                                            else:
+                                                raise FileNotFoundError(f"图片文件未找到: {img_path}")
+                                        else:
+                                            # 坐标点击或其他方式（暂未实现）
+                                            execution_logs.append(f"  ⚠ 暂不支持非图片的点击定位: {element_data.get('locator_strategy') if element_data else 'None'}")
+                                    
+                                    elif action_type == 'fill':
+                                        execution_logs.append(f"  输入文本: {input_value}")
+                                        text(input_value)
+                                        
+                                    elif action_type == 'wait':
+                                        wait_sec = wait_time / 1000.0
+                                        execution_logs.append(f"  等待: {wait_sec}秒")
+                                        sleep(wait_sec)
+                                        
+                                    execution_logs.append(f"  ✓ 步骤执行成功")
+                                    step_results.append({
+                                        'step_number': i,
+                                        'action_type': action_type,
+                                        'success': True
+                                    })
+                                    
+                                except Exception as e:
+                                    execution_logs.append(f"  ✗ 步骤执行失败: {str(e)}")
+                                    execution_result['status'] = 'failed'
+                                    execution_result['error_message'] = str(e)
+                                    step_results.append({
+                                        'step_number': i,
+                                        'action_type': action_type,
+                                        'success': False,
+                                        'error': str(e)
+                                    })
+                                    return False
+                                    
+                            execution_logs.append("========== 执行完成 ==========")
+                            return True
+                        else:
+                            execution_logs.append("⚠ 没有测试步骤")
+                            return True
+
+                    except Exception as e:
+                        execution_logs.append(f"✗ Airtest执行异常: {str(e)}")
+                        execution_result['status'] = 'failed'
+                        execution_result['error_message'] = str(e)
+                        return False
+
+                # 启动线程执行Airtest
+                thread = threading.Thread(target=run_airtest_test)
+                thread.start()
+                thread.join()  # 等待执行完成
+
             elif engine_type == 'selenium':
                 # Selenium同步执行
                 def run_test_selenium():
@@ -1590,8 +1822,9 @@ class TestCaseViewSet(viewsets.ModelViewSet):
                     async def run_test():
                         """异步执行测试"""
                         # 根据浏览器类型选择
+                        # 如果环境无法下载chromium，尝试直接使用系统安装的chrome
                         browser_map = {
-                            'chrome': 'chromium',
+                            'chrome': 'chrome',  # 改为使用系统Chrome
                             'firefox': 'firefox',
                             'safari': 'webkit'
                         }
@@ -1654,7 +1887,11 @@ class TestCaseViewSet(viewsets.ModelViewSet):
                                     # 执行步骤
                                     try:
                                         execution_logs.append(f"  [调试] 准备执行步骤...")
-                                        success, step_log, screenshot_base64 = await engine.execute_step(step, element_data or {})
+                                        success, step_log, screenshot_base64, debug_data = await engine.execute_step(
+                                            step, 
+                                            element_data or {},
+                                            project_config=test_case.project.debug_config
+                                        )
                                         execution_logs.append(f"  [调试] 步骤执行完成, success={success}")
 
                                         execution_logs.append(f"  {step_log}")
@@ -1666,7 +1903,8 @@ class TestCaseViewSet(viewsets.ModelViewSet):
                                             'action_type': action_type,
                                             'description': description or '',
                                             'success': success,
-                                            'error': None if success else step_log
+                                            'error': None if success else step_log,
+                                            'debug_data': debug_data  # 添加调试数据
                                         })
 
                                         # 如果步骤失败,保存截图
@@ -1773,6 +2011,15 @@ class TestCaseViewSet(viewsets.ModelViewSet):
                                 execution_logs.append("警告: 测试用例没有定义任何步骤")
                                 return True
 
+                        except Exception as e:
+                            logger.error(f"Playwright执行异常: {str(e)}")
+                            execution_logs.append(f"✗ 致命错误: {str(e)}")
+                            import traceback
+                            execution_logs.append(f"  [调试] 异常堆栈:\n{traceback.format_exc()}")
+                            execution_result['status'] = 'failed'
+                            execution_result['error_message'] = f"引擎执行错误: {str(e)}"
+                            return False
+
                         finally:
                             # 关闭浏览器
                             execution_logs.append("")
@@ -1799,8 +2046,20 @@ class TestCaseViewSet(viewsets.ModelViewSet):
             execution_logs.append("")
             execution_logs.append("执行环境信息:")
             execution_logs.append(f"- 执行引擎: {engine_type.upper()}")
-            execution_logs.append(f"- 浏览器: {request.data.get('browser', 'chrome').capitalize()}")
-            execution_logs.append(f"- 屏幕分辨率: 1920x1080")
+            
+            if engine_type in ['airtest', 'appium']:
+                # 移动端环境信息
+                if device_info:
+                    execution_logs.append(f"- 执行设备: {device_info}")
+                else:
+                    execution_logs.append(f"- 执行设备: 自动连接/未知")
+                # 尝试获取一些设备详情（如果可用）
+                # 这里可以扩展更多设备信息
+            else:
+                # Web端环境信息
+                execution_logs.append(f"- 浏览器: {request.data.get('browser', 'chrome').capitalize()}")
+                execution_logs.append(f"- 屏幕分辨率: 1920x1080") # 这里通常是固定的或者从capabilities获取
+            
             execution_logs.append(f"- 总执行时间: {total_time}秒")
 
             if screenshots:
@@ -1814,7 +2073,19 @@ class TestCaseViewSet(viewsets.ModelViewSet):
             execution.error_message = execution_result['error_message'] or ''
 
             # 保存步骤执行结果为JSON格式
-            execution.execution_logs = json.dumps(step_results, ensure_ascii=False)
+            if step_results:
+                execution.execution_logs = json.dumps(step_results, ensure_ascii=False)
+            else:
+                # 兼容旧格式或无步骤情况
+                execution.execution_logs = json.dumps([{
+                    'step_number': 0,
+                    'action_type': 'system',
+                    'description': '执行日志',
+                    'success': True,
+                    'error': '\n'.join(execution_logs),
+                    'debug_data': None
+                }], ensure_ascii=False)
+            
             execution.execution_time = total_time
             execution.finished_at = timezone.now()
             execution.screenshots = screenshots
@@ -1847,7 +2118,7 @@ class TestCaseViewSet(viewsets.ModelViewSet):
 
             return Response({
                 'success': execution.status == 'passed',
-                'logs': execution.execution_logs,
+                'logs': execution.execution_logs,  # 直接返回 execution_logs
                 'screenshots': screenshots,
                 'execution_time': execution.execution_time,
                 'errors': errors
@@ -2911,6 +3182,7 @@ class AICaseViewSet(viewsets.ModelViewSet):
             ai_case=ai_case,
             case_name=ai_case.name,
             task_description=ai_case.task_description,
+            execution_mode=ai_case.execution_mode,
             status='running',
             executed_by=request.user,
             logs="正在分析任务...\n"
@@ -2919,88 +3191,137 @@ class AICaseViewSet(viewsets.ModelViewSet):
         # 异步执行
         import threading
         from asgiref.sync import sync_to_async
-        from .ai_agent import run_full_process_sync
         
         def run_task():
             # 注册停止信号
             STOP_SIGNALS[execution_record.id] = False
 
             try:
+                # 定义异步安全的 should_stop
+                async def should_stop_async():
+                    if STOP_SIGNALS.get(execution_record.id, False):
+                        return True
+                    await sync_to_async(execution_record.refresh_from_db)()
+                    return execution_record.status == 'stopped'
+
                 def should_stop():
                     return STOP_SIGNALS.get(execution_record.id, False)
 
-                async def on_analysis_complete(planned_tasks):
-                    execution_record.planned_tasks = planned_tasks
-                    execution_record.logs += "任务分析完成，开始执行...\n"
-                    await sync_to_async(execution_record.save)()
+                if ai_case.execution_mode == 'mobile':
+                    # 移动端执行逻辑
+                    from .ai_mobile import BasePhoneAgent
+                    from .models import UiDevice
+                    import asyncio
                     
-                async def on_step_update(step_info):
+                    # 自动寻找可用设备
+                    device = UiDevice.objects.filter(status='online').first()
+                    if not device:
+                         execution_record.logs += "错误: 未找到在线的移动设备，无法执行移动端任务。\n"
+                         execution_record.status = 'failed'
+                         execution_record.save()
+                         return
+
+                    execution_record.logs += f"已选择设备: {device.name} ({device.device_id})\n"
+                    execution_record.save()
+
+                    async def run_mobile_async():
+                        agent = await sync_to_async(BasePhoneAgent)(
+                            device_id=device.device_id, 
+                            case_name=ai_case.name
+                        )
+                        agent.execution_record = execution_record
+                        
+                        async def mobile_callback(data):
+                            if data.get('type') == 'log':
+                                content = data.get('content', '')
+                                execution_record.logs += content + "\n"
+                                await sync_to_async(execution_record.save)(update_fields=['logs'])
+                        
+                        await agent.run_task(ai_case.task_description, callback=mobile_callback, should_stop=should_stop_async)
+
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
                     try:
-                        # 处理日志
-                        if step_info.get('type') == 'log':
-                            content = step_info.get('content')
-                            if content:
-                                execution_record.logs += content
-                                await sync_to_async(execution_record.save)()
-                            return
+                        loop.run_until_complete(run_mobile_async())
+                    finally:
+                        loop.close()
 
-                        # 处理任务状态
-                        task_id = step_info.get('task_id')
-                        status = step_info.get('status')
-                        if task_id and status:
-                            updated = False
-                            for task in execution_record.planned_tasks:
-                                if task['id'] == task_id:
-                                    task['status'] = status
-                                    updated = True
-                                    break
-                            if updated:
-                                await sync_to_async(execution_record.save)()
-                    except Exception as e:
-                        print(f"更新步骤状态失败: {e}")
-
-                history = run_full_process_sync(
-                    ai_case.task_description, 
-                    analysis_callback=on_analysis_complete, 
-                    step_callback=on_step_update,
-                    should_stop=should_stop
-                )
-                
-                # 检查是否是手动停止
-                if should_stop():
-                    execution_record.status = 'stopped'
-                    execution_record.logs += "\n[System] 任务已由用户停止。"
                 else:
-                    # 更新成功状态
-                    execution_record.status = 'passed'
-                    execution_record.logs += "\n执行完成。"
+                    # Web端执行逻辑 (原有逻辑)
+                    from .ai_agent import run_full_process_sync
 
-                    # 记录任务完成统计信息
+                    async def on_analysis_complete(planned_tasks):
+                        execution_record.planned_tasks = planned_tasks
+                        execution_record.logs += "任务分析完成，开始执行...\n"
+                        await sync_to_async(execution_record.save)()
+                        
+                    async def on_step_update(step_info):
+                        try:
+                            # 处理日志
+                            if step_info.get('type') == 'log':
+                                content = step_info.get('content')
+                                if content:
+                                    execution_record.logs += content
+                                    await sync_to_async(execution_record.save)()
+                                return
+
+                            # 处理任务状态
+                            task_id = step_info.get('task_id')
+                            status = step_info.get('status')
+                            if task_id and status:
+                                updated = False
+                                for task in execution_record.planned_tasks:
+                                    if task['id'] == task_id:
+                                        task['status'] = status
+                                        updated = True
+                                        break
+                                if updated:
+                                    await sync_to_async(execution_record.save)()
+                        except Exception as e:
+                            print(f"更新步骤状态失败: {e}")
+
+                    history = run_full_process_sync(
+                        ai_case.task_description, 
+                        analysis_callback=on_analysis_complete, 
+                        step_callback=on_step_update,
+                        should_stop=should_stop
+                    )
+                    
+                    # 检查是否是手动停止
+                    if should_stop():
+                        execution_record.status = 'stopped'
+                        execution_record.logs += "\n[System] 任务已由用户停止。"
+                    else:
+                        # 更新成功状态
+                        execution_record.status = 'passed'
+                        execution_record.logs += "\n执行完成。"
+
+                        # 记录任务完成统计信息
+                        if execution_record.planned_tasks:
+                            total_tasks = len(execution_record.planned_tasks)
+                            completed_tasks = len([t for t in execution_record.planned_tasks if t.get('status') == 'completed'])
+                            pending_tasks = len([t for t in execution_record.planned_tasks if t.get('status') == 'pending'])
+                            logger.info(f"🏁 Task completion summary: {completed_tasks}/{total_tasks} tasks completed, {pending_tasks} pending")
+                    
+                    execution_record.end_time = timezone.now()
+                    execution_record.duration = (execution_record.end_time - execution_record.start_time).total_seconds()
+                    
+                    # 格式化 history 为日志 (如果不是停止状态)
+                    steps = []
+                    if history:
+                        if hasattr(history, 'steps'):
+                            steps = [extract_step_info(s, i) for i, s in enumerate(history.steps)]
+
+                    execution_record.steps_completed = steps
+
+                    # 自动标记已完成的任务
                     if execution_record.planned_tasks:
-                        total_tasks = len(execution_record.planned_tasks)
-                        completed_tasks = len([t for t in execution_record.planned_tasks if t.get('status') == 'completed'])
-                        pending_tasks = len([t for t in execution_record.planned_tasks if t.get('status') == 'pending'])
-                        logger.info(f"🏁 Task completion summary: {completed_tasks}/{total_tasks} tasks completed, {pending_tasks} pending")
-                
-                execution_record.end_time = timezone.now()
-                execution_record.duration = (execution_record.end_time - execution_record.start_time).total_seconds()
-                
-                # 格式化 history 为日志 (如果不是停止状态)
-                steps = []
-                if history:
-                    if hasattr(history, 'steps'):
-                        steps = [extract_step_info(s, i) for i, s in enumerate(history.steps)]
+                        self._auto_mark_completed_tasks(execution_record)
 
-                execution_record.steps_completed = steps
+                    # 处理GIF录制文件
+                    self._process_gif_recording(execution_record, history)
 
-                # 自动标记已完成的任务
-                if execution_record.planned_tasks:
-                    self._auto_mark_completed_tasks(execution_record)
-
-                # 处理GIF录制文件
-                self._process_gif_recording(execution_record, history)
-
-                execution_record.save()
+                    execution_record.save()
 
             except Exception as e:
                 execution_record.status = 'failed'
@@ -3068,6 +3389,11 @@ class AIExecutionRecordViewSet(viewsets.ModelViewSet):
         task_description = request.data.get('task_description')
         execution_mode = request.data.get('execution_mode', 'text')  # 默认文本模式
         enable_gif = request.data.get('enable_gif', True)  # GIF录制开关，默认开启
+        device_id = request.data.get('device_id') # 移动端设备ID
+        model_config_id = request.data.get('model_config_id') # AI模型配置ID
+        browser_type = request.data.get('browser_type', 'chrome') # 浏览器类型
+        
+        logger.info(f"Run Adhoc Task: execution_mode={execution_mode}, device_id={device_id}, model_config_id={model_config_id}, browser_type={browser_type}, task={task_description[:50]}...")
 
         if not project_id or not task_description:
             return Response({'error': '缺少必要参数'}, status=status.HTTP_400_BAD_REQUEST)
@@ -3085,7 +3411,7 @@ class AIExecutionRecordViewSet(viewsets.ModelViewSet):
             execution_mode=execution_mode,
             status='running',
             executed_by=request.user,
-            logs="正在分析任务...\n"
+            logs=f"正在分析任务... (Mode: {execution_mode}, Device: {device_id})\n"
         )
 
         # 异步执行
@@ -3113,65 +3439,120 @@ class AIExecutionRecordViewSet(viewsets.ModelViewSet):
                         return True
                     execution_record.refresh_from_db()
                     return execution_record.status == 'stopped'
-
-                async def on_analysis_complete(planned_tasks):
-                    execution_record.planned_tasks = planned_tasks
-                    execution_record.logs += "任务分析完成，开始执行...\n"
-                    await sync_to_async(execution_record.save)()
-                    
-                async def on_step_update(step_info):
-                    try:
-                        # 处理日志
-                        if step_info.get('type') == 'log':
-                            content = step_info.get('content')
-                            if content:
-                                execution_record.logs += content
-                                # 立即保存到数据库，确保前端轮询能看到最新日志
-                                await sync_to_async(execution_record.save)(update_fields=['logs'])
-                            return
-
-                        # 处理任务状态
-                        task_id = step_info.get('task_id')
-                        status = step_info.get('status')
-                        logger.info(f"DEBUG: on_step_update received: task_id={task_id}, status={status}")
+                
+                if execution_mode == 'mobile':
+                    # 移动端执行逻辑
+                    if not device_id:
+                        raise ValueError("Mobile mode requires device_id")
                         
-                        if task_id and status:
-                            updated = False
-                            if execution_record.planned_tasks:
-                                for task in execution_record.planned_tasks:
-                                    # 确保类型一致进行比较
-                                    if str(task['id']) == str(task_id):
-                                        old_status = task.get('status', 'pending')
-                                        task['status'] = status
-                                        updated = True
-                                        logger.info(f"DEBUG: Updated task {task_id} from {old_status} to {status}")
-                                        break
-                            if updated:
-                                # 立即保存到数据库，确保前端轮询能看到最新状态
-                                await sync_to_async(execution_record.save)(update_fields=['planned_tasks'])
-                            else:
-                                logger.warning(f"DEBUG: Task ID {task_id} not found in planned_tasks: {execution_record.planned_tasks}")
-                    except Exception as e:
-                        logger.error(f"更新步骤状态失败: {e}", exc_info=True)
+                    from .ai_mobile import BasePhoneAgent
+                    import asyncio
+                    
+                    async def run_mobile_async():
+                        # 使用 sync_to_async 包装类实例化，因为 __init__ 中有数据库访问
+                        agent = await sync_to_async(BasePhoneAgent)(
+                            device_id=device_id, 
+                            case_name=f"Mobile Task {execution_record.id}",
+                            model_config_id=model_config_id
+                        )
+                        agent.execution_record = execution_record # Link record
+                        
+                        async def mobile_callback(data):
+                            if data.get('type') == 'log':
+                                content = data.get('content', '')
+                                execution_record.logs += content + "\n"
+                                await sync_to_async(execution_record.save)(update_fields=['logs'])
+                        
+                        await agent.run_task(task_description, callback=mobile_callback, should_stop=should_stop_async)
 
-                history = run_full_process_sync(
-                    task_description,
-                    analysis_callback=on_analysis_complete,
-                    step_callback=on_step_update,
-                    should_stop=should_stop_async, # 传递异步版本
-                    execution_mode=execution_mode,
-                    enable_gif=enable_gif,  # 传递GIF录制开关
-                    case_name=task_description[:50] if task_description else "Adhoc Task"  # 传递用例名称用于GIF文件命名
-                )
+                    # 在新的事件循环中运行
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    try:
+                        loop.run_until_complete(run_mobile_async())
+                    finally:
+                        loop.close()
+                        
+                else:
+                    # 原有Web/Text执行逻辑
+                    from .ai_agent import run_full_process_sync
+                    
+                    async def on_analysis_complete(planned_tasks):
+                        execution_record.planned_tasks = planned_tasks
+                        execution_record.logs += "任务分析完成，开始执行...\n"
+                        await sync_to_async(execution_record.save)()
+                        
+                    async def on_step_update(step_info):
+                        try:
+                            # 处理日志
+                            if step_info.get('type') == 'log':
+                                content = step_info.get('content')
+                                if content:
+                                    execution_record.logs += content
+                                    # 立即保存到数据库，确保前端轮询能看到最新日志
+                                    await sync_to_async(execution_record.save)(update_fields=['logs'])
+                                return
+
+                            # 处理任务状态
+                            task_id = step_info.get('task_id')
+                            status = step_info.get('status')
+                            logger.info(f"DEBUG: on_step_update received: task_id={task_id}, status={status}")
+                            
+                            if task_id and status:
+                                updated = False
+                                if execution_record.planned_tasks:
+                                    for task in execution_record.planned_tasks:
+                                        # 确保类型一致进行比较
+                                        if str(task['id']) == str(task_id):
+                                            old_status = task.get('status', 'pending')
+                                            task['status'] = status
+                                            updated = True
+                                            logger.info(f"DEBUG: Updated task {task_id} from {old_status} to {status}")
+                                            break
+                                if updated:
+                                    # 立即保存到数据库，确保前端轮询能看到最新状态
+                                    await sync_to_async(execution_record.save)(update_fields=['planned_tasks'])
+                                else:
+                                    logger.warning(f"DEBUG: Task ID {task_id} not found in planned_tasks: {execution_record.planned_tasks}")
+                        except Exception as e:
+                            logger.error(f"更新步骤状态失败: {e}", exc_info=True)
+
+                    history = run_full_process_sync(
+                        task_description,
+                        analysis_callback=on_analysis_complete,
+                        step_callback=on_step_update,
+                        should_stop=should_stop_async, # 传递异步版本
+                        execution_mode=execution_mode,
+                        enable_gif=enable_gif,  # 传递GIF录制开关
+                        case_name=task_description[:50] if task_description else "Adhoc Task",  # 传递用例名称用于GIF文件命名
+                        model_config_id=model_config_id,
+                        browser_type=browser_type
+                    )
+                    
+                    # 格式化 history 为日志 (如果不是停止状态)
+                    steps = []
+                    if history:
+                        if hasattr(history, 'steps'):
+                            steps = [extract_step_info(s, i) for i, s in enumerate(history.steps)]
+
+                    execution_record.steps_completed = steps
+
+                    # 自动标记已完成的任务
+                    if execution_record.planned_tasks:
+                        self._auto_mark_completed_tasks(execution_record)
+
+                    # 处理GIF录制文件
+                    self._process_gif_recording(execution_record, history)
 
                 # 检查是否是手动停止 (使用同步版本)
                 if should_stop_sync():
                     execution_record.status = 'stopped'
                     execution_record.logs += "\n[System] 任务已由用户停止。"
                 else:
-                    # 更新成功状态
-                    execution_record.status = 'passed'
-                    execution_record.logs += "\n执行完成。"
+                    if execution_mode != 'mobile': # mobile mode sets status inside run_task
+                         # 更新成功状态
+                        execution_record.status = 'passed'
+                        execution_record.logs += "\n执行完成。"
 
                     # 记录任务完成统计信息
                     if execution_record.planned_tasks:
@@ -3182,22 +3563,6 @@ class AIExecutionRecordViewSet(viewsets.ModelViewSet):
                 
                 execution_record.end_time = timezone.now()
                 execution_record.duration = (execution_record.end_time - execution_record.start_time).total_seconds()
-                
-                # 格式化 history 为日志 (如果不是停止状态)
-                steps = []
-                if history:
-                    if hasattr(history, 'steps'):
-                        steps = [extract_step_info(s, i) for i, s in enumerate(history.steps)]
-
-                execution_record.steps_completed = steps
-
-                # 自动标记已完成的任务
-                if execution_record.planned_tasks:
-                    self._auto_mark_completed_tasks(execution_record)
-
-                # 处理GIF录制文件
-                self._process_gif_recording(execution_record, history)
-
                 execution_record.save()
 
             except Exception as e:
@@ -3462,5 +3827,144 @@ class UiDashboardViewSet(viewsets.ViewSet):
             'suite_count': suite_test_case_count,
             'execution_count': total_execution_count
         })
+
+
+class UiDeviceViewSet(viewsets.ModelViewSet):
+    queryset = UiDevice.objects.all()
+    serializer_class = UiDeviceSerializer
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
+    filterset_fields = ['status', 'platform']
+    search_fields = ['name', 'device_id']
+    permission_classes = [IsAuthenticated]
+
+    def perform_create(self, serializer):
+        instance = serializer.save(last_online=timezone.now())
+        log_operation('create', 'ui_device', instance.id, instance.name, self.request.user)
+
+    def perform_update(self, serializer):
+        instance = serializer.save()
+        log_operation('edit', 'ui_device', instance.id, instance.name, self.request.user)
+
+    def perform_destroy(self, instance):
+        log_operation('delete', 'ui_device', instance.id, instance.name, self.request.user)
+        instance.delete()
+
+    @action(detail=False, methods=['get'])
+    def refresh(self, request):
+        """刷新设备列表"""
+        from .utils.device_manager import DeviceManager
+        
+        # 1. 获取当前连接的设备
+        android_devices = DeviceManager.get_android_devices()
+        ios_devices = DeviceManager.get_ios_devices()
+        
+        current_device_ids = set()
+        
+        # 2. 更新或创建设备
+        for dev in android_devices + ios_devices:
+            device_id = dev['device_id']
+            current_device_ids.add(device_id)
+            
+            # 使用从DeviceManager获取的类型
+            device_type = dev.get('type', 'real')
+            
+            UiDevice.objects.update_or_create(
+                device_id=device_id,
+                defaults={
+                    'name': dev['name'],
+                    'platform': dev['platform'],
+                    'type': device_type,
+                    'status': dev['status'],
+                    'version': dev['version'],
+                    'last_online': timezone.now()
+                }
+            )
+            
+        # 3. 将不在列表中的设备标记为离线
+        UiDevice.objects.exclude(device_id__in=current_device_ids).update(status='offline')
+        
+        return Response({'status': 'ok', 'count': len(current_device_ids)})
+
+    @action(detail=False, methods=['post'])
+    def connect_remote(self, request):
+        """连接远程设备 (无需先创建记录)"""
+        ip = request.data.get('ip')
+        port = request.data.get('port', '5555')
+        
+        if not ip:
+            return Response({'error': 'IP address required'}, status=400)
+            
+        from .utils.device_manager import DeviceManager
+        success, msg = DeviceManager.connect_android_remote(ip, port)
+        
+        if success:
+            # 连接成功后，自动添加到数据库
+            device_id = f"{ip}:{port}"
+            UiDevice.objects.update_or_create(
+                device_id=device_id,
+                defaults={
+                    'name': f'Remote Android ({ip})',
+                    'platform': 'android',
+                    'status': 'online',
+                    'last_online': timezone.now()
+                }
+            )
+            return Response({'status': 'connected', 'msg': msg})
+        else:
+            return Response({'error': msg}, status=500)
+
+    @action(detail=True, methods=['post'])
+    def connect(self, request, pk=None):
+        """连接设备 (Android Remote)"""
+        device = self.get_object()
+        if device.platform != 'android':
+            return Response({'error': 'Only Android supports remote connect'}, status=400)
+            
+        ip = request.data.get('ip')
+        port = request.data.get('port', '5555')
+        
+        if not ip:
+            return Response({'error': 'IP address required'}, status=400)
+            
+        from .utils.device_manager import DeviceManager
+        success, msg = DeviceManager.connect_android_remote(ip, port)
+        
+        if success:
+            device.status = 'online'
+            device.save()
+            return Response({'status': 'connected', 'msg': msg})
+        else:
+            return Response({'error': msg}, status=500)
+
+    @action(detail=True, methods=['post'])
+    def disconnect(self, request, pk=None):
+        """断开设备"""
+        device = self.get_object()
+        from .utils.device_manager import DeviceManager
+        
+        success, msg = DeviceManager.disconnect_android(device.device_id)
+        if success:
+            device.status = 'offline'
+            device.save()
+            return Response({'status': 'disconnected', 'msg': msg})
+
+        else:
+            return Response({'error': msg}, status=500)
+
+    @action(detail=True, methods=['get'])
+    def screenshot(self, request, pk=None):
+        """获取设备实时截图"""
+        device = self.get_object()
+        from .utils.device_manager import DeviceManager
+        
+        # 暂时只支持Android
+        if device.platform != 'android':
+             return Response({'error': 'Not supported'}, status=400)
+
+        image_data = DeviceManager.get_screenshot_bytes(device.device_id)
+        if image_data:
+            return HttpResponse(image_data, content_type="image/png")
+        else:
+            return Response({'error': 'Failed to capture screenshot'}, status=500)
 
 

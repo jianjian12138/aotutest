@@ -1,20 +1,12 @@
 <template>
-  <div class="notification-configs-container">
-    <!-- 页面说明 -->
+  <div class="page-container">
     <div class="page-header">
-      <h1 class="page-title">
-        <el-icon class="title-icon">
-          <Setting/>
-        </el-icon>
-        UI自动化通知配置
-      </h1>
-      <p class="page-description">
-        配置飞书、企微、钉钉Webhook机器人地址
-      </p>
+      <h1 class="page-title">自动化通知配置</h1>
     </div>
 
-    <!-- Tab切换 -->
-    <div class="content-wrapper">
+    <div class="card-container">
+      <p class="description-text">配置飞书、企微、钉钉Webhook机器人地址</p>
+      
       <el-tabs v-model="activeTab" class="notification-tabs">
 
         <!-- 飞书机器人Tab -->
@@ -410,45 +402,9 @@ export default {
 </script>
 
 <style scoped>
-.notification-configs-container {
-  padding: 24px;
-  background: #f5f7fa;
-  min-height: 100vh;
-}
-
-.page-header {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  padding: 32px 24px;
-  border-radius: 12px;
-  margin-bottom: 24px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-}
-
-.page-title {
-  font-size: 28px;
-  font-weight: 600;
-  margin: 0 0 12px 0;
-  display: flex;
-  align-items: center;
-}
-
-.title-icon {
-  margin-right: 12px;
-  font-size: 24px;
-}
-
-.page-description {
-  font-size: 16px;
-  opacity: 0.9;
-  margin: 0;
-}
-
-.content-wrapper {
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-  overflow: hidden;
+.description-text {
+  color: #666;
+  margin-bottom: 20px;
 }
 
 .notification-tabs :deep(.el-tabs__nav-wrap) {
@@ -525,18 +481,6 @@ export default {
 
 /* 响应式设计 */
 @media (max-width: 768px) {
-  .notification-configs-container {
-    padding: 16px;
-  }
-
-  .page-header {
-    padding: 24px 16px;
-  }
-
-  .page-title {
-    font-size: 24px;
-  }
-
   .notification-tabs :deep(.el-tabs__item) {
     padding: 12px 20px;
     font-size: 14px;

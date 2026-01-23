@@ -1,59 +1,72 @@
 <template>
-  <div class="page-container">
+  <div class="execution-list-page">
+    <!-- 头部区域 -->
     <div class="page-header">
-      <h1 class="page-title">测试执行记录</h1>
-      <el-select v-model="projectId" placeholder="选择项目" style="width: 200px; margin-right: 15px" @change="onProjectChange">
-        <el-option v-for="project in projects" :key="project.id" :label="project.name" :value="project.id" />
-      </el-select>
-    </div>
-
-    <div class="card-container">
-      <div class="filter-bar">
-        <el-form :inline="true" :model="queryParams" class="demo-form-inline">
-          <el-form-item label="搜索">
-            <el-input
-              v-model="queryParams.search"
-              placeholder="搜索用例名称"
-              clearable
-              @keyup.enter="handleSearch"
-            >
-              <template #prefix>
-                <el-icon><Search /></el-icon>
-              </template>
-            </el-input>
-          </el-form-item>
-          <el-form-item label="状态">
-            <el-select v-model="queryParams.status" placeholder="执行状态" clearable>
-              <el-option label="待执行" value="pending" />
-              <el-option label="执行中" value="running" />
-              <el-option label="通过" value="passed" />
-              <el-option label="失败" value="failed" />
-              <el-option label="错误" value="error" />
-            </el-select>
-          </el-form-item>
-          <el-form-item label="浏览器">
-            <el-select v-model="queryParams.browser" placeholder="浏览器" clearable>
-              <el-option label="Chrome" value="chrome" />
-              <el-option label="Firefox" value="firefox" />
-              <el-option label="Safari" value="safari" />
-              <el-option label="Edge" value="edge" />
-            </el-select>
-          </el-form-item>
-          <el-form-item>
-            <el-button type="primary" @click="handleSearch">查询</el-button>
-            <el-button @click="resetQuery">重置</el-button>
-            <el-button 
-              type="danger" 
-              :disabled="selectedIds.length === 0"
-              @click="handleBatchDelete"
-            >
-              批量删除
-            </el-button>
-          </el-form-item>
-        </el-form>
+      <h2 class="page-title">执行记录</h2>
+      <div class="header-actions">
+        <el-select v-model="projectId" placeholder="选择项目" style="width: 200px" @change="onProjectChange">
+          <el-option v-for="project in projects" :key="project.id" :label="project.name" :value="project.id" />
+        </el-select>
       </div>
+    </div>
+    
+    <!-- 主内容区域 -->
+    <div class="main-content">
+      <div class="card-container">
+        <!-- 筛选栏 -->
+        <div class="filter-bar">
+          <el-form :inline="true" :model="queryParams" class="demo-form-inline">
+            <el-form-item label="搜索">
+              <el-input
+                v-model="queryParams.search"
+                placeholder="搜索用例名称"
+                clearable
+                @keyup.enter="handleSearch"
+              >
+                <template #prefix>
+                  <el-icon><Search /></el-icon>
+                </template>
+              </el-input>
+            </el-form-item>
+            <el-form-item label="状态">
+              <el-select v-model="queryParams.status" placeholder="执行状态" clearable style="width: 120px">
+                <el-option label="待执行" value="pending" />
+                <el-option label="执行中" value="running" />
+                <el-option label="通过" value="passed" />
+                <el-option label="失败" value="failed" />
+                <el-option label="错误" value="error" />
+              </el-select>
+            </el-form-item>
+            <el-form-item label="浏览器">
+              <el-select v-model="queryParams.browser" placeholder="浏览器" clearable style="width: 120px">
+                <el-option label="Chrome" value="chrome" />
+                <el-option label="Firefox" value="firefox" />
+                <el-option label="Safari" value="safari" />
+                <el-option label="Edge" value="edge" />
+              </el-select>
+            </el-form-item>
+            <el-form-item>
+              <el-button type="primary" @click="handleSearch">查询</el-button>
+              <el-button @click="resetQuery">重置</el-button>
+              <el-button 
+                type="danger" 
+                :disabled="selectedIds.length === 0"
+                @click="handleBatchDelete"
+              >
+                批量删除
+              </el-button>
+            </el-form-item>
+          </el-form>
+        </div>
 
-      <el-table :data="executions" v-loading="loading" style="width: 100%" @selection-change="handleSelectionChange">
+        <!-- 表格区域 -->
+        <el-table 
+          :data="executions" 
+          v-loading="loading" 
+          style="width: 100%" 
+          height="100%"
+          @selection-change="handleSelectionChange"
+        >
         <el-table-column type="selection" width="55" align="center" />
         <el-table-column prop="id" label="ID" width="80" align="center" />
         <el-table-column prop="test_case_name" label="用例名称" min-width="200">
@@ -144,7 +157,8 @@
         />
       </div>
     </div>
-
+    </div>
+</div>
     <!-- 执行详情对话框 -->
     <el-dialog v-model="showDetailDialog" title="执行详情" width="900px">
       <div v-if="currentExecution" class="execution-detail">
@@ -236,6 +250,7 @@
           <el-radio-group v-model="rerunFormData.engine">
             <el-radio label="playwright">Playwright</el-radio>
             <el-radio label="selenium">Selenium</el-radio>
+            <el-radio label="airtest">Airtest</el-radio>
           </el-radio-group>
         </el-form-item>
         <el-form-item label="浏览器">
@@ -258,7 +273,6 @@
         <el-button type="primary" @click="handleRerun" :loading="rerunning">确认重跑</el-button>
       </template>
     </el-dialog>
-  </div>
 </template>
 
 <script setup>
@@ -398,7 +412,8 @@ const getBrowserText = (browser) => {
 const getEngineText = (engine) => {
   const engineMap = {
     'playwright': 'Playwright',
-    'selenium': 'Selenium'
+    'selenium': 'Selenium',
+    'airtest': 'Airtest'
   }
   return engineMap[engine] || engine || 'Playwright'
 }
@@ -618,44 +633,72 @@ onMounted(async () => {
 </script>
 
 <style scoped lang="scss">
-.page-container {
-  padding: 20px;
-  height: 100%;
-  overflow-y: auto;
-  background: #f5f5f5;
+.execution-list-page {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-color: #f5f7fa;
+  overflow: hidden; /* 防止出现双重滚动条 */
 }
 
 .page-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
+  padding: 15px 20px;
+  border-bottom: 1px solid #e6e6e6;
   background: white;
-  padding: 20px;
-  border-radius: 4px;
+  flex-shrink: 0;
 }
 
 .page-title {
   margin: 0;
   font-size: 24px;
+  font-weight: 600;
   color: #303133;
 }
 
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.main-content {
+  flex: 1;
+  overflow: hidden;
+  padding: 0; /* 移除内边距，使其与标题对齐 */
+  display: flex;
+}
+
 .card-container {
+  flex: 1;
+  width: 100%;
   background-color: #fff;
-  border-radius: 8px;
+  /* border-radius: 8px; */ /* 如果需要完全对齐标题，可以考虑移除圆角 */
   padding: 20px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 1px 4px rgba(0, 21, 41, 0.08);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* 确保表格占满剩余空间 */
+.el-table {
+  flex: 1;
+  width: 100%;
 }
 
 .filter-bar {
   margin-bottom: 20px;
+  flex-shrink: 0;
 }
 
 .pagination-container {
   margin-top: 20px;
   display: flex;
   justify-content: flex-end;
+  flex-shrink: 0;
 }
 
 .execution-detail {

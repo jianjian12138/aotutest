@@ -1,11 +1,12 @@
 <template>
-  <div class="requirement-analysis">
+  <div class="page-container">
     <div class="page-header">
-      <h1>智能测试用例生成</h1>
-      <p>基于需求描述或文档，AI将直接为您生成高质量的测试用例</p>
+      <div class="header-content">
+        <h1 class="page-title">智能用例生成</h1>
+      </div>
     </div>
 
-    <div class="main-content">
+    <div class="card-container main-content">
       <!-- 手动输入需求描述区域 -->
       <div class="manual-input-section" v-if="!isGenerating && !showResults">
         <div class="manual-input-card">
@@ -30,14 +31,38 @@
               <div class="char-count">{{ manualInput.description.length }}/2000</div>
             </div>
             
+            <div class="form-row" style="display: flex; gap: 20px;">
+              <div class="form-group" style="flex: 1;">
+                <label>关联项目（可选）</label>
+                <select v-model="manualInput.selectedProject" class="form-select">
+                  <option value="">请选择项目</option>
+                  <option v-for="project in projects" :key="project.id" :value="project.id">
+                    {{ project.name }}
+                  </option>
+                </select>
+              </div>
+
+              <div class="form-group" style="flex: 1;">
+                <label>提示词模板（可选）</label>
+                <select v-model="manualInput.selectedPromptConfig" class="form-select">
+                  <option value="">默认提示词</option>
+                  <option v-for="config in promptConfigs" :key="config.id" :value="config.id">
+                    {{ config.name }}
+                  </option>
+                </select>
+              </div>
+            </div>
+
             <div class="form-group">
-              <label>关联项目（可选）</label>
-              <select v-model="manualInput.selectedProject" class="form-select">
-                <option value="">请选择项目</option>
-                <option v-for="project in projects" :key="project.id" :value="project.id">
-                  {{ project.name }}
+              <label>关联知识库文档（增强生成准确性，可选）</label>
+              <select v-model="manualInput.selectedKnowledgeDocs" multiple class="form-select" style="height: 100px;">
+                <option v-for="doc in knowledgeBaseDocs" :key="doc.id" :value="doc.id">
+                  {{ doc.title }}
                 </option>
               </select>
+              <p class="text-gray-500" style="font-size: 0.85rem; color: #666; margin-top: 5px;">
+                按住 Ctrl (Windows) 或 Cmd (Mac) 可多选。选中的文档将作为生成用例的参考上下文。
+              </p>
             </div>
 
             <button 
@@ -103,14 +128,38 @@
                 placeholder="请输入文档标题">
             </div>
             
+            <div class="form-row" style="display: flex; gap: 20px;">
+              <div class="form-group" style="flex: 1;">
+                <label>关联项目（可选）</label>
+                <select v-model="selectedProject" class="form-select">
+                  <option value="">请选择项目</option>
+                  <option v-for="project in projects" :key="project.id" :value="project.id">
+                    {{ project.name }}
+                  </option>
+                </select>
+              </div>
+
+              <div class="form-group" style="flex: 1;">
+                <label>提示词模板（可选）</label>
+                <select v-model="selectedPromptConfig" class="form-select">
+                  <option value="">默认提示词</option>
+                  <option v-for="config in promptConfigs" :key="config.id" :value="config.id">
+                    {{ config.name }}
+                  </option>
+                </select>
+              </div>
+            </div>
+
             <div class="form-group">
-              <label>关联项目（可选）</label>
-              <select v-model="selectedProject" class="form-select">
-                <option value="">请选择项目</option>
-                <option v-for="project in projects" :key="project.id" :value="project.id">
-                  {{ project.name }}
+              <label>关联知识库文档（增强生成准确性，可选）</label>
+              <select v-model="selectedKnowledgeDocs" multiple class="form-select" style="height: 100px;">
+                <option v-for="doc in knowledgeBaseDocs" :key="doc.id" :value="doc.id">
+                  {{ doc.title }}
                 </option>
               </select>
+              <p class="text-gray-500" style="font-size: 0.85rem; color: #666; margin-top: 5px;">
+                按住 Ctrl (Windows) 或 Cmd (Mac) 可多选。
+              </p>
             </div>
 
             <button 
@@ -230,14 +279,21 @@ export default {
       manualInput: {
         title: '',
         description: '',
-        selectedProject: ''
+        selectedProject: '',
+        selectedKnowledgeDocs: [],
+        selectedPromptConfig: ''
       },
       
       // 文件上传
       selectedFile: null,
       documentTitle: '',
       selectedProject: '',
+      selectedKnowledgeDocs: [],
+      selectedPromptConfig: '',
+      
       projects: [],
+      knowledgeBaseDocs: [],
+      promptConfigs: [],
       isDragOver: false,
       
       // 生成状态
@@ -263,6 +319,8 @@ export default {
   
   mounted() {
     this.loadProjects()
+    this.loadKnowledgeBaseDocs()
+    this.loadPromptConfigs()
   },
   
   beforeUnmount() {
@@ -278,6 +336,32 @@ export default {
         this.projects = response.data.results || response.data
       } catch (error) {
         console.error('加载项目失败:', error)
+      }
+    },
+
+    async loadKnowledgeBaseDocs() {
+      try {
+        // 尝试不同的知识库文档API路径
+        let response;
+        try {
+          response = await api.get('/knowledge-graph/api/documents/')
+        } catch (e) {
+          // 如果新路径失败，尝试旧路径
+          response = await api.get('/assistant/api/documents/')
+        }
+        this.knowledgeBaseDocs = response.data.results || response.data
+      } catch (error) {
+        console.error('加载知识库文档失败:', error)
+      }
+    },
+
+    async loadPromptConfigs() {
+      try {
+        const response = await api.get('/requirement-analysis/api/prompts/')
+        const results = response.data.results || response.data
+        this.promptConfigs = results.filter(p => p.is_active && p.prompt_type === 'writer')
+      } catch (error) {
+        console.error('加载提示词配置失败:', error)
       }
     },
 
@@ -332,7 +416,13 @@ export default {
 
       const requirementText = `需求标题: ${this.manualInput.title}\n\n需求描述:\n${this.manualInput.description}`
       
-      await this.startGeneration(this.manualInput.title, requirementText, this.manualInput.selectedProject)
+      await this.startGeneration(
+        this.manualInput.title, 
+        requirementText, 
+        this.manualInput.selectedProject,
+        this.manualInput.selectedKnowledgeDocs,
+        this.manualInput.selectedPromptConfig
+      )
     },
 
     async generateFromDocument() {
@@ -368,7 +458,13 @@ export default {
 
         const requirementText = `文档标题: ${this.documentTitle}\n\n文档内容:\n${extractedText}`
         
-        await this.startGeneration(this.documentTitle, requirementText, this.selectedProject)
+        await this.startGeneration(
+          this.documentTitle, 
+          requirementText, 
+          this.selectedProject,
+          this.selectedKnowledgeDocs,
+          this.selectedPromptConfig
+        )
 
       } catch (error) {
         console.error('文档处理失败:', error)
@@ -376,7 +472,7 @@ export default {
       }
     },
 
-    async startGeneration(title, requirementText, projectId) {
+    async startGeneration(title, requirementText, projectId, knowledgeBaseIds, promptConfigId) {
       this.isGenerating = true
       this.currentStep = 1
       this.progressText = '正在创建生成任务...'
@@ -393,6 +489,15 @@ export default {
         // 如果选择了项目，添加到请求中
         if (projectId) {
           requestData.project = projectId
+        }
+        
+        // 添加 RAG 和 Prompt 配置
+        if (knowledgeBaseIds && knowledgeBaseIds.length > 0) {
+          requestData.knowledge_base_ids = knowledgeBaseIds
+        }
+        
+        if (promptConfigId) {
+          requestData.prompt_config_id = promptConfigId
         }
         
         const response = await api.post('/requirement-analysis/api/testcase-generation/generate/', requestData)
@@ -830,26 +935,54 @@ export default {
 </script>
 
 <style scoped>
+/* 页面特定样式 */
+.page-container {
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  max-width: 100%; /* 新增：覆盖全局样式的 max-width: 1600px，确保铺满 */
+}
+
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 20px;
+  border-bottom: 1px solid #e6e6e6;
+  background: white;
+  flex-shrink: 0;
+}
+
+.page-title {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+  color: #303133;
+  position: relative;
+  padding-left: 16px;
+}
+
+.page-title::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 20px;
+  background: var(--primary-color, #409eff);
+  border-radius: 2px;
+}
+
+.header-actions {
+  display: flex;
+  gap: 15px;
+}
+
 .requirement-analysis {
   padding: 20px;
   max-width: 1200px;
   margin: 0 auto;
-}
-
-.page-header {
-  text-align: center;
-  margin-bottom: 40px;
-}
-
-.page-header h1 {
-  font-size: 2.5rem;
-  color: #2c3e50;
-  margin-bottom: 10px;
-}
-
-.page-header p {
-  color: #666;
-  font-size: 1.1rem;
 }
 
 .manual-input-card, .upload-card {

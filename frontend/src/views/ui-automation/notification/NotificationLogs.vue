@@ -1,160 +1,169 @@
 <template>
   <div class="notification-logs-container">
-    <!-- 页面操作栏 -->
-    <div class="page-actions">
-      <el-row :gutter="20" class="filter-row">
-        <el-col :span="6">
-          <el-input
-              v-model="searchForm.taskName"
-              placeholder="搜索任务名称"
-              clearable
-              @clear="handleSearch"
-              @keyup.enter="handleSearch"
-          >
-            <template #prefix>
-              <el-icon>
-                <Search/>
-              </el-icon>
-            </template>
-          </el-input>
-        </el-col>
-        <el-col :span="6">
-          <el-date-picker
-              v-model="searchForm.dateRange"
-              type="daterange"
-              range-separator="至"
-              start-placeholder="开始日期"
-              end-placeholder="结束日期"
-              value-format="YYYY-MM-DD"
-              @change="handleSearch"
-          />
-        </el-col>
-        <el-col :span="6">
-          <el-select
-              v-model="searchForm.status"
-              placeholder="通知状态"
-              clearable
-              @change="handleSearch"
-          >
-            <el-option label="全部状态" value=""/>
-            <el-option label="成功" value="SUCCESS"/>
-            <el-option label="失败" value="FAILED"/>
-            <el-option label="重试中" value="RETRYING"/>
-          </el-select>
-        </el-col>
-        <el-col :span="6">
-          <el-button type="primary" @click="handleSearch">
-            <el-icon>
-              <Search/>
-            </el-icon>
-            搜索
-          </el-button>
-          <el-button @click="handleReset">
-            重置
-          </el-button>
-        </el-col>
-      </el-row>
-    </div>
-
-    <!-- 通知列表 -->
-    <div class="logs-table-container">
-      <el-table
-          :data="logsData"
-          v-loading="loading"
-          element-loading-text="加载中..."
-          stripe
-          style="width: 100%"
-          @sort-change="handleSortChange"
-      >
-        <el-table-column
-            prop="task_name"
-            label="任务名称"
-            min-width="150"
-            sortable="custom"
-        />
-        <el-table-column
-            prop="task_type_display"
-            label="任务类型"
-            min-width="100"
-        >
-          <template #default="{ row }">
-            <el-tag
-                type="info"
-                size="small"
-            >
-              {{ row.task_type_display }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column
-            prop="actual_notification_type_display"
-            label="通知类型"
-            min-width="120"
-        >
-          <template #default="{ row }">
-            <el-tag
-                :type="getNotificationTypeTagType(row.actual_notification_type_display)"
-                size="small"
-            >
-              {{ row.actual_notification_type_display }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column
-            prop="created_at"
-            label="通知时间"
-            min-width="180"
-            sortable="custom"
-        >
-          <template #default="{ row }">
-            {{ formatDate(row.created_at) }}
-          </template>
-        </el-table-column>
-        <el-table-column
-            prop="status_display"
-            label="状态"
-            min-width="100"
-            sortable="custom"
-        >
-          <template #default="{ row }">
-            <el-tag
-                :type="getStatusTagType(row.status_display)"
-                size="small"
-            >
-              {{ row.status_display }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column
-            label="操作"
-            fixed="right"
-            width="120"
-        >
-          <template #default="{ row }">
-            <el-button
-                type="primary"
-                link
-                size="small"
-                @click="viewDetail(row)"
-            >
-              查看详情
-            </el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-
-      <!-- 分页 -->
-      <div class="pagination-container">
-        <el-pagination
-            v-model:current-page="pagination.currentPage"
-            v-model:page-size="pagination.pageSize"
-            :page-sizes="[10, 20, 50, 100]"
-            :total="pagination.total"
-            layout="total, sizes, prev, pager, next, jumper"
-            @size-change="handleSizeChange"
-            @current-change="handleCurrentChange"
-        />
+    <div class="page-header">
+      <h3 class="page-title">通知列表</h3>
+      <div class="actions">
       </div>
+    </div>
+    
+    <div class="content">
+        <!-- 页面操作栏 -->
+        <div class="page-actions">
+          <el-row :gutter="20" class="filter-row">
+            <el-col :span="6">
+              <el-input
+                  v-model="searchForm.taskName"
+                  placeholder="搜索任务名称"
+                  clearable
+                  @clear="handleSearch"
+                  @keyup.enter="handleSearch"
+              >
+                <template #prefix>
+                  <el-icon>
+                    <Search/>
+                  </el-icon>
+                </template>
+              </el-input>
+            </el-col>
+            <el-col :span="6">
+              <el-date-picker
+                  v-model="searchForm.dateRange"
+                  type="daterange"
+                  range-separator="至"
+                  start-placeholder="开始日期"
+                  end-placeholder="结束日期"
+                  value-format="YYYY-MM-DD"
+                  @change="handleSearch"
+              />
+            </el-col>
+            <el-col :span="6">
+              <el-select
+                  v-model="searchForm.status"
+                  placeholder="通知状态"
+                  clearable
+                  @change="handleSearch"
+              >
+                <el-option label="全部状态" value=""/>
+                <el-option label="成功" value="SUCCESS"/>
+                <el-option label="失败" value="FAILED"/>
+                <el-option label="重试中" value="RETRYING"/>
+              </el-select>
+            </el-col>
+            <el-col :span="6">
+              <el-button type="primary" @click="handleSearch">
+                <el-icon>
+                  <Search/>
+                </el-icon>
+                搜索
+              </el-button>
+              <el-button @click="handleReset">
+                重置
+              </el-button>
+            </el-col>
+          </el-row>
+        </div>
+
+        <!-- 通知列表 -->
+        <el-table
+            :data="logsData"
+            v-loading="loading"
+            element-loading-text="加载中..."
+            stripe
+            style="width: 100%; flex: 1;"
+            height="100%"
+            @sort-change="handleSortChange"
+        >
+            <el-table-column
+                prop="task_name"
+                label="任务名称"
+                min-width="150"
+                sortable="custom"
+            />
+            <el-table-column
+                prop="task_type_display"
+                label="任务类型"
+                min-width="100"
+            >
+              <template #default="{ row }">
+                <el-tag
+                    type="info"
+                    size="small"
+                >
+                  {{ row.task_type_display }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column
+                prop="actual_notification_type_display"
+                label="通知类型"
+                min-width="120"
+            >
+              <template #default="{ row }">
+                <el-tag
+                    :type="getNotificationTypeTagType(row.actual_notification_type_display)"
+                    size="small"
+                >
+                  {{ row.actual_notification_type_display }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column
+                prop="created_at"
+                label="通知时间"
+                min-width="180"
+                sortable="custom"
+            >
+              <template #default="{ row }">
+                {{ formatDate(row.created_at) }}
+              </template>
+            </el-table-column>
+            <el-table-column
+                prop="status_display"
+                label="状态"
+                min-width="100"
+                sortable="custom"
+            >
+              <template #default="{ row }">
+                <el-tag
+                    :type="getStatusTagType(row.status_display)"
+                    size="small"
+                >
+                  {{ row.status_display }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column
+                label="操作"
+                fixed="right"
+                width="120"
+            >
+              <template #default="{ row }">
+                <el-button
+                    type="primary"
+                    link
+                    size="small"
+                    @click="viewDetail(row)"
+                >
+                  <el-icon><Document /></el-icon>
+                  查看详情
+                </el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+
+          <!-- 分页 -->
+          <div class="pagination-container">
+            <el-pagination
+                v-model:current-page="pagination.currentPage"
+                v-model:page-size="pagination.pageSize"
+                :page-sizes="[10, 20, 50, 100]"
+                :total="pagination.total"
+                layout="total, sizes, prev, pager, next, jumper"
+                @size-change="handleSizeChange"
+                @current-change="handleCurrentChange"
+            />
+          </div>
+        </div>
     </div>
 
     <!-- 详情弹窗 -->
@@ -252,11 +261,10 @@
         </span>
       </template>
     </el-dialog>
-  </div>
 </template>
 
 <script>
-import {Search} from '@element-plus/icons-vue'
+import {Search, Document} from '@element-plus/icons-vue'
 import {ref, reactive, onMounted, computed} from 'vue'
 import {ElMessage} from 'element-plus'
 import { getNotificationLogs } from '@/api/ui_automation.js'
@@ -264,7 +272,8 @@ import { getNotificationLogs } from '@/api/ui_automation.js'
 export default {
   name: 'NotificationLogs',
   components: {
-    Search
+    Search,
+    Document
   },
   setup() {
     // 数据状态
@@ -537,35 +546,86 @@ export default {
 
 <style scoped>
 .notification-logs-container {
-  padding: 20px;
-  background: #fff;
-  border-radius: 8px;
-  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-color: #f5f7fa;
+  overflow: hidden;
 }
 
-.page-actions {
-  margin-bottom: 20px;
-  padding: 20px;
-  background: #f8f9fa;
-  border-radius: 6px;
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 20px;
+  border-bottom: 1px solid #e6e6e6;
+  background: white;
+  flex-shrink: 0;
 }
 
-.filter-row {
+.page-title {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+  color: #303133;
+  position: relative;
+  padding-left: 16px;
+}
+
+.page-title::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 20px;
+  background: var(--primary-color, #409eff);
+  border-radius: 2px;
+}
+
+.header-actions {
   display: flex;
   align-items: center;
   gap: 15px;
 }
 
-.logs-table-container {
-  margin-top: 20px;
+.main-content {
+  flex: 1;
+  overflow: hidden;
+  padding: 0;
+  display: flex;
+}
+
+.card-container {
+  flex: 1;
+  width: 100%;
+  background-color: #fff;
+  padding: 20px;
+  box-shadow: 0 1px 4px rgba(0, 21, 41, 0.08);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.filter-bar {
+  margin-bottom: 20px;
+  flex-shrink: 0;
+}
+
+.filter-row {
+  display: flex;
+  align-items: center;
 }
 
 .pagination-container {
   margin-top: 20px;
   display: flex;
   justify-content: flex-end;
+  flex-shrink: 0;
 }
 
+/* 详情弹窗样式 */
 .notification-detail-form :deep(.el-form-item) {
   margin-bottom: 18px;
 }

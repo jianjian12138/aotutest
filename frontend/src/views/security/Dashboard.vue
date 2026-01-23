@@ -1,5 +1,12 @@
 <template>
   <div class="dashboard-container">
+    <el-card shadow="hover" class="page-card">
+      <template #header>
+        <div class="card-header page-header" style="margin-bottom: 0;">
+          <h2 class="page-title">数据看板</h2>
+        </div>
+      </template>
+    </el-card>
     <!-- 数据概览 -->
     <div class="stats-section">
       <el-row :gutter="20">
@@ -442,7 +449,7 @@ onMounted(() => {
 <style scoped>
 .dashboard-container {
   width: 100%;
-  padding: 0 20px;
+  padding: 0 ;
 }
 
 .stats-section {

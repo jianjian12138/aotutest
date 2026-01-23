@@ -25,6 +25,13 @@
       <el-table :data="cases" v-loading="loading" style="width: 100%">
         <el-table-column prop="name" label="用例名称" min-width="200" show-overflow-tooltip />
         <el-table-column prop="description" label="描述" min-width="200" show-overflow-tooltip />
+        <el-table-column prop="execution_mode" label="执行模式" width="100">
+          <template #default="{ row }">
+            <el-tag :type="row.execution_mode === 'mobile' ? 'warning' : 'info'">
+              {{ row.execution_mode === 'mobile' ? 'Mobile' : 'Web' }}
+            </el-tag>
+          </template>
+        </el-table-column>
         <el-table-column prop="task_description" label="任务描述" min-width="300" show-overflow-tooltip />
         <el-table-column prop="created_at" label="创建时间" width="180" :formatter="formatDate" />
         <el-table-column label="操作" width="200" fixed="right">
@@ -63,6 +70,12 @@
       <el-form :model="editForm" :rules="formRules" ref="editFormRef" label-width="100px">
         <el-form-item label="用例名称" prop="name">
           <el-input v-model="editForm.name" placeholder="请输入用例名称" />
+        </el-form-item>
+        <el-form-item label="执行模式" prop="execution_mode">
+          <el-select v-model="editForm.execution_mode" placeholder="请选择执行模式">
+            <el-option label="Web" value="web" />
+            <el-option label="Mobile" value="mobile" />
+          </el-select>
         </el-form-item>
         <el-form-item label="描述" prop="description">
           <el-input v-model="editForm.description" type="textarea" placeholder="请输入用例描述" />
@@ -117,13 +130,15 @@ const currentCaseId = ref(null)
 const editForm = reactive({
   name: '',
   description: '',
-  task_description: ''
+  task_description: '',
+  execution_mode: 'web'
 })
 const editFormRef = ref(null)
 
 const formRules = {
   name: [{ required: true, message: '请输入用例名称', trigger: 'blur' }],
-  task_description: [{ required: true, message: '请输入任务描述', trigger: 'blur' }]
+  task_description: [{ required: true, message: '请输入任务描述', trigger: 'blur' }],
+  execution_mode: [{ required: true, message: '请选择执行模式', trigger: 'change' }]
 }
 
 // 加载项目列表
@@ -189,6 +204,7 @@ const editCase = (row) => {
   editForm.name = row.name
   editForm.description = row.description
   editForm.task_description = row.task_description
+  editForm.execution_mode = row.execution_mode || 'web'
   showEditDialog.value = true
 }
 
@@ -202,7 +218,8 @@ const confirmEdit = async () => {
         await updateAICase(currentCaseId.value, {
           name: editForm.name,
           description: editForm.description,
-          task_description: editForm.task_description
+          task_description: editForm.task_description,
+          execution_mode: editForm.execution_mode
         })
         
         ElMessage.success('更新成功')
@@ -244,7 +261,7 @@ const runCase = async (row) => {
     await runAICase(row.id)
     ElMessage.success('用例开始执行')
     // 跳转到执行记录页面
-    router.push('/ai-intelligent-mode/execution-records')
+    router.push('/natural-language-testing/execution-records')
   } catch (error) {
     console.error('执行失败:', error)
     ElMessage.error('执行失败')

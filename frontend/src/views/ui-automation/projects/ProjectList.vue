@@ -1,74 +1,71 @@
 <template>
-  <div class="page-container">
+  <div class="project-management-container">
     <div class="page-header">
-      <h1 class="page-title">UI自动化项目</h1>
-      <el-button type="primary" @click="showCreateDialog = true">
-        <el-icon><Plus /></el-icon>
-        新建项目
-      </el-button>
+      <h1 class="page-title">UI项目管理</h1>
+      <div class="header-actions">
+        <el-button type="primary" @click="showCreateDialog = true">
+          <el-icon><Plus /></el-icon>
+          新建项目
+        </el-button>
+      </div>
     </div>
     
-    <div class="card-container">
-      <div class="filter-bar">
-        <el-row :gutter="20">
-          <el-col :span="6">
-            <el-input
-              v-model="searchText"
-              placeholder="搜索项目名称"
-              clearable
-              @input="handleSearch"
-            >
-              <template #prefix>
-                <el-icon><Search /></el-icon>
-              </template>
-            </el-input>
-          </el-col>
-          <el-col :span="4">
-            <el-select v-model="statusFilter" placeholder="状态筛选" clearable @change="handleFilter">
-              <el-option label="未开始" value="NOT_STARTED" />
-              <el-option label="进行中" value="IN_PROGRESS" />
-              <el-option label="已结束" value="COMPLETED" />
-            </el-select>
-          </el-col>
-        </el-row>
+    <div class="main-content">
+      <div class="content-wrapper">
+        <div class="projects-header">
+          <h4>项目列表</h4>
+        <div class="search-filter">
+          <el-input
+            v-model="searchText"
+            placeholder="搜索项目名称"
+            clearable
+            style="width: 300px; margin-right: 15px"
+            @input="handleSearch"
+          >
+            <template #prefix>
+              <el-icon><Search /></el-icon>
+            </template>
+          </el-input>
+          <el-button type="primary" @click="handleSearch">
+            <el-icon><Search /></el-icon>
+            查询
+          </el-button>
+        </div>
       </div>
       
-      <el-table :data="projects" v-loading="loading" style="width: 100%">
-        <el-table-column prop="name" label="项目名称" min-width="200">
-          <template #default="{ row }">
-            <el-link @click="goToProjectDetail(row.id)" type="primary">
-              {{ row.name }}
-            </el-link>
-          </template>
-        </el-table-column>
-        <el-table-column prop="description" label="描述" min-width="300" show-overflow-tooltip />
-        <el-table-column prop="status" label="状态" width="100">
-          <template #default="{ row }">
-            <el-tag :type="getStatusType(row.status)">{{ getStatusText(row.status) }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column prop="base_url" label="基础URL" min-width="200" show-overflow-tooltip />
-        <el-table-column prop="owner.username" label="负责人" width="100" />
-        <el-table-column prop="created_at" label="创建时间" width="180" :formatter="formatDate" />
-        <el-table-column prop="updated_at" label="更新时间" width="180" :formatter="formatDate" />
-        <el-table-column label="操作" width="180" fixed="right">
-          <template #default="{ row }">
-            <el-button size="small" type="primary" @click="goToProjectDetail(row.id)">
-              <el-icon><View /></el-icon>
-              查看
-            </el-button>
-            <el-button size="small" @click="editProject(row)">
-              <el-icon><Edit /></el-icon>
-              编辑
-            </el-button>
-            <el-button size="small" type="danger" @click="deleteProject(row.id)">
-              <el-icon><Delete /></el-icon>
-              删除
-            </el-button>
-          </template>
-        </el-table-column>
-      </el-table>
+      <div class="projects-list">
+        <div
+          v-for="project in projects"
+          :key="project.id"
+          class="project-item"
+          @click="goToProjectDetail(project.id)"
+        >
+          <div class="project-header">
+            <div class="project-info">
+              <h4 class="project-name">{{ project.name }}</h4>
+              <p class="project-description">{{ project.description || '暂无描述' }}</p>
+            </div>
+            <div class="project-actions">
+              <el-button size="small" type="primary" text @click.stop="editProject(project)">
+                <el-icon><Edit /></el-icon>
+                编辑
+              </el-button>
+              <el-button size="small" type="danger" text @click.stop="deleteProject(project.id)">
+                <el-icon><Delete /></el-icon>
+                删除
+              </el-button>
+            </div>
+          </div>
+          <div class="project-meta">
+            <el-tag :type="getStatusType(project.status)" size="small">
+              {{ getStatusText(project.status) }}
+            </el-tag>
+            <span class="update-time">{{ formatDate(null, null, project.updated_at) }}</span>
+          </div>
+        </div>
+      </div>
       
+      <!-- 分页 -->
       <div class="pagination-container">
         <el-pagination
           v-model:current-page="pagination.currentPage"
@@ -79,6 +76,7 @@
           @size-change="handleSizeChange"
           @current-change="handleCurrentChange"
         />
+      </div>
       </div>
     </div>
     
@@ -152,21 +150,21 @@
     
     <!-- 项目详情弹框 -->
     <el-dialog v-model="showDetailDialog" title="项目详情" width="600px">
-      <div v-if="currentProjectDetail" class="project-detail">
-        <el-descriptions bordered column="1">
+      <div v-if="currentProjectDetail" class="view-dialog-content">
+        <el-descriptions :column="2" border>
           <el-descriptions-item label="项目名称">{{ currentProjectDetail.name }}</el-descriptions-item>
-          <el-descriptions-item label="项目描述" :span="2">{{ currentProjectDetail.description || '暂无描述' }}</el-descriptions-item>
           <el-descriptions-item label="项目状态">
             <el-tag :type="getStatusType(currentProjectDetail.status)">
               {{ getStatusText(currentProjectDetail.status) }}
             </el-tag>
           </el-descriptions-item>
+          <el-descriptions-item label="项目描述" :span="2">{{ currentProjectDetail.description || '暂无描述' }}</el-descriptions-item>
           <el-descriptions-item label="基础URL">{{ currentProjectDetail.base_url }}</el-descriptions-item>
           <el-descriptions-item label="负责人">{{ currentProjectDetail.owner?.username || '暂无' }}</el-descriptions-item>
-          <el-descriptions-item label="开始日期">{{ currentProjectDetail.start_date ? formatDate(null, null, currentProjectDetail.start_date) : '未设置' }}</el-descriptions-item>
-          <el-descriptions-item label="结束日期">{{ currentProjectDetail.end_date ? formatDate(null, null, currentProjectDetail.end_date) : '未设置' }}</el-descriptions-item>
-          <el-descriptions-item label="创建时间">{{ formatDate(null, null, currentProjectDetail.created_at) }}</el-descriptions-item>
-          <el-descriptions-item label="更新时间">{{ formatDate(null, null, currentProjectDetail.updated_at) }}</el-descriptions-item>
+          <el-descriptions-item label="开始日期" :span="2">{{ currentProjectDetail.start_date ? formatDate(null, null, currentProjectDetail.start_date) : '未设置' }}</el-descriptions-item>
+          <el-descriptions-item label="结束日期" :span="2">{{ currentProjectDetail.end_date ? formatDate(null, null, currentProjectDetail.end_date) : '未设置' }}</el-descriptions-item>
+          <el-descriptions-item label="创建时间" :span="2">{{ formatDate(null, null, currentProjectDetail.created_at) }}</el-descriptions-item>
+          <el-descriptions-item label="更新时间" :span="2">{{ formatDate(null, null, currentProjectDetail.updated_at) }}</el-descriptions-item>
         </el-descriptions>
       </div>
       <div v-else class="text-center text-gray-500">
@@ -455,38 +453,150 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.page-container {
-  padding: 20px;
-  height: 100%;
-  overflow-y: auto;
+.project-management-container {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #f5f7fa;
+  overflow: hidden;
 }
 
 .page-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
+  padding: 15px 20px;
+  border-bottom: 1px solid #e6e6e6;
+  background: white;
+  flex-shrink: 0;
 }
 
 .page-title {
   margin: 0;
   font-size: 24px;
+  font-weight: 600;
+  color: #303133;
 }
 
-.card-container {
-  background-color: #fff;
-  border-radius: 8px;
+.header-actions {
+  display: flex;
+  align-items: center;
+}
+
+.main-content {
+  flex: 1;
+  overflow: hidden;
+  padding: 0;
+  display: flex;
+}
+
+.content-wrapper {
+  flex: 1;
+  width: 100%;
+  background: white;
   padding: 20px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  height: 100%;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
 }
 
-.filter-bar {
+.projects-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid #e6e6e6;
+  flex-shrink: 0;
+
+  h4 {
+    margin: 0;
+    color: #303133;
+    font-size: 18px;
+  }
+
+  .search-filter {
+    display: flex;
+    align-items: center;
+  }
+}
+
+.projects-list {
+  flex: 1;
+  overflow-y: auto;
+  margin-bottom: 20px;
+}
+
+.project-item {
+  border: 1px solid #e6e6e6;
+  border-radius: 8px;
+  margin-bottom: 15px;
+  padding: 20px;
+  cursor: pointer;
+  transition: all 0.3s;
+  background: white;
+}
+
+.project-item:hover {
+  border-color: #409eff;
+  box-shadow: 0 2px 8px rgba(64, 158, 255, 0.1);
+}
+
+.project-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 15px;
+}
+
+.project-info {
+  flex: 1;
+  margin-right: 20px;
+}
+
+.project-name {
+  margin: 0 0 8px 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.project-description {
+  margin: 0;
+  color: #606266;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.project-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.project-meta {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  font-size: 14px;
+  color: #909399;
+}
+
+.update-time {
+  font-size: 12px;
 }
 
 .pagination-container {
   margin-top: 20px;
   display: flex;
   justify-content: flex-end;
+  flex-shrink: 0;
+}
+
+.dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
 }
 </style>
+

@@ -5,9 +5,12 @@ Playwright自动化测试执行引擎
 import asyncio
 import base64
 import time
+import os
+import json
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 from playwright.async_api import async_playwright, Page, Browser, BrowserContext, TimeoutError as PlaywrightTimeout
+from django.conf import settings
 import logging
 from .variable_resolver import resolve_variables
 
@@ -37,8 +40,15 @@ class PlaywrightTestEngine:
             self.playwright = await async_playwright().start()
 
             # 根据浏览器类型选择启动方式
+            channel = None
             if self.browser_type == 'chromium':
                 browser_launcher = self.playwright.chromium
+            elif self.browser_type == 'chrome':
+                browser_launcher = self.playwright.chromium
+                channel = 'chrome'
+            elif self.browser_type == 'msedge':
+                browser_launcher = self.playwright.chromium
+                channel = 'msedge'
             elif self.browser_type == 'firefox':
                 browser_launcher = self.playwright.firefox
             elif self.browser_type == 'webkit':
@@ -47,10 +57,39 @@ class PlaywrightTestEngine:
                 browser_launcher = self.playwright.chromium
 
             # 启动浏览器
-            self.browser = await browser_launcher.launch(
-                headless=self.headless,
-                args=['--disable-blink-features=AutomationControlled']  # 避免被检测
-            )
+            launch_args = {
+                'headless': self.headless,
+                'args': ['--disable-blink-features=AutomationControlled']
+            }
+            if channel:
+                launch_args['channel'] = channel
+
+            try:
+                self.browser = await browser_launcher.launch(**launch_args)
+            except Exception as e:
+                # 如果是 Chrome 启动失败，尝试降级
+                if channel == 'chrome':
+                    logger.warning(f"Chrome 启动失败，尝试使用 Edge: {e}")
+                    # 1. 尝试降级到 Edge
+                    launch_args['channel'] = 'msedge'
+                    try:
+                        self.browser = await browser_launcher.launch(**launch_args)
+                        # 更新当前实例的 browser_type 标记，以便日志准确
+                        self.browser_type = 'msedge'
+                    except Exception as e2:
+                        logger.warning(f"Edge 启动也失败，尝试使用 Playwright 自带 Chromium: {e2}")
+                        # 2. 尝试降级到 Playwright 自带 Chromium
+                        # 移除 channel 参数，使用默认的 bundled chromium
+                        if 'channel' in launch_args:
+                            del launch_args['channel']
+                        try:
+                            self.browser = await browser_launcher.launch(**launch_args)
+                            self.browser_type = 'chromium'
+                        except Exception as e3:
+                            logger.error(f"所有浏览器启动尝试均失败: {e3}")
+                            raise e # 抛出最初的 Chrome 错误，因为这是用户的首选
+                else:
+                    raise e
 
             # 创建浏览器上下文
             self.context = await self.browser.new_context(
@@ -82,7 +121,87 @@ class PlaywrightTestEngine:
         except Exception as e:
             logger.error(f"关闭浏览器失败: {str(e)}")
 
-    async def execute_step(self, step, element_data: Dict) -> Tuple[bool, str, Optional[str]]:
+    async def _capture_debug_data(self, step, project_config=None, timing="after"):
+        """采集调试数据"""
+        try:
+            # 1. 检查是否开启全局采集
+            if not project_config or not project_config.get('enable_debug_capture', False):
+                return None
+            
+            # 2. 检查步骤是否开启采集
+            if not getattr(step, 'enable_debug_capture', False):
+                return None
+
+            # 3. 检查时机配置
+            debug_config = project_config.get('debug_config', {})
+            if not debug_config.get(f'enable_{timing}', False):
+                return None
+
+            items = debug_config.get(f'{timing}_items', [])
+            if not items:
+                return None
+
+            # 创建调试数据目录
+            # 结构: media/debug_data/project_id/case_id/
+            project_id = step.test_case.project.id
+            case_id = step.test_case.id
+            step_name = f"step_{step.step_number}"
+            
+            # 使用 MEDIA_ROOT
+            relative_dir = os.path.join('debug_data', str(project_id), str(case_id))
+            base_dir = os.path.join(settings.MEDIA_ROOT, relative_dir)
+            os.makedirs(base_dir, exist_ok=True)
+            
+            timestamp = int(time.time() * 1000)
+            file_prefix = f"{step_name}_{timing}_{timestamp}"
+            
+            data = {}
+            captured_data = {}
+            
+            # 采集各项数据
+            if "dom" in items:
+                try:
+                    data["dom"] = await self.page.content()
+                except:
+                    pass
+                    
+            if "iframes" in items:
+                try:
+                    data["iframes"] = [frame.url for frame in self.page.frames]
+                except:
+                    pass
+                    
+            if "text_candidates" in items:
+                try:
+                    data["text_candidates"] = await self.page.evaluate("() => document.body.innerText")
+                except:
+                    pass
+
+            # 保存JSON数据
+            if data:
+                json_filename = f"{file_prefix}.json"
+                json_path = os.path.join(base_dir, json_filename)
+                with open(json_path, 'w', encoding='utf-8') as f:
+                    json.dump(data, f, ensure_ascii=False, indent=2)
+                captured_data['data_file'] = os.path.join(settings.MEDIA_URL, relative_dir, json_filename).replace('\\', '/')
+                    
+            # 截图作为额外文件
+            if "screenshot" in items:
+                screenshot_filename = f"{file_prefix}.png"
+                screenshot_path = os.path.join(base_dir, screenshot_filename)
+                try:
+                    await self.page.screenshot(path=screenshot_path)
+                    captured_data['screenshot'] = os.path.join(settings.MEDIA_URL, relative_dir, screenshot_filename).replace('\\', '/')
+                except:
+                    pass
+            
+            return captured_data
+
+        except Exception as e:
+            logger.error(f"Error capturing debug data: {e}")
+            return None
+
+    async def execute_step(self, step, element_data: Dict, project_config: Dict = None) -> Tuple[bool, str, Optional[str], Optional[Dict]]:
         """
         执行单个测试步骤
 
@@ -91,7 +210,7 @@ class PlaywrightTestEngine:
             element_data: 元素数据字典 {locator_strategy, locator_value, name}
 
         Returns:
-            (是否成功, 日志信息, 截图base64)
+            (是否成功, 日志信息, 截图base64, 调试数据)
         """
         action_type = step.action_type
         
@@ -106,6 +225,10 @@ class PlaywrightTestEngine:
             
         start_time = time.time()
         screenshot_base64 = None
+        debug_data = {}
+
+        # 步骤前采集
+        debug_data['before'] = await self._capture_debug_data(step, project_config, timing='before')
 
         try:
             # wait和screenshot操作不需要元素定位器
@@ -114,7 +237,9 @@ class PlaywrightTestEngine:
                 await asyncio.sleep(wait_seconds)
                 execution_time = round(time.time() - start_time, 2)
                 log = f"✓ 固定等待 {wait_seconds} 秒完成 - 耗时 {execution_time}秒"
-                return True, log, None
+                # 步骤后采集
+                debug_data['after'] = await self._capture_debug_data(step, project_config, timing='after')
+                return True, log, None, debug_data
 
             elif action_type == 'screenshot':
                 screenshot = await self.page.screenshot()
@@ -123,7 +248,9 @@ class PlaywrightTestEngine:
                 log = f"✓ 截图成功\n"
                 log += f"  - 截图范围: 整个页面\n"
                 log += f"  - 执行时间: {execution_time}秒"
-                return True, log, screenshot_base64
+                # 步骤后采集
+                debug_data['after'] = await self._capture_debug_data(step, project_config, timing='after')
+                return True, log, screenshot_base64, debug_data
 
             elif action_type == 'switchTab':
                 # 切换标签页
@@ -188,7 +315,9 @@ class PlaywrightTestEngine:
                 log += f"  - 目标索引: {final_target_index}\n"
                 log += f"  - 页面标题: {await self.page.title()}\n"
                 log += f"  - 执行时间: {execution_time}秒"
-                return True, log, None
+                # 步骤后采集
+                debug_data['after'] = await self._capture_debug_data(step, project_config, timing='after')
+                return True, log, None, debug_data
 
             # 其他操作需要元素定位器
             # 获取元素定位器
@@ -294,7 +423,9 @@ class PlaywrightTestEngine:
                         log += f"  - 超时设置: {timeout_ms/1000}秒\n"
                         log += f"  - 特殊处理: Playwright原生点击内部触发器 + 等待展开\n"
                         log += f"  - 执行时间: {execution_time}秒"
-                        return True, log, None
+                        # 步骤后采集
+                        debug_data['after'] = await self._capture_debug_data(step, project_config, timing='after')
+                        return True, log, None, debug_data
                     except Exception as e:
                         logger.warning(f"Playwright 点击失败，尝试其他方法: {e}")
                         
@@ -316,7 +447,9 @@ class PlaywrightTestEngine:
                             log += f"  - 定位器: {locator_strategy}={locator_value}\n"
                             log += f"  - 超时设置: {timeout_ms/1000}秒\n"
                             log += f"  - 执行时间: {execution_time}秒"
-                            return True, log, None
+                            # 步骤后采集
+                            debug_data['after'] = await self._capture_debug_data(step, project_config, timing='after')
+                            return True, log, None, debug_data
                         except Exception as e2:
                             logger.error(f"所有点击方法都失败: {e2}")
                             raise
@@ -435,7 +568,9 @@ class PlaywrightTestEngine:
                         log += f"  - 匹配数量: {count}\n"
                         log += f"  - 执行方法: {method_desc}{auto_close_msg}\n"
                         log += f"  - 执行时间: {execution_time}秒"
-                        return True, log, None
+                        # 步骤后采集
+                        debug_data['after'] = await self._capture_debug_data(step, project_config, timing='after')
+                        return True, log, None, debug_data
                         
                         logger.info(f"JS执行结果: {js_result}")
                         
@@ -464,7 +599,9 @@ class PlaywrightTestEngine:
                         if isinstance(js_result, dict) and 'allValues' in js_result:
                             log += f"  - 当前选中值: {js_result['allValues']}\n"
                         log += f"  - 执行时间: {execution_time}秒"
-                        return True, log, None
+                        # 步骤后采集
+                        debug_data['after'] = await self._capture_debug_data(step, project_config, timing='after')
+                        return True, log, None, debug_data
                     except Exception as e:
                         logger.error(f"下拉框选项点击失败: {e}")
                         execution_time = round(time.time() - start_time, 2)
@@ -489,7 +626,7 @@ class PlaywrightTestEngine:
                             pass
 
                         # 返回: (是否成功, 日志信息, 截图base64)
-                        return False, error_log, screenshot_base64
+                        return False, error_log, screenshot_base64, debug_data
                 else:
                     # 普通元素：正常点击
                     # 如果启用了强制操作，先等待元素在 DOM 中，不要求可见
@@ -507,7 +644,9 @@ class PlaywrightTestEngine:
                     if force_action:
                         log += f"  - 强制操作: 是（跳过可见性检查，等待attached）\n"
                     log += f"  - 执行时间: {execution_time}秒"
-                    return True, log, None
+                    # 步骤后采集
+                    debug_data['after'] = await self._capture_debug_data(step, project_config, timing='after')
+                    return True, log, None, debug_data
 
             elif action_type == 'fill':
                 await locator.fill(resolved_input_value, timeout=timeout_ms, force=force_action)
@@ -526,7 +665,9 @@ class PlaywrightTestEngine:
                 if force_action:
                     log += f"  - 强制操作: 是（忽略可见性检查）\n"
                 log += f"  - 执行时间: {execution_time}秒"
-                return True, log, None
+                # 步骤后采集
+                debug_data['after'] = await self._capture_debug_data(step, project_config, timing='after')
+                return True, log, None, debug_data
 
             elif action_type == 'getText':
                 text = await locator.inner_text(timeout=timeout_ms)
@@ -536,7 +677,9 @@ class PlaywrightTestEngine:
                 log += f"  - 文本内容: '{text}'\n"
                 log += f"  - 超时设置: {timeout_ms/1000}秒\n"
                 log += f"  - 执行时间: {execution_time}秒"
-                return True, log, None
+                # 步骤后采集
+                debug_data['after'] = await self._capture_debug_data(step, project_config, timing='after')
+                return True, log, None, debug_data
 
             elif action_type == 'waitFor':
                 await locator.wait_for(state='visible', timeout=timeout_ms)
@@ -545,7 +688,9 @@ class PlaywrightTestEngine:
                 log += f"  - 定位器: {locator_strategy}={locator_value}\n"
                 log += f"  - 超时设置: {timeout_ms/1000}秒\n"
                 log += f"  - 等待时间: {execution_time}秒"
-                return True, log, None
+                # 步骤后采集
+                debug_data['after'] = await self._capture_debug_data(step, project_config, timing='after')
+                return True, log, None, debug_data
 
             elif action_type == 'hover':
                 await locator.hover(timeout=timeout_ms, force=force_action)
@@ -556,6 +701,8 @@ class PlaywrightTestEngine:
                 if force_action:
                     log += f"  - 强制操作: 是（忽略可见性检查）\n"
                 log += f"  - 执行时间: {execution_time}秒"
+                # 步骤后采集
+                await self._capture_debug_data(step, project_config, timing='after')
                 return True, log, None
 
             elif action_type == 'scroll':
@@ -594,7 +741,9 @@ class PlaywrightTestEngine:
                         if resolved_assert_value != step.assert_value:
                              log += f"  - 变量解析: '{step.assert_value}' => '{resolved_assert_value}'\n"
                         log += f"  - 超时设置: {timeout_ms/1000}秒"
-                        return True, log, None
+                        # 步骤后采集
+                        debug_data['after'] = await self._capture_debug_data(step, project_config, timing='after')
+                        return True, log, None, debug_data
                     else:
                         log = f"✗ 断言失败: 文本不等于 '{resolved_assert_value}'\n"
                         if resolved_assert_value != step.assert_value:
@@ -609,6 +758,8 @@ class PlaywrightTestEngine:
                     is_visible = await locator.is_visible()
                     if is_visible:
                         log = f"✓ 断言通过: 元素 '{element_name}' 可见"
+                        # 步骤后采集
+                        await self._capture_debug_data(step, project_config, timing='after')
                         return True, log, None
                     else:
                         log = f"✗ 断言失败: 元素 '{element_name}' 不可见"
@@ -620,18 +771,22 @@ class PlaywrightTestEngine:
                     count = await locator.count()
                     if count > 0:
                         log = f"✓ 断言通过: 元素 '{element_name}' 存在"
-                        return True, log, None
+                        # 步骤后采集
+                        after_data = await self._capture_debug_data(step, project_config, timing='after')
+                        if after_data:
+                            debug_data.update(after_data)
+                        return True, log, None, debug_data
                     else:
                         log = f"✗ 断言失败: 元素 '{element_name}' 不存在"
                         screenshot = await self.page.screenshot()
                         screenshot_base64 = f"data:image/png;base64,{base64.b64encode(screenshot).decode()}"
-                        return False, log, screenshot_base64
+                        return False, log, screenshot_base64, debug_data
 
 
 
             else:
                 log = f"⚠ 未知的操作类型: {action_type}"
-                return True, log, None
+                return True, log, None, debug_data
 
         except PlaywrightTimeout as e:
             execution_time = round(time.time() - start_time, 2)
@@ -648,7 +803,7 @@ class PlaywrightTestEngine:
             except:
                 pass
 
-            return False, log, screenshot_base64
+            return False, log, screenshot_base64, debug_data
 
         except Exception as e:
             execution_time = round(time.time() - start_time, 2)
@@ -665,7 +820,7 @@ class PlaywrightTestEngine:
             except:
                 pass
 
-            return False, log, screenshot_base64
+            return False, log, screenshot_base64, debug_data
 
     async def navigate(self, url: str) -> Tuple[bool, str]:
         """

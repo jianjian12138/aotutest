@@ -1,13 +1,7 @@
 <template>
-  <div class="task-detail">
+  <div class="page-container">
     <div class="page-header">
-      <div class="header-left">
-        <h2>任务详情 - {{ task.title }}</h2>
-        <div class="task-info">
-          <span class="task-id">任务ID: {{ taskId }}</span>
-          <span class="task-status" :class="task.status">{{ getStatusText(task.status) }}</span>
-        </div>
-      </div>
+      <h1 class="page-title">任务详情 - {{ task.title }}</h1>
       <div class="header-actions">
         <button 
           v-if="testCases.length > 0" 
@@ -20,139 +14,146 @@
       </div>
     </div>
 
-    <!-- 需求描述折叠卡片 -->
-    <div v-if="task.requirement_text" class="requirement-description-card">
-      <el-collapse>
-        <el-collapse-item name="requirement">
-          <template #title>
-            <div class="collapse-title">
-              <span class="title-icon">📋</span>
-              <span class="title-text">需求描述</span>
-              <span class="title-hint">（点击展开查看完整内容）</span>
-            </div>
-          </template>
-          <div class="requirement-content">
-            <div class="requirement-text">
-              {{ task.requirement_text }}
-            </div>
-            <div class="requirement-actions">
-              <el-button size="small" @click="copyRequirementText">
-                <el-icon><DocumentCopy /></el-icon>
-                复制需求描述
-              </el-button>
-            </div>
-          </div>
-        </el-collapse-item>
-      </el-collapse>
-    </div>
-
-    <div v-if="isLoading" class="loading-state">
-      <p>🔄 正在加载任务详情...</p>
-    </div>
-
-    <div v-else-if="!task.task_id" class="error-state">
-      <h3>任务不存在或已被删除</h3>
-      <router-link to="/generated-testcases">返回任务列表</router-link>
-    </div>
-
-    <div v-else class="task-content">
-      <!-- 批量操作区域 -->
-      <div class="batch-actions" v-if="testCases.length > 0">
-        <div class="selection-info">
-          <label class="select-all">
-            <input 
-              type="checkbox" 
-              :checked="isAllSelected" 
-              @change="toggleSelectAll">
-            全选
-          </label>
-          <span class="selected-count" v-if="selectedCases.length > 0">
-            已选择 {{ selectedCases.length }} 条用例
-          </span>
-        </div>
-        <div class="batch-buttons">
-          <button 
-            class="batch-adopt-btn" 
-            :disabled="selectedCases.length === 0"
-            @click="batchAdopt">
-            ✅ 一键采纳 ({{ selectedCases.length }})
-          </button>
-          <button 
-            class="batch-discard-btn" 
-            :disabled="selectedCases.length === 0"
-            @click="batchDiscard">
-            ❌ 一键弃用 ({{ selectedCases.length }})
-          </button>
-        </div>
+    <div class="card-container">
+      <div class="task-info-bar" style="margin-bottom: 20px; display: flex; gap: 20px; align-items: center;">
+        <span class="task-id" style="color: #606266;">任务ID: {{ taskId }}</span>
+        <span class="task-status" :class="task.status">{{ getStatusText(task.status) }}</span>
       </div>
 
-      <!-- 测试用例列表 -->
-      <div class="testcases-table" v-if="testCases.length > 0">
-        <div class="table-header">
-          <div class="header-cell checkbox-cell">选择</div>
-          <div class="header-cell">测试用例编号</div>
-          <div class="header-cell">测试场景</div>
-          <div class="header-cell">前置条件</div>
-          <div class="header-cell">操作步骤</div>
-          <div class="header-cell">预期结果</div>
-          <div class="header-cell">优先级</div>
-          <div class="header-cell">操作</div>
-        </div>
-        
-        <div class="table-body">
-          <div 
-            v-for="(testCase, index) in paginatedTestCases" 
-            :key="testCase.id || index"
-            class="table-row">
-            <div class="body-cell checkbox-cell">
+      <!-- 需求描述折叠卡片 -->
+      <div v-if="task.requirement_text" class="requirement-description-card">
+        <el-collapse>
+          <el-collapse-item name="requirement">
+            <template #title>
+              <div class="collapse-title">
+                <span class="title-icon">📋</span>
+                <span class="title-text">需求描述</span>
+                <span class="title-hint">（点击展开查看完整内容）</span>
+              </div>
+            </template>
+            <div class="requirement-content">
+              <div class="requirement-text">
+                {{ task.requirement_text }}
+              </div>
+              <div class="requirement-actions">
+                <el-button size="small" @click="copyRequirementText">
+                  <el-icon><DocumentCopy /></el-icon>
+                  复制需求描述
+                </el-button>
+              </div>
+            </div>
+          </el-collapse-item>
+        </el-collapse>
+      </div>
+  
+      <div v-if="isLoading" class="loading-state">
+        <p>🔄 正在加载任务详情...</p>
+      </div>
+  
+      <div v-else-if="!task.task_id" class="error-state">
+        <h3>任务不存在或已被删除</h3>
+        <router-link to="/generated-testcases">返回任务列表</router-link>
+      </div>
+  
+      <div v-else class="task-content">
+        <!-- 批量操作区域 -->
+        <div class="batch-actions" v-if="testCases.length > 0">
+          <div class="selection-info">
+            <label class="select-all">
               <input 
                 type="checkbox" 
-                :value="testCase"
-                v-model="selectedCases"
-                @change="updateSelectAll">
-            </div>
-            <div class="body-cell">{{ testCase.caseId || `TC${String(index + 1).padStart(3, '0')}` }}</div>
-            <div class="body-cell">{{ testCase.scenario }}</div>
-            <div class="body-cell text-limit-2">{{ formatTextForList(testCase.precondition) }}</div>
-            <div class="body-cell text-limit-2">{{ formatTextForList(testCase.steps) }}</div>
-            <div class="body-cell text-limit-2">{{ formatTextForList(testCase.expected) }}</div>
-            <div class="body-cell">
-              <span class="priority-tag" :class="testCase.priority?.toLowerCase()">{{ testCase.priority || 'P2' }}</span>
-            </div>
-            <div class="body-cell">
-              <div class="action-buttons">
-                <button class="view-btn" @click="viewCaseDetail(testCase, index)">📖 查看详情</button>
-                <button class="adopt-btn" @click="adoptSingleCase(testCase, index)">✅ 采纳</button>
-                <button class="discard-btn" @click="discardSingleCase(testCase, index)">❌ 弃用</button>
+                :checked="isAllSelected" 
+                @change="toggleSelectAll">
+              全选
+            </label>
+            <span class="selected-count" v-if="selectedCases.length > 0">
+              已选择 {{ selectedCases.length }} 条用例
+            </span>
+          </div>
+          <div class="batch-buttons">
+            <button 
+              class="batch-adopt-btn" 
+              :disabled="selectedCases.length === 0"
+              @click="batchAdopt">
+              ✅ 一键采纳 ({{ selectedCases.length }})
+            </button>
+            <button 
+              class="batch-discard-btn" 
+              :disabled="selectedCases.length === 0"
+              @click="batchDiscard">
+              ❌ 一键弃用 ({{ selectedCases.length }})
+            </button>
+          </div>
+        </div>
+  
+        <!-- 测试用例列表 -->
+        <div class="testcases-table" v-if="testCases.length > 0">
+          <div class="table-header">
+            <div class="header-cell checkbox-cell">选择</div>
+            <div class="header-cell">测试用例编号</div>
+            <div class="header-cell">测试场景</div>
+            <div class="header-cell">前置条件</div>
+            <div class="header-cell">操作步骤</div>
+            <div class="header-cell">预期结果</div>
+            <div class="header-cell">优先级</div>
+            <div class="header-cell">操作</div>
+          </div>
+          
+          <div class="table-body">
+            <div 
+              v-for="(testCase, index) in paginatedTestCases" 
+              :key="testCase.id || index"
+              class="table-row">
+              <div class="body-cell checkbox-cell">
+                <input 
+                  type="checkbox" 
+                  :value="testCase"
+                  v-model="selectedCases"
+                  @change="updateSelectAll">
+              </div>
+              <div class="body-cell">{{ testCase.caseId || `TC${String(index + 1).padStart(3, '0')}` }}</div>
+              <div class="body-cell">{{ testCase.scenario }}</div>
+              <div class="body-cell text-limit-2">{{ formatTextForList(testCase.precondition) }}</div>
+              <div class="body-cell text-limit-2">{{ formatTextForList(testCase.steps) }}</div>
+              <div class="body-cell text-limit-2">{{ formatTextForList(testCase.expected) }}</div>
+              <div class="body-cell">
+                <span class="priority-tag" :class="testCase.priority?.toLowerCase()">{{ testCase.priority || 'P2' }}</span>
+              </div>
+              <div class="body-cell">
+                <div class="action-buttons">
+                  <button class="view-btn" @click="viewCaseDetail(testCase, index)">📖 查看详情</button>
+                  <button class="adopt-btn" @click="adoptSingleCase(testCase, index)">✅ 采纳</button>
+                  <button class="discard-btn" @click="discardSingleCase(testCase, index)">❌ 弃用</button>
+                </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
-
-      <div v-else class="empty-state">
-        <h3>暂无测试用例数据</h3>
-        <p>该任务还没有生成测试用例或用例已被清空</p>
-      </div>
-
-      <!-- 分页 -->
-      <div v-if="testCases.length > 0" class="pagination-section">
-        <div class="pagination-info">
-          显示 {{ paginationStart }}-{{ paginationEnd }} 条，共 {{ testCases.length }} 条
+  
+        <div v-else class="empty-state">
+          <h3>暂无测试用例数据</h3>
+          <p>该任务还没有生成测试用例或用例已被清空</p>
         </div>
-        <div class="pagination-controls">
-          <div class="page-size-selector">
-            <label>每页显示：</label>
-            <select v-model="pageSize" @change="currentPage = 1">
-              <option value="10">10 条</option>
-              <option value="20">20 条</option>
-              <option value="50">50 条</option>
-            </select>
+  
+        <!-- 分页 -->
+        <div v-if="testCases.length > 0" class="pagination-section">
+          <div class="pagination-info">
+            显示 {{ paginationStart }}-{{ paginationEnd }} 条，共 {{ testCases.length }} 条
           </div>
-          <div class="pagination-buttons">
-            <button :disabled="currentPage <= 1" @click="currentPage--">上一页</button>
-            <span class="current-page">第 {{ currentPage }} 页，共 {{ totalPages }} 页</span>
-            <button :disabled="currentPage >= totalPages" @click="currentPage++">下一页</button>
+          <div class="pagination-controls">
+            <div class="page-size-selector">
+              <label>每页显示：</label>
+              <select v-model="pageSize" @change="currentPage = 1">
+                <option value="10">10 条</option>
+                <option value="20">20 条</option>
+                <option value="50">50 条</option>
+              </select>
+            </div>
+            <div class="pagination-buttons">
+              <button :disabled="currentPage <= 1" @click="currentPage--">上一页</button>
+              <span class="current-page">第 {{ currentPage }} 页，共 {{ totalPages }} 页</span>
+              <button :disabled="currentPage >= totalPages" @click="currentPage++">下一页</button>
+            </div>
           </div>
         </div>
       </div>
@@ -878,12 +879,50 @@ export default {
 </script>
 
 <style scoped>
-.task-detail {
-  padding: 20px;
-  max-width: 1400px;
-  margin: 0 auto;
+/* 页面特定样式 */
+.page-container {
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+
+  max-width: 100%; /* 新增：覆盖全局样式的 max-width: 1600px，确保铺满 */
 }
 
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 20px;
+  border-bottom: 1px solid #e6e6e6;
+  background: white;
+  flex-shrink: 0;
+}
+
+.page-title {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+  color: #303133;
+  position: relative;
+  padding-left: 16px;
+}
+
+.page-title::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 20px;
+  background: var(--primary-color, #409eff);
+  border-radius: 2px;
+}
+
+.header-actions {
+  display: flex;
+  gap: 15px;
+}
 /* 需求描述折叠卡片 */
 .requirement-description-card {
   margin-bottom: 20px;
@@ -959,30 +998,6 @@ export default {
 
 .requirement-description-card :deep(.el-collapse-item__content) {
   padding: 0 20px 16px;
-}
-
-.page-header {
-  margin-bottom: 20px;
-  padding-bottom: 15px;
-  border-bottom: 1px solid #eee;
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-}
-
-.header-left {
-  flex: 1;
-}
-
-.page-header h2 {
-  color: #2c3e50;
-  margin: 0 0 10px 0;
-}
-
-.task-info {
-  display: flex;
-  gap: 20px;
-  align-items: center;
 }
 
 .task-id {

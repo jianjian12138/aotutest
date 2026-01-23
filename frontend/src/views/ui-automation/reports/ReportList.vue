@@ -1,8 +1,8 @@
 <template>
   <div class="report-view">
-    <div class="header">
-      <h3>测试报告</h3>
-      <div class="actions">
+    <div class="page-header">
+      <h1 class="page-title">测试报告</h1>
+      <div class="header-actions">
         <el-select v-model="selectedProject" placeholder="选择项目" style="width: 200px; margin-right: 15px" @change="onProjectChange">
           <el-option v-for="project in projects" :key="project.id" :label="project.name" :value="project.id" />
         </el-select>
@@ -13,7 +13,8 @@
       </div>
     </div>
 
-    <div class="content">
+    <div class="main-content">
+      <div class="content-wrapper">
       <el-table :data="reports" v-loading="loading" style="width: 100%">
         <el-table-column prop="id" label="ID" width="80" />
         <el-table-column prop="test_suite_name" label="测试套件" min-width="200" />
@@ -89,6 +90,7 @@
           @size-change="handleSizeChange"
           @current-change="handleCurrentChange"
         />
+      </div>
       </div>
     </div>
 
@@ -184,6 +186,7 @@
                   link
                   @click="viewCaseDetail(row)"
                 >
+                  <el-icon><Document /></el-icon>
                   查看详情
                 </el-button>
               </template>
@@ -514,40 +517,46 @@ onMounted(async () => {
 
 <style scoped lang="scss">
 .report-view {
-  padding: 20px;
-  height: 100%;
+  height: 100vh;
   display: flex;
   flex-direction: column;
   background: #f5f5f5;
 }
 
-.header {
+.page-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
+  padding: 15px 20px;
+  border-bottom: 1px solid #e6e6e6;
   background: white;
-  padding: 20px;
-  border-radius: 4px;
-
-  h3 {
-    margin: 0;
-    color: #303133;
-    font-size: 24px;
-  }
-
-  .actions {
-    display: flex;
-    align-items: center;
-  }
 }
 
-.content {
+.page-title {
+  margin: 0;
+  font-size: 24px;
+  color: #303133;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+}
+
+.main-content {
   flex: 1;
-  overflow: auto;
+  overflow: hidden;
+  padding: 0;
+}
+
+.content-wrapper {
   background: white;
   padding: 20px;
   border-radius: 4px;
+  height: 100%;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
 }
 
 .pagination-container {

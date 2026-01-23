@@ -1,199 +1,207 @@
 <template>
-  <div class="automation-testing">
-    <div class="header">
-      <h3>自动化测试</h3>
-      <el-button type="primary" @click="showCreateSuiteDialog = true">
-        <el-icon><Plus /></el-icon>
-        新建测试套件
-      </el-button>
+  <div class="page-container">
+    <div class="page-header">
+      <h3 class="page-title">自动化测试</h3>
+      <div class="header-actions">
+        <el-button type="primary" @click="showCreateSuiteDialog = true">
+          <el-icon><Plus /></el-icon>
+          新建测试套件
+        </el-button>
+      </div>
     </div>
 
-    <div class="content-layout">
-      <!-- 左侧项目选择和测试套件列表 -->
-      <div class="sidebar">
-        <div class="project-selector">
-          <el-select 
-            v-model="selectedProject" 
-            placeholder="选择项目"
-            @change="onProjectChange"
-            style="width: 100%;"
-          >
-            <el-option
-              v-for="project in httpProjects"
-              :key="project.id"
-              :label="project.name"
-              :value="project.id"
-            />
-          </el-select>
-        </div>
-        
-        <div class="suite-list">
-          <div class="list-header">
-            <span>测试套件</span>
-            <el-button size="small" text @click="loadTestSuites">
-              <el-icon><Refresh /></el-icon>
-            </el-button>
-          </div>
-          
-          <el-scrollbar height="400px">
-            <div
-              v-for="suite in testSuites"
-              :key="suite.id"
-              class="suite-item"
-              :class="{ active: selectedSuite?.id === suite.id }"
-              @click="selectSuite(suite)"
-            >
-              <div class="suite-info">
-                <div class="suite-name">{{ suite.name }}</div>
-                <div class="suite-meta">
-                  {{ suite.suite_requests?.length || 0 }} 个请求
+    <div class="main-content">
+      <div class="card-container">
+        <div class="content" style="height: 100%; display: flex; flex-direction: column;">
+          <div class="content-layout">
+            <!-- 左侧项目选择和测试套件列表 -->
+            <div class="sidebar">
+              <div class="project-selector">
+                <el-select 
+                  v-model="selectedProject" 
+                  placeholder="选择项目"
+                  @change="onProjectChange"
+                  style="width: 100%;"
+                >
+                  <el-option
+                    v-for="project in httpProjects"
+                    :key="project.id"
+                    :label="project.name"
+                    :value="project.id"
+                  />
+                </el-select>
+              </div>
+              
+              <div class="suite-list">
+                <div class="list-header">
+                  <span>测试套件</span>
+                  <el-button size="small" text @click="loadTestSuites">
+                    <el-icon><Refresh /></el-icon>
+                  </el-button>
+                </div>
+                
+                <el-scrollbar>
+                  <div
+                    v-for="suite in testSuites"
+                    :key="suite.id"
+                    class="suite-item"
+                    :class="{ active: selectedSuite?.id === suite.id }"
+                    @click="selectSuite(suite)"
+                  >
+                    <div class="suite-info">
+                      <div class="suite-name">{{ suite.name }}</div>
+                      <div class="suite-meta">
+                        {{ suite.suite_requests?.length || 0 }} 个请求
+                      </div>
+                    </div>
+                    <el-dropdown @command="handleSuiteAction" trigger="click">
+                      <el-button size="small" text>
+                        <el-icon><MoreFilled /></el-icon>
+                      </el-button>
+                      <template #dropdown>
+                        <el-dropdown-menu>
+                          <el-dropdown-item :command="{ action: 'run', suite }">运行</el-dropdown-item>
+                          <el-dropdown-item :command="{ action: 'edit', suite }">编辑</el-dropdown-item>
+                          <el-dropdown-item :command="{ action: 'duplicate', suite }">复制</el-dropdown-item>
+                          <el-dropdown-item :command="{ action: 'delete', suite }" divided>删除</el-dropdown-item>
+                        </el-dropdown-menu>
+                      </template>
+                    </el-dropdown>
+                  </div>
+                </el-scrollbar>
+              </div>
+            </div>
+
+            <!-- 右侧测试套件详情 -->
+            <div class="suite-content">
+              <div v-if="!selectedSuite" class="empty-state">
+                <el-empty description="请选择一个测试套件查看详情" />
+              </div>
+              
+              <div v-else class="suite-detail">
+                <!-- 套件信息 -->
+                <div class="suite-header">
+                  <div class="suite-title">
+                    <h4>{{ selectedSuite.name }}</h4>
+                    <div class="suite-actions">
+                      <el-button type="success" @click="runTestSuite(selectedSuite)" :loading="running">
+                        <el-icon><VideoPlay /></el-icon>
+                        运行测试
+                      </el-button>
+                      <el-button @click="editSuite(selectedSuite)">
+                        <el-icon><Edit /></el-icon>
+                        编辑
+                      </el-button>
+                    </div>
+                  </div>
+                  <div class="suite-description">
+                    {{ selectedSuite.description || '暂无描述' }}
+                  </div>
+                  <div class="suite-meta">
+                    <el-tag size="small">{{ getEnvironmentName(selectedSuite.environment) }}</el-tag>
+                    <span class="meta-text">创建者：{{ selectedSuite.created_by?.username }}</span>
+                    <span class="meta-text">创建时间：{{ formatDate(selectedSuite.created_at) }}</span>
+                  </div>
+                </div>
+
+                <!-- 请求列表 -->
+                <div class="requests-section">
+                  <div class="section-header">
+                    <h5>测试请求</h5>
+                    <el-button size="small" @click="showAddRequest">
+                      <el-icon><Plus /></el-icon>
+                      添加请求
+                    </el-button>
+                  </div>
+                  
+                  <el-table :data="selectedSuite.suite_requests" style="width: 100%">
+                    <el-table-column type="index" width="50" />
+                    <el-table-column prop="request.name" label="请求名称" min-width="200" />
+                    <el-table-column prop="request.method" label="方法" width="80">
+                      <template #default="scope">
+                        <el-tag :type="getMethodType(scope.row.request.method)" size="small">
+                          {{ scope.row.request.method }}
+                        </el-tag>
+                      </template>
+                    </el-table-column>
+                    <el-table-column prop="request.url" label="URL" min-width="300" show-overflow-tooltip />
+                    <el-table-column prop="enabled" label="启用" width="80">
+                      <template #default="scope">
+                        <el-switch 
+                          v-model="scope.row.enabled" 
+                          @change="updateRequestEnabled(scope.row)"
+                        />
+                      </template>
+                    </el-table-column>
+                    <el-table-column label="断言" width="100">
+                      <template #default="scope">
+                        {{ scope.row.assertions?.length || 0 }} 个
+                      </template>
+                    </el-table-column>
+                    <el-table-column label="操作" width="150">
+                      <template #default="scope">
+                        <el-button link type="primary" @click="editAssertions(scope.row)" size="small">
+                          编辑断言
+                        </el-button>
+                        <el-button link type="danger" @click="removeRequest(scope.row)" size="small">
+                          移除
+                        </el-button>
+                      </template>
+                    </el-table-column>
+                  </el-table>
+                </div>
+
+                <!-- 执行历史 -->
+                <div class="executions-section">
+                  <div class="section-header">
+                    <h5>执行历史</h5>
+                    <el-button size="small" @click="loadExecutions">
+                      <el-icon><Refresh /></el-icon>
+                      刷新
+                    </el-button>
+                  </div>
+                  
+                  <el-table :data="executions" v-loading="executionsLoading">
+                    <el-table-column prop="status" label="状态" width="100">
+                      <template #default="scope">
+                        <el-tag :type="getStatusType(scope.row.status)">
+                          {{ getStatusText(scope.row.status) }}
+                        </el-tag>
+                      </template>
+                    </el-table-column>
+                    <el-table-column prop="total_requests" label="总请求数" width="100" />
+                    <el-table-column prop="passed_requests" label="通过数" width="100">
+                      <template #default="scope">
+                        <span style="color: #67c23a">{{ scope.row.passed_requests }}</span>
+                      </template>
+                    </el-table-column>
+                    <el-table-column prop="failed_requests" label="失败数" width="100">
+                      <template #default="scope">
+                        <span style="color: #f56c6c">{{ scope.row.failed_requests }}</span>
+                      </template>
+                    </el-table-column>
+                    <el-table-column label="平均耗时" width="120">
+                      <template #default="scope">
+                        {{ getAverageExecutionTime(scope.row) }}
+                      </template>
+                    </el-table-column>
+                    <el-table-column prop="executed_by.username" label="执行者" width="120" />
+                    <el-table-column prop="created_at" label="执行时间" width="160">
+                      <template #default="scope">
+                        {{ formatDate(scope.row.created_at) }}
+                      </template>
+                    </el-table-column>
+                    <el-table-column label="操作" width="120">
+                      <template #default="scope">
+                        <el-button link type="primary" @click="viewExecutionDetail(scope.row)" size="small">
+                          查看详情
+                        </el-button>
+                      </template>
+                    </el-table-column>
+                  </el-table>
                 </div>
               </div>
-              <el-dropdown @command="handleSuiteAction" trigger="click">
-                <el-button size="small" text>
-                  <el-icon><MoreFilled /></el-icon>
-                </el-button>
-                <template #dropdown>
-                  <el-dropdown-menu>
-                    <el-dropdown-item :command="{ action: 'run', suite }">运行</el-dropdown-item>
-                    <el-dropdown-item :command="{ action: 'edit', suite }">编辑</el-dropdown-item>
-                    <el-dropdown-item :command="{ action: 'duplicate', suite }">复制</el-dropdown-item>
-                    <el-dropdown-item :command="{ action: 'delete', suite }" divided>删除</el-dropdown-item>
-                  </el-dropdown-menu>
-                </template>
-              </el-dropdown>
             </div>
-          </el-scrollbar>
-        </div>
-      </div>
-
-      <!-- 右侧测试套件详情 -->
-      <div class="main-content">
-        <div v-if="!selectedSuite" class="empty-state">
-          <el-empty description="请选择一个测试套件查看详情" />
-        </div>
-        
-        <div v-else class="suite-detail">
-          <!-- 套件信息 -->
-          <div class="suite-header">
-            <div class="suite-title">
-              <h4>{{ selectedSuite.name }}</h4>
-              <div class="suite-actions">
-                <el-button type="success" @click="runTestSuite(selectedSuite)" :loading="running">
-                  <el-icon><VideoPlay /></el-icon>
-                  运行测试
-                </el-button>
-                <el-button @click="editSuite(selectedSuite)">
-                  <el-icon><Edit /></el-icon>
-                  编辑
-                </el-button>
-              </div>
-            </div>
-            <div class="suite-description">
-              {{ selectedSuite.description || '暂无描述' }}
-            </div>
-            <div class="suite-meta">
-              <el-tag size="small">{{ getEnvironmentName(selectedSuite.environment) }}</el-tag>
-              <span class="meta-text">创建者：{{ selectedSuite.created_by?.username }}</span>
-              <span class="meta-text">创建时间：{{ formatDate(selectedSuite.created_at) }}</span>
-            </div>
-          </div>
-
-          <!-- 请求列表 -->
-          <div class="requests-section">
-            <div class="section-header">
-              <h5>测试请求</h5>
-              <el-button size="small" @click="showAddRequest">
-                <el-icon><Plus /></el-icon>
-                添加请求
-              </el-button>
-            </div>
-            
-            <el-table :data="selectedSuite.suite_requests" style="width: 100%">
-              <el-table-column type="index" width="50" />
-              <el-table-column prop="request.name" label="请求名称" min-width="200" />
-              <el-table-column prop="request.method" label="方法" width="80">
-                <template #default="scope">
-                  <el-tag :type="getMethodType(scope.row.request.method)" size="small">
-                    {{ scope.row.request.method }}
-                  </el-tag>
-                </template>
-              </el-table-column>
-              <el-table-column prop="request.url" label="URL" min-width="300" show-overflow-tooltip />
-              <el-table-column prop="enabled" label="启用" width="80">
-                <template #default="scope">
-                  <el-switch 
-                    v-model="scope.row.enabled" 
-                    @change="updateRequestEnabled(scope.row)"
-                  />
-                </template>
-              </el-table-column>
-              <el-table-column label="断言" width="100">
-                <template #default="scope">
-                  {{ scope.row.assertions?.length || 0 }} 个
-                </template>
-              </el-table-column>
-              <el-table-column label="操作" width="150">
-                <template #default="scope">
-                  <el-button link type="primary" @click="editAssertions(scope.row)" size="small">
-                    编辑断言
-                  </el-button>
-                  <el-button link type="danger" @click="removeRequest(scope.row)" size="small">
-                    移除
-                  </el-button>
-                </template>
-              </el-table-column>
-            </el-table>
-          </div>
-
-          <!-- 执行历史 -->
-          <div class="executions-section">
-            <div class="section-header">
-              <h5>执行历史</h5>
-              <el-button size="small" @click="loadExecutions">
-                <el-icon><Refresh /></el-icon>
-                刷新
-              </el-button>
-            </div>
-            
-            <el-table :data="executions" v-loading="executionsLoading">
-              <el-table-column prop="status" label="状态" width="100">
-                <template #default="scope">
-                  <el-tag :type="getStatusType(scope.row.status)">
-                    {{ getStatusText(scope.row.status) }}
-                  </el-tag>
-                </template>
-              </el-table-column>
-              <el-table-column prop="total_requests" label="总请求数" width="100" />
-              <el-table-column prop="passed_requests" label="通过数" width="100">
-                <template #default="scope">
-                  <span style="color: #67c23a">{{ scope.row.passed_requests }}</span>
-                </template>
-              </el-table-column>
-              <el-table-column prop="failed_requests" label="失败数" width="100">
-                <template #default="scope">
-                  <span style="color: #f56c6c">{{ scope.row.failed_requests }}</span>
-                </template>
-              </el-table-column>
-              <el-table-column label="平均耗时" width="120">
-                <template #default="scope">
-                  {{ getAverageExecutionTime(scope.row) }}
-                </template>
-              </el-table-column>
-              <el-table-column prop="executed_by.username" label="执行者" width="120" />
-              <el-table-column prop="created_at" label="执行时间" width="160">
-                <template #default="scope">
-                  {{ formatDate(scope.row.created_at) }}
-                </template>
-              </el-table-column>
-              <el-table-column label="操作" width="120">
-                <template #default="scope">
-                  <el-button link type="primary" @click="viewExecutionDetail(scope.row)" size="small">
-                    查看详情
-                  </el-button>
-                </template>
-              </el-table-column>
-            </el-table>
           </div>
         </div>
       </div>
@@ -296,6 +304,73 @@
         <el-button type="primary" @click="addSelectedRequests" :loading="addingRequests">
           添加选中的请求
         </el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 断言编辑对话框 -->
+    <el-dialog
+      v-model="showAssertionsDialog"
+      title="编辑断言"
+      width="800px"
+    >
+      <div class="assertions-content">
+        <div class="mb-3">
+          <el-button type="primary" size="small" @click="addAssertion">
+            <el-icon><Plus /></el-icon> 添加断言
+          </el-button>
+        </div>
+        <el-table :data="currentAssertions" style="width: 100%" border>
+          <el-table-column prop="source" label="断言源" width="150">
+            <template #default="scope">
+              <el-select v-model="scope.row.source" size="small">
+                <el-option label="状态码" value="status_code" />
+                <el-option label="响应头" value="header" />
+                <el-option label="响应体(JSON)" value="json_body" />
+                <el-option label="响应时间" value="response_time" />
+              </el-select>
+            </template>
+          </el-table-column>
+          <el-table-column prop="property" label="属性/路径" min-width="150">
+            <template #default="scope">
+              <el-input 
+                v-model="scope.row.property" 
+                size="small" 
+                :placeholder="scope.row.source === 'json_body' ? '$.data.id' : (scope.row.source === 'header' ? 'Content-Type' : '无')"
+                :disabled="['status_code', 'response_time'].includes(scope.row.source)"
+              />
+            </template>
+          </el-table-column>
+          <el-table-column prop="operator" label="运算符" width="120">
+            <template #default="scope">
+              <el-select v-model="scope.row.operator" size="small">
+                <el-option label="等于" value="equals" />
+                <el-option label="不等于" value="not_equals" />
+                <el-option label="包含" value="contains" />
+                <el-option label="不包含" value="not_contains" />
+                <el-option label="大于" value="gt" />
+                <el-option label="小于" value="lt" />
+              </el-select>
+            </template>
+          </el-table-column>
+          <el-table-column prop="target" label="目标值" min-width="150">
+            <template #default="scope">
+              <el-input v-model="scope.row.target" size="small" placeholder="预期值" />
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="80">
+            <template #default="scope">
+              <el-button link type="danger" @click="removeAssertion(scope.$index)" size="small">
+                删除
+              </el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="showAssertionsDialog = false">取消</el-button>
+          <el-button type="primary" @click="saveAssertions" :loading="savingAssertions">保存</el-button>
+        </span>
       </template>
     </el-dialog>
 
@@ -819,7 +894,43 @@ const updateRequestEnabled = async (suiteRequest) => {
 }
 
 const editAssertions = (suiteRequest) => {
-  ElMessage.info('断言编辑功能开发中')
+  currentRequest.value = suiteRequest
+  // Deep copy assertions to avoid direct modification
+  currentAssertions.value = JSON.parse(JSON.stringify(suiteRequest.assertions || []))
+  showAssertionsDialog.value = true
+}
+
+const addAssertion = () => {
+  currentAssertions.value.push({
+    source: 'status_code',
+    property: '',
+    operator: 'equals',
+    target: ''
+  })
+}
+
+const removeAssertion = (index) => {
+  currentAssertions.value.splice(index, 1)
+}
+
+const saveAssertions = async () => {
+  if (!currentRequest.value) return
+  
+  savingAssertions.value = true
+  try {
+    await api.put(`/api-testing/test-suite-requests/${currentRequest.value.id}/`, {
+      assertions: currentAssertions.value
+    })
+    
+    ElMessage.success('断言保存成功')
+    showAssertionsDialog.value = false
+    // Update local data
+    currentRequest.value.assertions = currentAssertions.value
+  } catch (error) {
+    ElMessage.error('保存断言失败')
+  } finally {
+    savingAssertions.value = false
+  }
 }
 
 const removeRequest = async (suiteRequest) => {
@@ -878,51 +989,96 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.automation-testing {
-  padding: 20px;
-  height: 100%;
+/* 页面特定样式 */
+.page-container {
+  padding: 0;
   display: flex;
   flex-direction: column;
+
+  max-width: 100%; /* 新增：覆盖全局样式的 max-width: 1600px，确保铺满 */
 }
 
-.header {
+.page-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
+  padding: 15px 20px;
+  border-bottom: 1px solid #e6e6e6;
+  background: white;
+  flex-shrink: 0;
 }
 
-.header h3 {
+.page-title {
   margin: 0;
+  font-size: 24px;
+  font-weight: 600;
   color: #303133;
+  position: relative;
+  padding-left: 16px;
+}
+
+.page-title::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 20px;
+  background: var(--primary-color, #409eff);
+  border-radius: 2px;
+}
+
+.header-actions {
+  display: flex;
+  gap: 15px;
+}
+
+.main-content {
+  flex: 1;
+  overflow: hidden;
+  padding: 0;
+  display: flex;
+}
+
+.card-container {
+  flex: 1;
+  width: 100%;
+  background-color: #fff;
+  padding: 0;
+  box-shadow: 0 1px 4px rgba(0, 21, 41, 0.08);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .content-layout {
   display: flex;
   flex: 1;
-  gap: 20px;
   overflow: hidden;
+  height: 100%;
 }
 
 .sidebar {
   width: 300px;
+  border-right: 1px solid #e4e7ed;
+  background: #f8f9fa;
   display: flex;
   flex-direction: column;
-  gap: 15px;
+  flex-shrink: 0;
 }
 
 .project-selector {
-  background: white;
   padding: 15px;
-  border-radius: 6px;
-  border: 1px solid #e4e7ed;
+  border-bottom: 1px solid #e4e7ed;
+  background: #f8f9fa;
 }
 
 .suite-list {
-  background: white;
-  border-radius: 6px;
-  border: 1px solid #e4e7ed;
+  flex: 1;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .list-header {
@@ -940,18 +1096,18 @@ onMounted(() => {
   justify-content: space-between;
   align-items: center;
   padding: 12px 15px;
-  border-bottom: 1px solid #f5f7fa;
+  border-bottom: 1px solid #f0f0f0;
   cursor: pointer;
   transition: background-color 0.3s;
 }
 
 .suite-item:hover {
-  background: #f5f7fa;
+  background: #f0f0f0;
 }
 
 .suite-item.active {
   background: #e1f3d8;
-  border-color: #67c23a;
+  border-left: 3px solid #67c23a;
 }
 
 .suite-info {
@@ -968,14 +1124,12 @@ onMounted(() => {
   color: #909399;
 }
 
-.main-content {
+.suite-content {
   flex: 1;
-  background: white;
-  border-radius: 6px;
-  border: 1px solid #e4e7ed;
-  overflow: hidden;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+  background: white;
 }
 
 .empty-state {

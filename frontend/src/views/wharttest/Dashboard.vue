@@ -1,6 +1,12 @@
 <template>
   <div class="wharttest-dashboard">
-    <h1>WHartTest 数据看板</h1>
+    <el-card shadow="hover" class="page-card">
+      <template #header>
+        <div class="card-header page-header" style="margin-bottom: 0;">
+          <h2 class="page-title">数据看板</h2>
+        </div>
+      </template>
+    </el-card>
     <div class="dashboard-cards">
       <el-row :gutter="20">
         <el-col :xs="24" :sm="12" :md="8">
@@ -73,7 +79,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import api from '@/utils/api'
+import { getWHartTestDashboardSummary } from '@/api/wharttest'
 import { ElMessage } from 'element-plus'
 
 // 数据
@@ -84,8 +90,9 @@ const successRate = ref(0)
 // 获取仪表盘数据
 const fetchDashboardData = async () => {
   try {
-    const response = await api.get('/dashboard/')
-    const data = response.data
+    const response = await getWHartTestDashboardSummary()
+    // 假设后端返回的数据结构直接包含这些字段，或者在data字段中
+    const data = response.data || response
     projectCount.value = data.project_count || 0
     executionCount.value = data.execution_count || 0
     successRate.value = data.success_rate || 0
@@ -102,7 +109,7 @@ onMounted(() => {
 
 <style scoped lang="scss">
 .wharttest-dashboard {
-  padding: 20px;
+  padding: 0;
   background-color: #f5f7fa;
   min-height: 100vh;
 }

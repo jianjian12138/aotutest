@@ -39,7 +39,7 @@ const routes = [
   {
     path: '/ai-generation',
     component: Layout,
-    meta: { requiresAuth: true, title: '用例管理' },
+    meta: { requiresAuth: true },
     children: [
       {
         path: '',
@@ -48,14 +48,12 @@ const routes = [
       {
         path: 'requirement-analysis',
         name: 'RequirementAnalysis',
-        component: () => import('@/views/requirement-analysis/RequirementAnalysisView.vue'),
-        meta: { title: 'AI用例生成' }
+        component: () => import('@/views/requirement-analysis/RequirementAnalysisView.vue')
       },
       {
         path: 'projects',
         name: 'Projects',
-        component: ProjectList,
-        meta: { title: '项目管理' }
+        component: ProjectList
       },
       {
         path: 'projects/:id',
@@ -132,6 +130,7 @@ const routes = [
         name: 'AiTestReport',
         component: () => import('@/views/reports/AiTestReport.vue')
       },
+
       {
         path: 'prompt-config',
         name: 'PromptConfig',
@@ -235,6 +234,11 @@ const routes = [
         component: () => import('@/views/ui-automation/elements/ElementManagerEnhanced.vue')
       },
       {
+        path: 'page-objects',
+        name: 'UiPageObjects',
+        component: () => import('@/views/ui-automation/page-objects/PageObjectManager.vue')
+      },
+      {
         path: 'test-cases',
         name: 'UiTestCases',
         component: () => import('@/views/ui-automation/test-cases/TestCaseManager.vue')
@@ -265,6 +269,16 @@ const routes = [
         component: () => import('@/views/ui-automation/reports/ReportList.vue')
       },
       {
+        path: 'devices',
+        name: 'UiDevices',
+        component: () => import('@/views/ui-automation/device/DeviceManagement.vue')
+      },
+      {
+        path: 'debug-files',
+        name: 'UiDebugFiles',
+        component: () => import('@/views/ui-automation/debug/DebugFileManager.vue')
+      },
+      {
         path: 'scheduled-tasks',
         name: 'UiScheduledTasks',
         component: () => import('@/views/ui-automation/scheduled-tasks/ScheduledTasks.vue')
@@ -274,6 +288,108 @@ const routes = [
         name: 'UiNotificationLogs',
         component: () => import('@/views/ui-automation/notification/NotificationLogs.vue')
       }
+    ]
+  },
+  {
+    path: '/natural-language-testing',
+    component: Layout,
+    meta: { requiresAuth: true },
+    children: [
+      {
+        path: '',
+        redirect: 'web-testing'
+      },
+      {
+        path: 'web-testing',
+        name: 'WebAITesting',
+        component: () => import('@/views/ui-automation/ai/MobileAITesting.vue')
+      },
+      {
+        path: 'app-testing',
+        name: 'MobileAITesting',
+        component: () => import('@/views/ui-automation/ai/MobileAITesting.vue')
+      },
+      {
+        path: 'cases',
+        name: 'AICaseList',
+        component: () => import('@/views/ui-automation/ai/AICaseList.vue')
+      },
+      {
+        path: 'execution-records',
+        name: 'AIExecutionRecords',
+        component: () => import('@/views/ui-automation/ai/AIExecutionRecords.vue')
+      }
+    ]
+  },
+  {
+    path: '/configuration',
+    component: Layout,
+    meta: { requiresAuth: true },
+    children: [
+      {
+        path: '',
+        component: () => import('@/views/configuration/ConfigurationCenter.vue'),
+        children: [
+          {
+            path: '',
+            redirect: 'ai-model'
+          },
+          {
+            path: 'ai-model',
+            name: 'ConfigAIModel',
+            component: () => import('@/views/requirement-analysis/AIModelConfig.vue')
+          },
+          {
+            path: 'ui-env',
+            name: 'ConfigUIEnv',
+            component: () => import('@/views/configuration/UIEnvironmentConfig.vue')
+          },
+          {
+            path: 'ai-mode',
+            name: 'ConfigAIMode',
+            component: () => import('@/views/configuration/AIIntelligentModeConfig.vue')
+          },
+          {
+            path: 'cicd',
+            name: 'ConfigCicd',
+            component: () => import('@/views/configuration/CicdConfig.vue')
+          },
+          {
+            path: 'database',
+            name: 'ConfigDatabase',
+            component: () => import('@/views/configuration/DatabaseConfig.vue')
+          },
+          {
+            path: 'scheduled-tasks',
+            name: 'ConfigScheduledTasks',
+            component: () => import('@/views/configuration/ScheduledTasks.vue')
+          },
+          {
+            path: 'notifications',
+            name: 'ConfigNotifications',
+            component: () => import('@/views/configuration/NotificationConfigs.vue')
+          },
+          {
+            path: 'dify',
+            name: 'DifyConfig',
+            component: () => import('@/views/configuration/DifyConfig.vue')
+          },
+          {
+            path: 'users',
+            name: 'UserManagement',
+            component: () => import('@/views/system/UserManagement.vue')
+          }
+        ]
+      }
+    ]
+  },
+  {
+    path: '/cicd',
+    component: Layout,
+    meta: { requiresAuth: true },
+    children: [
+      { path: '', redirect: 'dashboard' },
+      { path: 'dashboard', name: 'CICDDashboard', component: () => import('@/views/cicd/CICDDashboard.vue') }
     ]
   },
   {
@@ -290,6 +406,10 @@ const routes = [
       { path: 'table-metadata', name: 'TableMetadata', component: () => import('@/views/data-factory/TableMetadata.vue') },
       { path: 'query-history', name: 'QueryHistory', component: () => import('@/views/data-factory/QueryHistory.vue') }
     ]
+  },
+  {
+    path: '/midscene',
+    redirect: '/natural-language-testing'
   },
   {
     path: '/strix-security',
@@ -324,119 +444,46 @@ const routes = [
     component: Layout,
     meta: { requiresAuth: true },
     children: [
-      { path: '', redirect: '/knowledge-graph/dashboard' },
-      { path: 'dashboard', name: 'KGDashboard', component: () => import('@/views/KnowledgeGraph.vue'), meta: { title: '个人工作台' } },
-      { path: 'notebook', name: 'KGNotebook', component: () => import('@/views/KnowledgeGraph.vue'), meta: { title: '个人笔记' } },
-      { path: 'idealab', name: 'KGIdeaLab', component: () => import('@/views/KnowledgeGraph.vue'), meta: { title: '深度研究' } },
-      { path: 'graph', name: 'KGGraph', component: () => import('@/views/KnowledgeGraph.vue'), meta: { title: '数据库可视化' } },
-      { path: 'engine', name: 'KGEngine', component: () => import('@/views/KnowledgeGraph.vue'), meta: { title: 'RAG 管道' } },
-      { path: 'sources', name: 'KGSources', component: () => import('@/views/KnowledgeGraph.vue'), meta: { title: '知识库' } },
-      { path: 'settings', name: 'KGSettings', component: () => import('@/views/KnowledgeGraph.vue'), meta: { title: '系统设置' } },
-      { path: 'evaluator', name: 'KGEvaluator', component: () => import('@/views/KnowledgeGraph.vue'), meta: { title: 'AI 评测师' } }
-    ]
-  },
-  {
-    path: '/midscene',
-    component: Layout,
-    meta: { requiresAuth: true, title: '自然语言Web测试' },
-    children: [
-      { path: '', redirect: 'dashboard' },
-      { path: 'dashboard', name: 'MidsceneDashboard', component: () => import('@/views/midscene/Dashboard.vue'), meta: { title: '数据看板' } },
-      { path: 'ai-testing', name: 'MidsceneAITesting', component: () => import('@/views/ui-automation/ai/AITesting.vue'), meta: { title: 'AI智能测试' } },
-      { path: 'test-execution', name: 'MidsceneTestExecution', component: () => import('@/views/midscene/TestExecution.vue'), meta: { title: '自然语言测试执行' } },
-      { path: 'tasks', name: 'MidsceneTasks', component: () => import('@/views/midscene/TaskManagement.vue'), meta: { title: '任务管理' } },
-      { path: 'tasks/:id', name: 'MidsceneTaskDetail', component: () => import('@/views/midscene/TaskDetail.vue'), meta: { title: '任务详情' } },
-      { path: 'execution-logs', name: 'MidsceneExecutionLogs', component: () => import('@/views/midscene/ExecutionLogManagement.vue'), meta: { title: '执行日志' } }
+      {
+        path: '',
+        component: () => import('@/views/knowledge-graph/KnowledgeGraph.vue'),
+        children: [
+          {
+            path: '',
+            redirect: 'dashboard'
+          },
+          {
+            path: 'dashboard',
+            name: 'KGDashboard',
+            component: () => import('@/views/knowledge-graph/components/KnowledgeBase.vue')
+          },
+          {
+            path: 'ai-agent',
+            name: 'KGAIAgent',
+            component: () => import('@/views/knowledge-graph/components/AIAgent.vue')
+          },
+          {
+            path: 'graph-viz',
+            name: 'KGGraphViz',
+            component: () => import('@/views/knowledge-graph/components/GraphViz.vue')
+          }
+        ]
+      }
     ]
   },
   {
     path: '/wharttest',
     component: Layout,
-    meta: { requiresAuth: true, title: '智能化测试' },
+    meta: { requiresAuth: true },
     children: [
       { path: '', redirect: 'dashboard' },
       { path: 'dashboard', name: 'WHartTestDashboard', component: () => import('@/views/wharttest/Dashboard.vue') },
-      { path: 'llm-chat', name: 'WHartTestLLMChat', component: () => import('@/views/wharttest/LLMChat.vue') },
-      { path: 'cases', name: 'WHartTestCaseManagement', component: () => import('@/views/wharttest/CaseManagement.vue') },
       { path: 'projects', name: 'WHartTestProjects', component: () => import('@/views/wharttest/ProjectManagement.vue') },
       { path: 'configs', name: 'WHartTestConfigs', component: () => import('@/views/wharttest/ConfigManagement.vue') },
       { path: 'executions', name: 'WHartTestExecutions', component: () => import('@/views/wharttest/ExecutionManagement.vue') },
       { path: 'tasks', name: 'WHartTestTasks', component: () => import('@/views/wharttest/TaskManagement.vue') },
       { path: 'integration-logs', name: 'WHartTestIntegrationLogs', component: () => import('@/views/wharttest/IntegrationLogManagement.vue') }
     ]
-  },
-  {
-    path: '/configuration',
-    component: Layout,
-    meta: { requiresAuth: true },
-    children: [
-      {
-        path: '',
-        component: () => import('@/views/configuration/ConfigurationCenter.vue'),
-        children: [
-          {
-            path: '',
-            redirect: 'ai-model'
-          },
-          {
-            path: 'ai-model',
-            name: 'ConfigAIModel',
-            component: () => import('@/views/requirement-analysis/AIModelConfig.vue'),
-            meta: { title: 'AI智能模式配置' }
-          },
-          {
-            path: 'ui-env',
-            name: 'ConfigUIEnv',
-            component: () => import('@/views/configuration/UIEnvironmentConfig.vue')
-          },
-          {
-            path: 'scheduled-task',
-            name: 'ConfigScheduledTask',
-            component: () => import('@/views/ui-automation/notification/NotificationConfigs.vue'),
-            meta: { title: '定时任务配置' }
-          },
-          {
-            path: 'dify',
-            name: 'DifyConfig',
-            component: () => import('@/views/configuration/DifyConfig.vue'),
-            meta: { title: '工作流配置' }
-          },
-          {
-            path: 'database',
-            name: 'DatabaseConfig',
-            component: () => import('@/views/configuration/DatabaseConfig.vue'),
-            meta: { title: '数据库配置' }
-          },
-          {
-            path: 'users',
-            name: 'UserManagement',
-            component: () => import('@/views/system/UserManagement.vue')
-          }
-        ]
-      },
-      {
-        path: 'midscene-config',
-        name: 'MidsceneConfig',
-        component: () => import('@/views/midscene/ConfigManagement.vue'),
-        meta: { title: 'Midscene配置' }
-      },
-      {
-        path: 'cicd-config',
-        name: 'CicdConfig',
-        component: () => import('@/views/configuration/CicdConfig.vue'),
-        meta: { title: 'CI/CD配置' }
-      },
-      {
-        path: 'cicd-dashboard',
-        name: 'CICDDashboard',
-        component: () => import('@/views/cicd/CICDDashboard.vue'),
-        meta: { title: 'CI/CD管理' }
-      }
-    ]
-  },
-  {
-    path: '/:pathMatch(.*)*',
-    redirect: '/home'
   }
 ]
 

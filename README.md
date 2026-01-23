@@ -1,4 +1,4 @@
-# TestHub 智能测试管理平台
+# Testing 智能测试管理平台
 
 <div align="center">
 
@@ -13,7 +13,7 @@
 
 ## 📖 项目简介
 
-TestHub 是一个功能强大的智能测试管理平台，集成了 **AI 需求分析**、**测试用例管理**、**API 测试**、**UI 自动化测试** 等多个模块，旨在提升测试效率和质量。平台采用 Django + Vue3 技术栈，提供现代化的用户界面和丰富的功能特性。
+Testing 是一个功能强大的智能测试管理平台，集成了 **AI 需求分析**、**测试用例管理**、**API 测试**、**UI 自动化测试** 等多个模块，旨在提升测试效率和质量。平台采用 Django + Vue3 技术栈，提供现代化的用户界面和丰富的功能特性。
 
 ## ✨ 核心特性
 
@@ -114,7 +114,7 @@ TestHub 是一个功能强大的智能测试管理平台，集成了 **AI 需求
 ## 📁 项目结构
 
 ```
-testhub_platform/
+Testing_platform/
 ├── apps/                           # Django 应用模块
 │   ├── users/                      # 用户管理
 │   ├── projects/                   # 项目管理
@@ -175,7 +175,7 @@ testhub_platform/
 1. **克隆项目**
 ```bash
 git clone <repository-url>
-cd testhub_platform
+cd Testing_platform
 ```
 
 2. **创建虚拟环境**
@@ -197,7 +197,7 @@ pip install -r requirements.txt
 创建 `.env` 文件：
 ```env
 # 数据库配置
-DB_NAME=testhub
+DB_NAME=Testing
 DB_USER=root
 DB_PASSWORD=your_password
 DB_HOST=localhost
@@ -220,7 +220,7 @@ DEFAULT_FROM_EMAIL=your_email@gmail.com
 ```bash
 # 创建数据库
 mysql -u root -p
-CREATE DATABASE testhub CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE DATABASE Testing CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 EXIT;
 
 # 创建 migrations 目录（如果不存在）
@@ -289,7 +289,7 @@ npm run build
 
 ### 2. 系统功能概述
 
-TestHub智能测试管理平台包含以下核心功能模块：
+Testing智能测试管理平台包含以下核心功能模块：
 
 | 模块名称 | 主要功能 | 访问路径 |
 |---------|---------|---------|
@@ -1084,26 +1084,4 @@ SIMPLE_JWT = {
 - **UI 自动化**: `ui_projects`, `ui_elements`, `element_groups`, `ui_page_objects`, `ui_test_scripts`, `ui_test_cases`, `ui_test_suites`, `ui_test_executions`, `ui_scheduled_tasks`, `ai_cases`, `ai_intelligent_mode_configs`
 - **JWT 安全**: `blacklisted_token`, `outstanding_token` - Token 黑名单管理
 
-## 🤝 贡献指南
 
-欢迎提交 Issue 和 Pull Request 来帮助改进项目！
-
-1. Fork 本仓库
-2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
-3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
-4. 推送到分支 (`git push origin feature/AmazingFeature`)
-5. 开启 Pull Request
-
-## 📝 许可证
-
-本项目采用 MIT 许可证 - 详见 [LICENSE](LICENSE) 文件
-
-## 📧 联系方式
-
-如有问题或建议，欢迎通过 Issue 反馈。
-
----
-
-<div align="center">
-Made with ❤️ by 大刚（公众号：测试开发实战）
-</div>

@@ -2,8 +2,8 @@
   <div class="wharttest-project-management">
     <el-card shadow="hover">
       <template #header>
-        <div class="card-header">
-          <h2>WHartTest 项目管理</h2>
+        <div class="card-header page-header" style="margin-bottom: 0;">
+          <h2 class="page-title">项目管理</h2>
           <el-button type="primary" @click="handleAddProject">
             <el-icon><Plus /></el-icon> 新建项目
           </el-button>
@@ -48,32 +48,97 @@
           @current-change="handleCurrentChange"
         />
       </div>
+
+      <!-- 项目编辑对话框 -->
+      <el-dialog
+        v-model="dialogVisible"
+        :title="dialogType === 'create' ? '新建项目' : '编辑项目'"
+        width="500px"
+      >
+        <el-form :model="form" label-width="120px">
+          <el-form-item label="项目名称" required>
+            <el-input v-model="form.name" placeholder="请输入项目名称" />
+          </el-form-item>
+          <el-form-item label="WHartTest ID" required>
+            <el-input v-model="form.wharttest_project_id" placeholder="WHartTest中的项目ID" />
+          </el-form-item>
+          <el-form-item label="关联配置" required>
+            <el-select v-model="form.config" placeholder="请选择配置" style="width: 100%">
+              <el-option
+                v-for="item in configs"
+                :key="item.id"
+                :label="item.name"
+                :value="item.id"
+              />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="描述">
+            <el-input v-model="form.description" type="textarea" placeholder="请输入描述" />
+          </el-form-item>
+          <el-form-item label="状态">
+            <el-switch v-model="form.is_active" active-text="激活" inactive-text="禁用" />
+          </el-form-item>
+        </el-form>
+        <template #footer>
+          <span class="dialog-footer">
+            <el-button @click="dialogVisible = false">取消</el-button>
+            <el-button type="primary" @click="submitForm">确定</el-button>
+          </span>
+        </template>
+      </el-dialog>
     </el-card>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, reactive } from 'vue'
 import { Plus } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import api from '@/utils/api'
+import { 
+  getWHartTestProjects, 
+  createWHartTestProject, 
+  updateWHartTestProject, 
+  deleteWHartTestProject,
+  getWHartTestConfigs
+} from '@/api/wharttest'
 
 const projects = ref([])
+const configs = ref([])
 const currentPage = ref(1)
 const pageSize = ref(20)
 const total = ref(0)
 
+// 对话框
+const dialogVisible = ref(false)
+const dialogType = ref('create')
+const form = reactive({
+  id: null,
+  name: '',
+  description: '',
+  wharttest_project_id: '',
+  config: null,
+  is_active: true
+})
+
+// 获取配置列表
+const fetchConfigs = async () => {
+  try {
+    const response = await getWHartTestConfigs({ page_size: 100, is_active: true })
+    configs.value = response.results || []
+  } catch (error) {
+    console.error('获取配置列表失败:', error)
+  }
+}
+
 // 从API获取项目数据
 const fetchProjects = async () => {
   try {
-    const response = await api.get('/projects/', {
-      params: {
-        page: currentPage.value,
-        page_size: pageSize.value
-      }
+    const response = await getWHartTestProjects({
+      page: currentPage.value,
+      page_size: pageSize.value
     })
-    projects.value = response.data.results || []
-    total.value = response.data.count || 0
+    projects.value = response.data.results || response.results || []
+    total.value = response.data.count || response.count || 0
   } catch (error) {
     console.error('获取项目数据失败:', error)
     ElMessage.error('获取项目数据失败')
@@ -83,15 +148,37 @@ const fetchProjects = async () => {
 }
 
 const handleAddProject = () => {
-  ElMessage.info('新建项目功能开发中')
+  dialogType.value = 'create'
+  form.id = null
+  form.name = ''
+  form.description = ''
+  form.wharttest_project_id = ''
+  form.config = configs.value.length > 0 ? configs.value[0].id : null
+  form.is_active = true
+  dialogVisible.value = true
 }
 
 const handleViewProject = (project) => {
-  ElMessage.info(`查看项目: ${project.name}`)
+  // 简单查看，复用编辑弹窗但禁用
+  dialogType.value = 'edit' // 或 view
+  // 这里为了简单，直接填充并显示，实际可禁用输入
+  fillForm(project)
+  dialogVisible.value = true
 }
 
 const handleEditProject = (project) => {
-  ElMessage.info(`编辑项目: ${project.name}`)
+  dialogType.value = 'edit'
+  fillForm(project)
+  dialogVisible.value = true
+}
+
+const fillForm = (project) => {
+  form.id = project.id
+  form.name = project.name
+  form.description = project.description
+  form.wharttest_project_id = project.wharttest_project_id
+  form.config = project.config
+  form.is_active = project.is_active
 }
 
 const handleDeleteProject = (project) => {
@@ -99,10 +186,44 @@ const handleDeleteProject = (project) => {
     confirmButtonText: '确定',
     cancelButtonText: '取消',
     type: 'warning'
-  }).then(() => {
-    ElMessage.success('项目已删除')
-    fetchProjects()
+  }).then(async () => {
+    try {
+      await deleteWHartTestProject(project.id)
+      ElMessage.success('项目已删除')
+      fetchProjects()
+    } catch (error) {
+      ElMessage.error('删除失败')
+    }
   }).catch(() => {})
+}
+
+const submitForm = async () => {
+  if (!form.name || !form.wharttest_project_id || !form.config) {
+    ElMessage.warning('请填写必要信息')
+    return
+  }
+
+  try {
+    const data = {
+      name: form.name,
+      description: form.description,
+      wharttest_project_id: form.wharttest_project_id,
+      config: form.config,
+      is_active: form.is_active
+    }
+
+    if (dialogType.value === 'create') {
+      await createWHartTestProject(data)
+      ElMessage.success('项目创建成功')
+    } else {
+      await updateWHartTestProject(form.id, data)
+      ElMessage.success('项目更新成功')
+    }
+    dialogVisible.value = false
+    fetchProjects()
+  } catch (error) {
+    ElMessage.error(dialogType.value === 'create' ? '创建失败' : '更新失败')
+  }
 }
 
 const handleSizeChange = (val) => {
@@ -117,13 +238,14 @@ const handleCurrentChange = (val) => {
 }
 
 onMounted(() => {
+  fetchConfigs()
   fetchProjects()
 })
 </script>
 
 <style scoped lang="scss">
 .wharttest-project-management {
-  padding: 20px;
+  padding: 0;
   background-color: #f5f7fa;
   min-height: 100vh;
 }
@@ -136,7 +258,7 @@ onMounted(() => {
   
   h2 {
     margin: 0;
-    font-size: 20px;
+    font-size: 24px;
     font-weight: 600;
     color: #2c3e50;
   }

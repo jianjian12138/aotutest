@@ -1,24 +1,23 @@
 <template>
-  <div class="project-management">
-    <el-card shadow="hover" class="page-card">
-      <template #header>
-        <div class="card-header">
-          <h2 class="page-title">项目管理</h2>
-          <div class="header-actions">
-            <el-button type="primary" @click="showCreateDialog = true">
-              <el-icon><Plus /></el-icon>
-              新建项目
-            </el-button>
-          </div>
-        </div>
-      </template>
-      
-      <div class="content">
+  <div class="page-container">
+    <div class="page-header">
+      <h3 class="page-title">项目管理</h3>
+      <div class="header-actions">
+        <el-button type="primary" @click="showCreateDialog = true">
+          <el-icon><Plus /></el-icon>
+          新建项目
+        </el-button>
+      </div>
+    </div>
+    
+    <div class="main-content">
+      <div class="card-container">
         <!-- 项目列表 -->
         <el-table 
           :data="projects" 
           v-loading="loading" 
-          style="width: 100%"
+          style="width: 100%; flex: 1;"
+          height="100%"
           border
           stripe
         >
@@ -47,11 +46,32 @@
               {{ formatDate(scope.row.created_at) }}
             </template>
           </el-table-column>
-          <el-table-column label="操作" width="200">
+          <el-table-column label="操作" width="280" fixed="right">
             <template #default="scope">
-              <el-button link type="primary" @click="editProject(scope.row)">编辑</el-button>
-              <el-button link type="primary" @click="viewProject(scope.row)">查看</el-button>
-              <el-button link type="danger" @click="deleteProject(scope.row)">删除</el-button>
+              <el-button
+                type="primary"
+                link
+                size="small"
+                @click="viewProject(scope.row)"
+              >
+                查看
+              </el-button>
+              <el-button
+                size="small"
+                link
+                type="primary"
+                @click="editProject(scope.row)"
+              >
+                编辑
+              </el-button>
+              <el-button
+                size="small"
+                link
+                type="danger"
+                @click="deleteProject(scope.row)"
+              >
+                删除
+              </el-button>
             </template>
           </el-table-column>
         </el-table>
@@ -69,7 +89,7 @@
           />
         </div>
       </div>
-    </el-card>
+    </div>
 
     <!-- 新建/编辑项目对话框 -->
     <el-dialog
@@ -219,6 +239,7 @@ import { ElMessage, ElMessageBox, ElDescriptions, ElDescriptionsItem } from 'ele
 import { Plus } from '@element-plus/icons-vue'
 import api from '@/utils/api'
 import dayjs from 'dayjs'
+import '@/assets/css/unified-styles.scss'
 
 const loading = ref(false)
 const projects = ref([])
@@ -449,38 +470,74 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.project-management {
-  width: 100%;
+/* 页面特定样式 */
+.page-container {
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+
+  max-width: 100%; /* 新增：覆盖全局样式的 max-width: 1600px，确保铺满 */
 }
 
-.page-card {
-  margin-bottom: 20px;
-}
-
-.card-header {
+.page-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  padding: 15px 20px;
+  border-bottom: 1px solid #e6e6e6;
+  background: white;
+  flex-shrink: 0;
 }
 
 .page-title {
   margin: 0;
-  font-size: 20px;
+  font-size: 24px;
   font-weight: 600;
+  color: #303133;
+  position: relative;
+  padding-left: 16px;
 }
 
-.content {
-  padding: 20px 0;
-}
-
-.pagination-container {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 20px;
+.page-title::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 20px;
+  background: var(--primary-color, #409eff);
+  border-radius: 2px;
 }
 
 .header-actions {
   display: flex;
-  gap: 10px;
+  align-items: center;
+  gap: 15px;
+}
+
+.main-content {
+  flex: 1;
+  overflow: hidden;
+  padding: 0;
+  display: flex;
+}
+
+.card-container {
+  flex: 1;
+  width: 100%;
+  background-color: #fff;
+  padding: 20px;
+  box-shadow: 0 1px 4px rgba(0, 21, 41, 0.08);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.pagination-container {
+  margin-top: 20px;
+  display: flex;
+  justify-content: flex-end;
+  flex-shrink: 0;
 }
 </style>

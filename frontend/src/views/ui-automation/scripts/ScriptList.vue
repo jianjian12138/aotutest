@@ -1,5 +1,5 @@
 <template>
-  <div class="script-list">
+  <div class="test-case-manager">
     <div class="page-header">
       <h1 class="page-title">脚本列表</h1>
       <div class="header-actions">
@@ -12,67 +12,134 @@
         </el-button>
       </div>
     </div>
-
+    
     <div class="main-content">
-      <el-table :data="scripts" stripe style="width: 100%">
-        <el-table-column type="index" label="序号" width="60" />
-        <el-table-column label="项目" width="150">
-          <template #default="{ row }">
-            {{ row.project?.name || '未知项目' }}
-          </template>
-        </el-table-column>
-        <el-table-column prop="name" label="名称" min-width="300" show-overflow-tooltip />
-        <el-table-column label="语言" width="100">
-          <template #default="{ row }">
-            <el-tag size="small" :type="row.language === 'python' ? 'success' : 'primary'">
-              {{ getLanguageText(row.language) }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="框架" width="120">
-          <template #default="{ row }">
-            <el-tag size="small" :type="row.framework === 'playwright' ? 'warning' : 'info'">
-              {{ getFrameworkText(row.framework) }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column prop="created_at" label="创建时间" width="180">
-          <template #default="{ row }">
-            {{ formatTime(row.created_at) }}
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="280" fixed="right">
-          <template #default="{ row }">
-            <el-button size="small" text @click="viewScript(row)">
-              <el-icon><View /></el-icon>
-              查看详情
+      <!-- 左侧：脚本列表 -->
+      <div class="left-panel">
+        <div class="panel-header">
+          <h3>脚本列表</h3>
+          <div class="search-filter">
+            <el-input
+              v-model="searchKeyword"
+              placeholder="搜索脚本名称..."
+              clearable
+              style="width: 200px; margin-right: 10px"
+            >
+              <template #prefix>
+                <el-icon><Search /></el-icon>
+              </template>
+            </el-input>
+            <el-button type="primary" @click="handleSearch">
+              <el-icon><Search /></el-icon>
+              查询
             </el-button>
-            <el-button size="small" text @click="editScript(row)">
-              <el-icon><Edit /></el-icon>
-              编辑
-            </el-button>
-            <el-button size="small" text @click="renameScript(row)">
-              <el-icon><EditPen /></el-icon>
-              重命名
-            </el-button>
-            <el-button size="small" text type="danger" @click="deleteScript(row)">
-              <el-icon><Delete /></el-icon>
-              删除
-            </el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-
-      <div class="pagination">
-        <el-pagination
-          v-model:current-page="currentPage"
-          v-model:page-size="pageSize"
-          :page-sizes="[10, 20, 50, 100]"
-          :total="total"
-          layout="total, sizes, prev, pager, next, jumper"
-          @size-change="handleSizeChange"
-          @current-change="handleCurrentChange"
-        />
+          </div>
+        </div>
+        
+        <div class="test-case-list">
+          <div
+            v-for="script in scripts"
+            :key="script.id"
+            class="test-case-item"
+            @click="viewScript(script)"
+          >
+            <div class="case-header">
+              <div class="case-info">
+                <h4 class="case-name">{{ script.name }}</h4>
+                <p class="case-description">{{ script.project?.name || '未知项目' }}</p>
+              </div>
+              <div class="case-actions">
+                <el-button size="small" text @click.stop="viewScript(script)">
+                  <el-icon><View /></el-icon>
+                  查看
+                </el-button>
+                <el-button size="small" text @click.stop="editScript(script)">
+                  <el-icon><Edit /></el-icon>
+                  编辑
+                </el-button>
+                <el-button size="small" text type="danger" @click.stop="deleteScript(script)">
+                  <el-icon><Delete /></el-icon>
+                  删除
+                </el-button>
+              </div>
+            </div>
+            <div class="case-meta">
+              <el-tag size="small" :type="script.language === 'python' ? 'success' : 'primary'">
+                {{ getLanguageText(script.language) }}
+              </el-tag>
+              <el-tag size="small" :type="script.framework === 'playwright' ? 'warning' : 'info'">
+                {{ getFrameworkText(script.framework) }}
+              </el-tag>
+              <span class="update-time">{{ formatTime(script.created_at) }}</span>
+            </div>
+          </div>
+        </div>
+        
+        <!-- 分页 -->
+        <div class="pagination-container">
+          <el-pagination
+            v-model:current-page="currentPage"
+            v-model:page-size="pageSize"
+            :page-sizes="[10, 20, 50, 100]"
+            layout="total, sizes, prev, pager, next, jumper"
+            :total="total"
+            @size-change="handleSizeChange"
+            @current-change="handleCurrentChange"
+          />
+        </div>
+      </div>
+      
+      <!-- 右侧：脚本详情 -->
+      <div class="right-panel">
+        <div v-if="currentScript" class="test-case-detail">
+          <div class="detail-header">
+            <h3>脚本详情</h3>
+            <div class="detail-actions">
+              <el-button type="primary" size="small" @click="editScript(currentScript)">
+                <el-icon><Edit /></el-icon>
+                编辑脚本
+              </el-button>
+              <el-button size="small" @click="renameScript(currentScript)">
+                <el-icon><EditPen /></el-icon>
+                重命名
+              </el-button>
+            </div>
+          </div>
+          
+          <div class="execution-result">
+            <div class="result-header">
+              <h4>{{ currentScript.name }}</h4>
+              <div>
+                <el-tag size="small" :type="currentScript.language === 'python' ? 'success' : 'primary'">
+                  {{ getLanguageText(currentScript.language) }}
+                </el-tag>
+                <el-tag size="small" :type="currentScript.framework === 'playwright' ? 'warning' : 'info'" style="margin-left: 10px">
+                  {{ getFrameworkText(currentScript.framework) }}
+                </el-tag>
+              </div>
+            </div>
+            <div class="result-content">
+              <el-descriptions :column="2" border>
+                <el-descriptions-item label="脚本名称" :span="2">{{ currentScript.name }}</el-descriptions-item>
+                <el-descriptions-item label="项目">{{ currentScript.project?.name || '未知项目' }}</el-descriptions-item>
+                <el-descriptions-item label="语言">{{ getLanguageText(currentScript.language) }}</el-descriptions-item>
+                <el-descriptions-item label="框架">{{ getFrameworkText(currentScript.framework) }}</el-descriptions-item>
+                <el-descriptions-item label="类型">{{ getScriptTypeText(currentScript.script_type) }}</el-descriptions-item>
+                <el-descriptions-item label="创建时间" :span="2">{{ formatTime(currentScript.created_at) }}</el-descriptions-item>
+                <el-descriptions-item label="更新时间" :span="2">{{ formatTime(currentScript.updated_at) }}</el-descriptions-item>
+              </el-descriptions>
+              
+              <div class="script-content">
+                <h4>脚本内容:</h4>
+                <pre class="code-view">{{ currentScript.content || '(无内容)' }}</pre>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div v-else class="no-selection">
+          <el-empty description="请选择一个脚本" />
+        </div>
       </div>
     </div>
 
@@ -146,7 +213,7 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, View, Edit, Delete, EditPen } from '@element-plus/icons-vue'
+import { Plus, View, Edit, Delete, EditPen, Search } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
 
 import {
@@ -165,6 +232,7 @@ const scripts = ref([])
 const currentPage = ref(1)
 const pageSize = ref(20)
 const total = ref(0)
+const searchKeyword = ref('')
 
 // 对话框控制
 const showDetailDialog = ref(false)
@@ -202,11 +270,18 @@ const loadScripts = async () => {
   }
 
   try {
-    const response = await getTestScripts({
+    const params = {
       project: selectedProject.value,
       page: currentPage.value,
       page_size: pageSize.value
-    })
+    }
+    
+    // 添加搜索条件
+    if (searchKeyword.value) {
+      params.search = searchKeyword.value
+    }
+
+    const response = await getTestScripts(params)
 
     // 处理分页响应
     if (response.data.results) {
@@ -220,6 +295,12 @@ const loadScripts = async () => {
     ElMessage.error('获取脚本列表失败')
     console.error('获取脚本列表失败:', error)
   }
+}
+
+// 搜索处理
+const handleSearch = () => {
+  currentPage.value = 1
+  loadScripts()
 }
 
 // 项目切换
@@ -380,7 +461,7 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.script-list {
+.test-case-manager {
   height: 100vh;
   display: flex;
   flex-direction: column;
@@ -390,7 +471,7 @@ onMounted(async () => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 20px;
+  padding: 15px 20px;
   border-bottom: 1px solid #e6e6e6;
   background: white;
 }
@@ -407,19 +488,148 @@ onMounted(async () => {
 
 .main-content {
   flex: 1;
-  padding: 20px;
-  overflow: auto;
-  background: #f5f5f5;
+  display: flex;
+  overflow: hidden;
 }
 
-.pagination {
-  margin-top: 20px;
+.left-panel {
+  width: 350px;
+  border-right: 1px solid #e6e6e6;
+  background: white;
+  display: flex;
+  flex-direction: column;
+}
+
+.panel-header {
+  padding: 15px;
+  border-bottom: 1px solid #e6e6e6;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.panel-header h3 {
+  margin: 0;
+}
+
+.test-case-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 15px;
+}
+
+.test-case-item {
+  border: 1px solid #e6e6e6;
+  border-radius: 6px;
+  margin-bottom: 10px;
+  padding: 15px;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.test-case-item:hover {
+  border-color: #409eff;
+  box-shadow: 0 2px 8px rgba(64, 158, 255, 0.1);
+}
+
+.case-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.case-info {
+  flex: 1;
+}
+
+.case-name {
+  margin: 0 0 5px 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.case-description {
+  margin: 0;
+  color: #666;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.case-actions {
+  display: flex;
+  gap: 5px;
+}
+
+.case-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: #888;
+  margin-top: 10px;
+}
+
+.right-panel {
+  flex: 1;
+  background: white;
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+}
+
+.detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid #e6e6e6;
+}
+
+.detail-header h3 {
+  margin: 0;
+}
+
+.detail-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.execution-result {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.result-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.result-header h4 {
+  margin: 0;
+}
+
+.result-content {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.no-selection {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+  color: #999;
+}
+
+.pagination-container {
+  padding: 15px;
+  border-top: 1px solid #e6e6e6;
   display: flex;
   justify-content: flex-end;
-}
-
-.script-detail {
-  padding: 10px;
 }
 
 .script-content {

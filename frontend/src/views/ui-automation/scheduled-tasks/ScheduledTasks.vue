@@ -1,135 +1,153 @@
 <template>
-  <div class="scheduled-tasks">
-    <div class="header">
-      <h3>UI自动化定时任务</h3>
-      <el-button type="primary" @click="handleCreateClick">
-        <el-icon><Plus /></el-icon>
-        新建定时任务
-      </el-button>
+  <div class="test-case-manager">
+    <div class="page-header">
+      <h1 class="page-title">UI自动化定时任务</h1>
+      <div class="header-actions">
+        <el-button type="primary" @click="handleCreateClick">
+          <el-icon><Plus /></el-icon>
+          新建定时任务
+        </el-button>
+      </div>
     </div>
+    
+    <div class="main-content">
+      <div class="card-container">
+      <div class="filters">
+        <el-row :gutter="20">
+          <el-col :span="6">
+            <el-select v-model="filters.task_type" placeholder="任务类型" clearable>
+              <el-option label="测试套件执行" value="TEST_SUITE" />
+              <el-option label="测试用例执行" value="TEST_CASE" />
+            </el-select>
+          </el-col>
+          <el-col :span="6">
+            <el-select v-model="filters.trigger_type" placeholder="触发器类型" clearable>
+              <el-option label="Cron表达式" value="CRON" />
+              <el-option label="固定间隔" value="INTERVAL" />
+              <el-option label="单次执行" value="ONCE" />
+            </el-select>
+          </el-col>
+          <el-col :span="6">
+            <el-select v-model="filters.status" placeholder="任务状态" clearable>
+              <el-option label="激活" value="ACTIVE" />
+              <el-option label="暂停" value="PAUSED" />
+              <el-option label="已完成" value="COMPLETED" />
+              <el-option label="失败" value="FAILED" />
+            </el-select>
+          </el-col>
+          <el-col :span="6">
+            <el-button @click="resetFilters">重置</el-button>
+            <el-button type="primary" @click="loadTasks">搜索</el-button>
+          </el-col>
+        </el-row>
+      </div>
 
-    <!-- 筛选条件 -->
-    <div class="filters">
-      <el-row :gutter="20">
-        <el-col :span="6">
-          <el-select v-model="filters.task_type" placeholder="任务类型" clearable>
-            <el-option label="测试套件执行" value="TEST_SUITE" />
-            <el-option label="测试用例执行" value="TEST_CASE" />
-          </el-select>
-        </el-col>
-        <el-col :span="6">
-          <el-select v-model="filters.trigger_type" placeholder="触发器类型" clearable>
-            <el-option label="Cron表达式" value="CRON" />
-            <el-option label="固定间隔" value="INTERVAL" />
-            <el-option label="单次执行" value="ONCE" />
-          </el-select>
-        </el-col>
-        <el-col :span="6">
-          <el-select v-model="filters.status" placeholder="任务状态" clearable>
-            <el-option label="激活" value="ACTIVE" />
-            <el-option label="暂停" value="PAUSED" />
-            <el-option label="已完成" value="COMPLETED" />
-            <el-option label="失败" value="FAILED" />
-          </el-select>
-        </el-col>
-        <el-col :span="6">
-          <el-button @click="resetFilters">重置</el-button>
-          <el-button type="primary" @click="loadTasks">搜索</el-button>
-        </el-col>
-      </el-row>
-    </div>
-
-    <!-- 任务列表 -->
-    <div class="task-list">
-      <el-table :data="tasks" v-loading="loading">
-        <el-table-column prop="name" label="任务名称" min-width="200" />
-        <el-table-column prop="task_type" label="任务类型" width="120">
-          <template #default="scope">
-            <el-tag :type="scope.row.task_type === 'TEST_SUITE' ? 'success' : 'primary'">
-              {{ scope.row.task_type === 'TEST_SUITE' ? '测试套件' : '测试用例' }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column prop="notification_type_display" label="通知类型" width="130">
-          <template #default="scope">
-            <el-tag v-if="scope.row.notification_type_display && scope.row.notification_type_display !== '-'"
-                    :type="getNotificationTypeTagType(scope.row.notification_type_display)"
-                    size="small">
-              {{ scope.row.notification_type_display }}
-            </el-tag>
-            <span v-else>-</span>
-          </template>
-        </el-table-column>
-        <el-table-column prop="trigger_type" label="触发器类型" width="120">
-          <template #default="scope">
-            <el-tag>
-              {{ scope.row.trigger_type === 'CRON' ? 'Cron' : scope.row.trigger_type === 'INTERVAL' ? '间隔' : '单次' }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column prop="status" label="状态" width="100">
-          <template #default="scope">
-            <el-tag :type="scope.row.status === 'ACTIVE' ? 'success' : scope.row.status === 'PAUSED' ? 'warning' : 'info'">
-              {{ scope.row.status === 'ACTIVE' ? '激活' : scope.row.status === 'PAUSED' ? '暂停' : '完成' }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column prop="engine" label="执行引擎" width="120">
-          <template #default="scope">
-            <el-tag size="small" type="info">
-              {{ scope.row.engine === 'playwright' ? 'Playwright' : 'Selenium' }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column prop="browser" label="浏览器" width="100">
-          <template #default="scope">
-            {{ scope.row.browser || 'chrome' }}
-          </template>
-        </el-table-column>
-        <el-table-column prop="next_run_time" label="下次执行时间" width="180">
-          <template #default="scope">
-            {{ formatDateTime(scope.row.next_run_time) }}
-          </template>
-        </el-table-column>
-        <el-table-column prop="last_run_time" label="上次执行时间" width="180">
-          <template #default="scope">
-            {{ formatDateTime(scope.row.last_run_time) }}
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="200" fixed="right">
-          <template #default="scope">
-            <el-button size="small" @click="runTaskNow(scope.row)" :loading="scope.row.running">
-              立即执行
-            </el-button>
-            <el-dropdown @command="(command) => handleTaskAction(command, scope.row)">
-              <el-button size="small">
-                更多<el-icon><arrow-down /></el-icon>
+      <!-- 任务列表 -->
+      <div class="task-list">
+        <el-table :data="tasks" v-loading="loading" height="100%">
+          <el-table-column prop="name" label="任务名称" min-width="200" />
+          <el-table-column prop="task_type" label="任务类型" width="120">
+            <template #default="scope">
+              <el-tag :type="scope.row.task_type === 'TEST_SUITE' ? 'success' : 'primary'">
+                {{ scope.row.task_type === 'TEST_SUITE' ? '测试套件' : '测试用例' }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="notification_type_display" label="通知类型" width="130">
+            <template #default="scope">
+              <el-tag v-if="scope.row.notification_type_display && scope.row.notification_type_display !== '-'"
+                      :type="getNotificationTypeTagType(scope.row.notification_type_display)"
+                      size="small">
+                {{ scope.row.notification_type_display }}
+              </el-tag>
+              <span v-else>-</span>
+            </template>
+          </el-table-column>
+          <el-table-column prop="trigger_type" label="触发器类型" width="120">
+            <template #default="scope">
+              <el-tag size="small">
+                {{ scope.row.trigger_type === 'CRON' ? 'Cron' : scope.row.trigger_type === 'INTERVAL' ? '间隔' : '单次' }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="status" label="状态" width="100">
+            <template #default="scope">
+              <el-tag :type="scope.row.status === 'ACTIVE' ? 'success' : scope.row.status === 'PAUSED' ? 'warning' : 'info'">
+                {{ scope.row.status === 'ACTIVE' ? '激活' : scope.row.status === 'PAUSED' ? '暂停' : '完成' }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="engine" label="执行引擎" width="120">
+            <template #default="scope">
+              <el-tag size="small" type="info">
+                {{ scope.row.engine === 'playwright' ? 'Playwright' : (scope.row.engine === 'selenium' ? 'Selenium' : 'Airtest') }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="browser" label="浏览器" width="100">
+            <template #default="scope">
+              {{ scope.row.browser || 'chrome' }}
+            </template>
+          </el-table-column>
+          <el-table-column prop="next_run_time" label="下次执行时间" width="180">
+            <template #default="scope">
+              {{ formatDateTime(scope.row.next_run_time) }}
+            </template>
+          </el-table-column>
+          <el-table-column prop="last_run_time" label="上次执行时间" width="180">
+            <template #default="scope">
+              {{ formatDateTime(scope.row.last_run_time) }}
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="200" fixed="right">
+            <template #default="scope">
+              <el-button size="small" type="primary" @click="runTaskNow(scope.row)" :loading="scope.row.running">
+                <el-icon><VideoPlay /></el-icon>
+                立即执行
               </el-button>
-              <template #dropdown>
-                <el-dropdown-menu>
-                  <el-dropdown-item command="edit">编辑</el-dropdown-item>
-                  <el-dropdown-item command="pause" v-if="scope.row.status === 'ACTIVE'">暂停</el-dropdown-item>
-                  <el-dropdown-item command="resume" v-if="scope.row.status === 'PAUSED'">激活</el-dropdown-item>
-                  <el-dropdown-item command="delete" divided>删除</el-dropdown-item>
-                </el-dropdown-menu>
-              </template>
-            </el-dropdown>
-          </template>
-        </el-table-column>
-      </el-table>
-    </div>
+              <el-dropdown @command="(command) => handleTaskAction(command, scope.row)">
+                <el-button size="small">
+                  更多<el-icon><arrow-down /></el-icon>
+                </el-button>
+                <template #dropdown>
+                  <el-dropdown-menu>
+                    <el-dropdown-item command="edit">
+                      <el-icon><Edit /></el-icon>
+                      编辑
+                    </el-dropdown-item>
+                    <el-dropdown-item command="pause" v-if="scope.row.status === 'ACTIVE'">
+                      <el-icon><VideoPause /></el-icon>
+                      暂停
+                    </el-dropdown-item>
+                    <el-dropdown-item command="resume" v-if="scope.row.status === 'PAUSED'">
+                      <el-icon><VideoPlay /></el-icon>
+                      激活
+                    </el-dropdown-item>
+                    <el-dropdown-item command="delete" divided>
+                      <el-icon><Delete /></el-icon>
+                      删除
+                    </el-dropdown-item>
+                  </el-dropdown-menu>
+                </template>
+              </el-dropdown>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
 
-    <!-- 分页 -->
-    <div class="pagination">
-      <el-pagination
-        v-model:current-page="pagination.current"
-        v-model:page-size="pagination.size"
-        :total="pagination.total"
-        :page-sizes="[10, 20, 50, 100]"
-        layout="total, sizes, prev, pager, next, jumper"
-        @size-change="loadTasks"
-        @current-change="loadTasks"
-      />
+      <!-- 分页 -->
+      <div class="pagination-container">
+        <el-pagination
+          v-model:current-page="pagination.current"
+          v-model:page-size="pagination.size"
+          :total="pagination.total"
+          :page-sizes="[10, 20, 50, 100]"
+          layout="total, sizes, prev, pager, next, jumper"
+          @size-change="loadTasks"
+          @current-change="loadTasks"
+        />
+      </div>
+      </div>
     </div>
 
     <!-- 创建/编辑对话框 -->
@@ -302,7 +320,7 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, ArrowDown } from '@element-plus/icons-vue'
+import { Plus, ArrowDown, Edit, Delete, VideoPause, VideoPlay } from '@element-plus/icons-vue'
 import {
   getScheduledTasks,
   createScheduledTask,
@@ -671,36 +689,70 @@ const deleteTask = async (task) => {
 </script>
 
 <style scoped>
-.scheduled-tasks {
-  padding: 20px;
-  height: 100%;
+.test-case-manager {
+  height: 100vh;
   display: flex;
   flex-direction: column;
 }
 
-.header {
+.page-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
+  padding: 15px 20px;
+  border-bottom: 1px solid #e6e6e6;
+  background: white;
+}
+
+.page-title {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.main-content {
+  flex: 1;
+  overflow: hidden;
+  background: #f5f7fa;
+  display: flex;
+  padding: 0;
+}
+
+.card-container {
+  flex: 1;
+  width: 100%;
+  background-color: #fff;
+  padding: 20px;
+  box-shadow: 0 1px 4px rgba(0, 21, 41, 0.08);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .filters {
   margin-bottom: 20px;
-  background: #f8f9fa;
-  padding: 20px;
-  border-radius: 8px;
+  flex-shrink: 0;
 }
 
 .task-list {
   flex: 1;
   overflow: hidden;
+  margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
 }
 
-.pagination {
-  margin-top: 20px;
+.pagination-container {
   display: flex;
   justify-content: flex-end;
+  flex-shrink: 0;
 }
 
 .cron-help {

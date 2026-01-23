@@ -1,52 +1,58 @@
 <template>
-  <div class="environment-management">
-    <div class="header">
-      <h3>环境管理</h3>
-      <el-button type="primary" @click="showCreateDialog = true">
-        <el-icon><Plus /></el-icon>
-        新建环境
-      </el-button>
+  <div class="page-container">
+    <div class="page-header">
+      <h3 class="page-title">环境管理</h3>
+      <div class="header-actions">
+        <el-button type="primary" @click="showCreateDialog = true">
+          <el-icon><Plus /></el-icon>
+          新建环境
+        </el-button>
+      </div>
     </div>
 
-    <el-tabs v-model="activeTab" @tab-change="onTabChange">
-      <el-tab-pane label="全局环境变量" name="GLOBAL">
-        <EnvironmentTable 
-          :data="globalEnvironments" 
-          :loading="loading"
-          scope="GLOBAL"
-          @edit="editEnvironment"
-          @delete="deleteEnvironment"
-          @activate="activateEnvironment"
-          @duplicate="duplicateEnvironment"
-        />
-      </el-tab-pane>
-      <el-tab-pane label="局部环境变量" name="LOCAL">
-        <div class="local-env-header">
-          <el-select 
-            v-model="selectedProject" 
-            placeholder="选择项目"
-            @change="loadLocalEnvironments"
-            style="width: 200px;"
-          >
-            <el-option
-              v-for="project in projects"
-              :key="project.id"
-              :label="project.name"
-              :value="project.id"
+    <div class="main-content">
+      <div class="card-container">
+        <el-tabs v-model="activeTab" @tab-change="onTabChange">
+          <el-tab-pane label="全局环境变量" name="GLOBAL">
+            <EnvironmentTable 
+              :data="globalEnvironments" 
+              :loading="loading"
+              scope="GLOBAL"
+              @edit="editEnvironment"
+              @delete="deleteEnvironment"
+              @activate="activateEnvironment"
+              @duplicate="duplicateEnvironment"
             />
-          </el-select>
-        </div>
-        <EnvironmentTable 
-          :data="localEnvironments" 
-          :loading="loading"
-          scope="LOCAL"
-          @edit="editEnvironment"
-          @delete="deleteEnvironment"
-          @activate="activateEnvironment"
-          @duplicate="duplicateEnvironment"
-        />
-      </el-tab-pane>
-    </el-tabs>
+          </el-tab-pane>
+          <el-tab-pane label="局部环境变量" name="LOCAL">
+            <div class="local-env-header">
+              <el-select 
+                v-model="selectedProject" 
+                placeholder="选择项目"
+                @change="loadLocalEnvironments"
+                class="filter-select"
+              >
+                <el-option
+                  v-for="project in projects"
+                  :key="project.id"
+                  :label="project.name"
+                  :value="project.id"
+                />
+              </el-select>
+            </div>
+            <EnvironmentTable 
+              :data="localEnvironments" 
+              :loading="loading"
+              scope="LOCAL"
+              @edit="editEnvironment"
+              @delete="deleteEnvironment"
+              @activate="activateEnvironment"
+              @duplicate="duplicateEnvironment"
+            />
+          </el-tab-pane>
+        </el-tabs>
+      </div>
+    </div>
 
     <!-- 创建/编辑环境对话框 -->
     <el-dialog
@@ -185,6 +191,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Delete, Setting } from '@element-plus/icons-vue'
 import api from '@/utils/api'
 import EnvironmentTable from './components/EnvironmentTable.vue'
+import '@/assets/css/unified-styles.scss'
 
 const activeTab = ref('GLOBAL')
 const globalEnvironments = ref([])
@@ -494,26 +501,60 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.environment-management {
-  padding: 20px;
+/* 页面特定样式 */
+.page-container {
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  max-width: 100%; /* 新增：覆盖全局样式的 max-width: 1600px，确保铺满 */
 }
-
-.header {
+.page-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
+  padding: 15px 20px;
+  border-bottom: 1px solid #e6e6e6;
+  background: white;
+  flex-shrink: 0;
 }
 
-.header h3 {
+.page-title {
   margin: 0;
+  font-size: 24px;
+  font-weight: 600;
   color: #303133;
+  position: relative;
+  padding-left: 16px;
+}
+
+.page-title::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 20px;
+  background: #409eff;
+}
+  
+
+/* Tabs样式调整 */
+:deep(.el-tabs__content) {
+  flex: 1;
+  overflow: hidden;
+  padding: 0 !important;
+}
+
+:deep(.el-tabs__header) {
+  margin-bottom: 15px;
 }
 
 .local-env-header {
   margin-bottom: 15px;
   padding-bottom: 15px;
   border-bottom: 1px solid #e4e7ed;
+  flex-shrink: 0;
 }
 
 .scope-help {

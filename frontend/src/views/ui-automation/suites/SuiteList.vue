@@ -1,96 +1,101 @@
 <template>
-  <div class="page-container">
+  <div class="test-case-manager">
     <div class="page-header">
       <h1 class="page-title">测试套件管理</h1>
-      <el-select v-model="projectId" placeholder="选择项目" style="width: 200px; margin-right: 15px" @change="onProjectChange">
-        <el-option v-for="project in projects" :key="project.id" :label="project.name" :value="project.id" />
-      </el-select>
-      <el-button type="primary" @click="handleNewSuite">
-        <el-icon><Plus /></el-icon>
-        新增套件
-      </el-button>
+      <div class="header-actions">
+        <el-select v-model="projectId" placeholder="选择项目" style="width: 200px; margin-right: 15px" @change="onProjectChange">
+          <el-option v-for="project in projects" :key="project.id" :label="project.name" :value="project.id" />
+        </el-select>
+        <el-button type="primary" @click="handleNewSuite">
+          <el-icon><Plus /></el-icon>
+          新增套件
+        </el-button>
+      </div>
     </div>
-
-    <div class="card-container">
-      <div class="filter-bar">
-        <el-row :gutter="20">
-          <el-col :span="6">
+    
+    <div class="main-content">
+      <!-- 左侧：套件列表 -->
+      <div class="left-panel">
+        <div class="panel-header">
+          <h3>套件列表</h3>
+          <div class="search-filter">
             <el-input
               v-model="searchText"
-              placeholder="搜索套件名称或描述"
+              placeholder="搜索套件名称"
               clearable
+              size="default"
+              style="width: 250px"
               @input="handleSearch"
             >
               <template #prefix>
                 <el-icon><Search /></el-icon>
               </template>
             </el-input>
-          </el-col>
-        </el-row>
+            <el-button type="primary" size="default" style="margin-left: 10px" @click="handleSearch">
+              查询
+            </el-button>
+          </div>
+        </div>
+        
+        <div class="test-case-list">
+          <div
+            v-for="suite in suites"
+            :key="suite.id"
+            class="test-case-item"
+            @click="editSuite(suite.id)"
+          >
+            <div class="case-header">
+              <div class="case-info">
+                <h4 class="case-name">{{ suite.name }}</h4>
+                <p class="case-description">{{ suite.description || '暂无描述' }}</p>
+              </div>
+              <div class="case-actions">
+                <el-button size="small" text @click.stop="viewSuite(suite)">
+                  <el-icon><Collection /></el-icon>
+                  查看
+                </el-button>
+                <el-button size="small" type="primary" text @click.stop="editSuite(suite.id)">
+                  <el-icon><Edit /></el-icon>
+                  编辑
+                </el-button>
+                <el-button size="small" text @click.stop="runSuite(suite)">
+                  <el-icon><RefreshRight /></el-icon>
+                  运行
+                </el-button>
+                <el-button size="small" type="danger" text @click.stop="deleteSuite(suite.id)">
+                  <el-icon><Delete /></el-icon>
+                  删除
+                </el-button>
+              </div>
+            </div>
+            <div class="case-meta">
+              <el-tag size="small" :type="getExecutionStatusTag(suite.execution_status)">
+                {{ getExecutionStatusText(suite.execution_status) }}
+              </el-tag>
+              <span class="step-count">{{ suite.test_case_count || 0 }} 用例</span>
+            </div>
+          </div>
+        </div>
+        
+        <!-- 分页 -->
+        <div class="pagination-container">
+          <el-pagination
+            v-model:current-page="pagination.currentPage"
+            v-model:page-size="pagination.pageSize"
+            :page-sizes="[10, 20, 50, 100]"
+            layout="total, sizes, prev, pager, next, jumper"
+            :total="total"
+            @size-change="handleSizeChange"
+            @current-change="handleCurrentChange"
+          />
+        </div>
       </div>
-
-      <el-table :data="suites" v-loading="loading" style="width: 100%">
-        <el-table-column type="selection" width="55" />
-        <el-table-column prop="name" label="套件名称" min-width="200">
-          <template #default="{ row }">
-            <el-link @click="editSuite(row.id)" type="primary">
-              {{ row.name }}
-            </el-link>
-          </template>
-        </el-table-column>
-        <el-table-column prop="description" label="描述" min-width="200" show-overflow-tooltip />
-        <el-table-column label="包含用例数" width="120">
-          <template #default="{ row }">
-            {{ row.test_case_count || 0 }}
-          </template>
-        </el-table-column>
-        <el-table-column label="执行状态" width="100">
-          <template #default="{ row }">
-            <el-tag :type="getExecutionStatusTag(row.execution_status)">
-              {{ getExecutionStatusText(row.execution_status) }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="通过数" width="90">
-          <template #default="{ row }">
-            <span style="color: #67c23a; font-weight: bold;">{{ row.passed_count || 0 }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="失败数" width="90">
-          <template #default="{ row }">
-            <span style="color: #f56c6c; font-weight: bold;">{{ row.failed_count || 0 }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column prop="created_at" label="创建时间" width="180" :formatter="formatDate" />
-        <el-table-column prop="updated_at" label="更新时间" width="180" :formatter="formatDate" />
-        <el-table-column label="操作" width="240" fixed="right">
-          <template #default="{ row }">
-            <el-button size="small" type="primary" @click="editSuite(row.id)">
-              <el-icon><Edit /></el-icon>
-              编辑
-            </el-button>
-            <el-button size="small" type="success" @click="runSuite(row)">
-              <el-icon><RefreshRight /></el-icon>
-              运行
-            </el-button>
-            <el-button size="small" type="danger" @click="deleteSuite(row.id)">
-              <el-icon><Delete /></el-icon>
-              删除
-            </el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-
-      <div class="pagination-container">
-        <el-pagination
-          v-model:current-page="pagination.currentPage"
-          v-model:page-size="pagination.pageSize"
-          :page-sizes="[10, 20, 50, 100]"
-          layout="total, sizes, prev, pager, next, jumper"
-          :total="total"
-          @size-change="handleSizeChange"
-          @current-change="handleCurrentChange"
-        />
+      
+      <!-- 右侧：套件详情 -->
+      <div class="right-panel">
+        <div class="no-selection">
+          <el-empty description="请选择一个测试套件" />
+        </div>
       </div>
     </div>
 
@@ -522,6 +527,13 @@ const deleteSuite = async (id) => {
   }
 }
 
+// 查看套件详情
+const viewSuite = (suite) => {
+  // 这里可以添加查看套件详情的逻辑，例如打开详情对话框
+  // 目前暂时复用编辑功能，因为编辑对话框已经包含了所有套件信息
+  editSuite(suite.id)
+}
+
 // 运行套件
 const runSuite = (suite) => {
   // 检查是否包含测试用例
@@ -759,21 +771,20 @@ const handleNewSuite = async () => {
 }
 </script>
 
-<style scoped lang="scss">
-.page-container {
-  padding: 20px;
-  background: #f5f5f5;
-  min-height: 100vh;
+<style scoped>
+.test-case-manager {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 
 .page-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
+  padding: 15px 20px;
+  border-bottom: 1px solid #e6e6e6;
   background: white;
-  padding: 20px;
-  border-radius: 4px;
 }
 
 .page-title {
@@ -781,23 +792,130 @@ const handleNewSuite = async () => {
   font-size: 24px;
 }
 
-.card-container {
-  background: white;
-  padding: 20px;
-  border-radius: 4px;
+.header-actions {
+  display: flex;
+  align-items: center;
 }
 
-.filter-bar {
-  margin-bottom: 20px;
+.main-content {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+.left-panel {
+  width: 450px;
+  border-right: 1px solid #e6e6e6;
+  background: white;
+  display: flex;
+  flex-direction: column;
+}
+
+.panel-header {
+  padding: 15px;
+  border-bottom: 1px solid #e6e6e6;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.panel-header h3 {
+  margin: 0;
+}
+
+.search-filter {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.test-case-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 15px;
+}
+
+.test-case-item {
+  border: 1px solid #e6e6e6;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  padding: 20px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  background: white;
+}
+
+.test-case-item:hover {
+  border-color: #409eff;
+  box-shadow: 0 4px 12px rgba(64, 158, 255, 0.15);
+  transform: translateY(-1px);
+}
+
+.case-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.case-info {
+  flex: 1;
+}
+
+.case-name {
+  margin: 0 0 5px 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.case-description {
+  margin: 0;
+  color: #666;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.case-actions {
+  display: flex;
+  gap: 5px;
+}
+
+.case-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: #888;
+  margin-top: 10px;
+}
+
+.step-count {
+  color: #409eff;
+  font-weight: 500;
+}
+
+.right-panel {
+  flex: 1;
+  background: white;
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+}
+
+.no-selection {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+  color: #999;
 }
 
 .pagination-container {
-  margin-top: 20px;
+  padding: 15px;
+  border-top: 1px solid #e6e6e6;
   display: flex;
   justify-content: flex-end;
 }
 
-// 测试用例选择器样式
 .test-case-selector {
   display: flex;
   gap: 20px;
@@ -818,26 +936,24 @@ const handleNewSuite = async () => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
 
-  h4 {
-    margin: 0;
-    font-size: 14px;
-    color: #303133;
-  }
+.panel-header h4 {
+  margin: 0;
+  font-size: 14px;
+  color: #303133;
 }
 
 .panel-content {
   padding: 10px;
 }
 
-
-:deep(.selected-row) {
+.selected-row {
   background-color: #f0f9ff !important;
 }
 
-:deep(.el-table__row) {
+.el-table__row {
   cursor: pointer;
-
   &:hover {
     background-color: #f5f7fa;
   }
@@ -845,7 +961,6 @@ const handleNewSuite = async () => {
 
 .mode-description {
   margin-top: 8px;
-  
   .description-text {
     font-size: 12px;
     color: #909399;

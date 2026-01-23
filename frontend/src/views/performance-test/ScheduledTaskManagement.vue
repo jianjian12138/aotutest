@@ -2,8 +2,8 @@
   <div class="scheduled-task-management">
     <el-card shadow="hover">
       <template #header>
-        <div class="card-header">
-          <h2>定时任务管理</h2>
+        <div class="card-header page-header" style="margin-bottom: 0;">
+          <h2 class="page-title">定时任务管理</h2>
           <el-button type="primary" @click="handleCreateScheduledTask">
             <el-icon><Plus /></el-icon>
             新建定时任务
@@ -106,7 +106,7 @@
           v-model:page-size="pagination.pageSize"
           :page-sizes="[10, 20, 50, 100]"
           layout="total, sizes, prev, pager, next, jumper"
-          :total="totalScheduledTasks"
+          :total="pagination.total"
           @size-change="handleSizeChange"
           @current-change="handleCurrentChange"
         />
@@ -159,10 +159,11 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElNotification, ElMessageBox } from 'element-plus'
 import { Plus, Search, View, EditPen, VideoPlay, VideoPause, Delete } from '@element-plus/icons-vue'
+import api from '@/utils/api'
 
 const router = useRouter()
 
@@ -171,71 +172,54 @@ const searchQuery = ref('')
 const statusFilter = ref('')
 
 // 分页
-const pagination = ref({
+const pagination = reactive({
   currentPage: 1,
-  pageSize: 20
+  pageSize: 20,
+  total: 0
 })
-const totalScheduledTasks = ref(12)
 
-// 测试套件列表（用于创建）
-const testSuites = ref([
-  { id: 1, name: '用户登录性能测试' },
-  { id: 2, name: '商品浏览性能测试' },
-  { id: 3, name: '订单流程性能测试' },
-  { id: 4, name: 'API基础性能测试' }
-])
+// 数据
+const scheduledTasks = ref([])
+const testSuites = ref([])
+const loading = ref(false)
 
-// 定时任务数据
-const scheduledTasks = ref([
-  {
-    id: 1,
-    name: '每日API性能测试',
-    description: '每天凌晨执行API基础性能测试',
-    test_suite: { name: 'API基础性能测试' },
-    cron_expression: '0 0 0 * * ?',
-    status: 'RUNNING',
-    concurrency: 100,
-    next_run_time: '2026-01-13 00:00:00',
-    last_run_time: '2026-01-12 00:00:00'
-  },
-  {
-    id: 2,
-    name: '每小时登录性能测试',
-    description: '每小时执行一次用户登录性能测试',
-    test_suite: { name: '用户登录性能测试' },
-    cron_expression: '0 0 * * * ?',
-    status: 'RUNNING',
-    concurrency: 50,
-    next_run_time: '2026-01-12 17:00:00',
-    last_run_time: '2026-01-12 16:00:00'
-  },
-  {
-    id: 3,
-    name: '每周订单流程测试',
-    description: '每周日执行订单流程性能测试',
-    test_suite: { name: '订单流程性能测试' },
-    cron_expression: '0 0 0 ? * SUN',
-    status: 'PAUSED',
-    concurrency: 30,
-    next_run_time: '2026-01-18 00:00:00',
-    last_run_time: '2026-01-11 00:00:00'
-  },
-  {
-    id: 4,
-    name: '商品浏览压力测试',
-    description: '测试商品浏览接口的压力表现',
-    test_suite: { name: '商品浏览性能测试' },
-    cron_expression: '0 0 12 * * ?',
-    status: 'RUNNING',
-    concurrency: 200,
-    next_run_time: '2026-01-13 12:00:00',
-    last_run_time: '2026-01-12 12:00:00'
+// 获取测试套件列表
+const fetchTestSuites = async () => {
+  try {
+    const response = await api.get('/performance-testing/test-suites/', {
+      params: { page_size: 100 }
+    })
+    testSuites.value = response.data.results
+  } catch (error) {
+    console.error('获取测试套件列表失败:', error)
   }
-])
+}
+
+// 获取定时任务列表
+const fetchScheduledTasks = async () => {
+  loading.value = true
+  try {
+    const params = {
+      page: pagination.currentPage,
+      page_size: pagination.pageSize,
+      search: searchQuery.value,
+      status: statusFilter.value
+    }
+    const response = await api.get('/performance-testing/scheduled-tasks/', { params })
+    scheduledTasks.value = response.data.results
+    pagination.total = response.data.count
+  } catch (error) {
+    ElMessage.error('获取定时任务列表失败')
+  } finally {
+    loading.value = false
+  }
+}
 
 // 对话框
 const dialogVisible = ref(false)
-const form = ref({
+const dialogType = ref('create')
+const form = reactive({
+  id: null,
   name: '',
   test_suite_id: '',
   cron_expression: '',
@@ -267,12 +251,13 @@ const getStatusText = (status) => {
 
 // 搜索
 const handleSearch = () => {
-  ElMessage.info('搜索功能开发中')
+  pagination.currentPage = 1
+  fetchScheduledTasks()
 }
 
 // 处理行点击
 const handleRowClick = (row) => {
-  handleViewScheduledTask(row)
+  // handleViewScheduledTask(row)
 }
 
 // 查看定时任务
@@ -282,11 +267,14 @@ const handleViewScheduledTask = (row) => {
 
 // 编辑定时任务
 const handleEditScheduledTask = (row) => {
-  ElNotification({
-    title: '提示',
-    message: `开始编辑定时任务：${row.name}`,
-    type: 'success'
-  })
+  dialogType.value = 'edit'
+  form.id = row.id
+  form.name = row.name
+  form.test_suite_id = row.test_suite?.id || row.test_suite // Adjust based on API response
+  form.cron_expression = row.cron_expression
+  form.concurrency = row.concurrency
+  form.description = row.description
+  dialogVisible.value = true
 }
 
 // 暂停定时任务
@@ -295,8 +283,14 @@ const handlePauseScheduledTask = (row) => {
     confirmButtonText: '确定',
     cancelButtonText: '取消',
     type: 'warning'
-  }).then(() => {
-    ElMessage.success(`定时任务 ${row.name} 已暂停`)
+  }).then(async () => {
+    try {
+      await api.post(`/performance-testing/scheduled-tasks/${row.id}/pause/`)
+      ElMessage.success(`定时任务 ${row.name} 已暂停`)
+      fetchScheduledTasks()
+    } catch (error) {
+      ElMessage.error('暂停失败')
+    }
   }).catch(() => {
     // 取消暂停
   })
@@ -308,8 +302,14 @@ const handleResumeScheduledTask = (row) => {
     confirmButtonText: '确定',
     cancelButtonText: '取消',
     type: 'info'
-  }).then(() => {
-    ElMessage.success(`定时任务 ${row.name} 已恢复`)
+  }).then(async () => {
+    try {
+      await api.post(`/performance-testing/scheduled-tasks/${row.id}/resume/`)
+      ElMessage.success(`定时任务 ${row.name} 已恢复`)
+      fetchScheduledTasks()
+    } catch (error) {
+      ElMessage.error('恢复失败')
+    }
   }).catch(() => {
     // 取消恢复
   })
@@ -321,8 +321,14 @@ const handleDeleteScheduledTask = (row) => {
     confirmButtonText: '确定',
     cancelButtonText: '取消',
     type: 'warning'
-  }).then(() => {
-    ElMessage.success('定时任务删除成功')
+  }).then(async () => {
+    try {
+      await api.delete(`/performance-testing/scheduled-tasks/${row.id}/`)
+      ElMessage.success('定时任务删除成功')
+      fetchScheduledTasks()
+    } catch (error) {
+      ElMessage.error('删除失败')
+    }
   }).catch(() => {
     // 取消删除
   })
@@ -330,35 +336,74 @@ const handleDeleteScheduledTask = (row) => {
 
 // 新建定时任务
 const handleCreateScheduledTask = () => {
+  dialogType.value = 'create'
+  form.id = null
+  form.name = ''
+  form.test_suite_id = testSuites.value.length > 0 ? testSuites.value[0].id : ''
+  form.cron_expression = ''
+  form.concurrency = 50
+  form.description = ''
   dialogVisible.value = true
-  form.value = {
-    name: '',
-    test_suite_id: '',
-    cron_expression: '',
-    concurrency: 50,
-    description: ''
-  }
 }
 
 // 提交表单
-const submitForm = () => {
-  ElMessage.success('定时任务创建成功')
-  dialogVisible.value = false
+const submitForm = async () => {
+  if (!form.name || !form.test_suite_id || !form.cron_expression) {
+    ElMessage.warning('请填写必要信息')
+    return
+  }
+  
+  try {
+    const data = {
+      name: form.name,
+      test_suite: form.test_suite_id,
+      cron_expression: form.cron_expression,
+      concurrency: form.concurrency,
+      description: form.description
+    }
+    
+    if (dialogType.value === 'create') {
+      await api.post('/performance-testing/scheduled-tasks/', data)
+      ElMessage.success('定时任务创建成功')
+    } else {
+      await api.put(`/performance-testing/scheduled-tasks/${form.id}/`, data)
+      ElMessage.success('定时任务更新成功')
+    }
+    dialogVisible.value = false
+    fetchScheduledTasks()
+  } catch (error) {
+    ElMessage.error(dialogType.value === 'create' ? '创建失败' : '更新失败')
+  }
 }
 
 // 分页变化
 const handleSizeChange = (size) => {
-  pagination.value.pageSize = size
+  pagination.pageSize = size
+  fetchScheduledTasks()
 }
 
 const handleCurrentChange = (current) => {
-  pagination.value.currentPage = current
+  pagination.currentPage = current
+  fetchScheduledTasks()
 }
+
+onMounted(() => {
+  fetchTestSuites()
+  fetchScheduledTasks()
+})
 </script>
 
 <style scoped>
-.scheduled-task-management {
+/* 页面特定样式 */
+.page-container {
   padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-width: 100%; /* 新增：覆盖全局样式的 max-width: 1600px，确保铺满 */
+}
+.scheduled-task-management {
+  padding: 0;
 }
 
 .card-header {

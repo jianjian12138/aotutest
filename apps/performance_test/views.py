@@ -571,7 +571,7 @@ class PerformanceTestExecutionViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
     filterset_fields = ['status', 'test_suite']
-    ordering = ['-created_at']
+    ordering = ['-start_time']
     pagination_class = StandardPagination
 
     def get_queryset(self):
@@ -685,7 +685,7 @@ class PerformanceDashboardViewSet(viewsets.ViewSet):
         # 获取最近的执行记录
         recent_executions = PerformanceTestExecution.objects.filter(
             test_suite__project__in=projects
-        ).order_by('-created_at')[:5]
+        ).order_by('-start_time')[:5]
         
         return Response({
             'total_projects': total_projects,

@@ -2,8 +2,8 @@
   <div class="scan-tasks">
     <el-card shadow="hover">
       <template #header>
-        <div class="card-header">
-          <h2>扫描任务管理</h2>
+        <div class="card-header page-header" style="margin-bottom: 0;">
+          <h2 class="page-title">扫描任务管理</h2>
           <el-button type="primary" @click="handleCreateTask">
             <el-icon><Plus /></el-icon>
             新建扫描任务
@@ -28,10 +28,8 @@
               clearable
             >
               <el-option label="全部" value="" />
-              <el-option label="待执行" value="pending" />
-              <el-option label="执行中" value="running" />
-              <el-option label="已完成" value="completed" />
-              <el-option label="失败" value="failed" />
+              <el-option label="已激活" :value="true" />
+              <el-option label="未激活" :value="false" />
             </el-select>
           </el-col>
           <el-col :span="6">
@@ -146,90 +144,112 @@
         </span>
       </template>
     </el-dialog>
+
+    <!-- 任务详情对话框 -->
+    <el-dialog
+      v-model="detailVisible"
+      title="任务详情"
+      width="600px"
+    >
+      <el-descriptions border :column="1">
+        <el-descriptions-item label="任务名称">{{ currentTask.name }}</el-descriptions-item>
+        <el-descriptions-item label="扫描目标">{{ currentTask.target }}</el-descriptions-item>
+        <el-descriptions-item label="扫描类型">
+          {{ currentTask.scan_type === 'basic' ? '基础扫描' : currentTask.scan_type === 'deep' ? '深度扫描' : '快速扫描' }}
+        </el-descriptions-item>
+        <el-descriptions-item label="状态">
+          <el-tag :type="getStatusTagType(currentTask.status)">
+            {{ getStatusText(currentTask.status) }}
+          </el-tag>
+        </el-descriptions-item>
+        <el-descriptions-item label="创建人">{{ currentTask.created_by }}</el-descriptions-item>
+        <el-descriptions-item label="创建时间">{{ currentTask.created_at }}</el-descriptions-item>
+        <el-descriptions-item label="完成时间">{{ currentTask.finished_at }}</el-descriptions-item>
+        <el-descriptions-item label="描述">{{ currentTask.description }}</el-descriptions-item>
+      </el-descriptions>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="detailVisible = false">关闭</el-button>
+          <el-button type="primary" @click="handleExecuteTask(currentTask)" :disabled="currentTask.status === 'running'">执行</el-button>
+        </span>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage, ElNotification, ElMessageBox } from 'element-plus'
+import { ElMessage, ElMessageBox, ElNotification } from 'element-plus'
 import { Plus, Search, View, VideoPlay, Delete } from '@element-plus/icons-vue'
+import { 
+  getSecurityProjects, 
+  createSecurityProject, 
+  deleteSecurityProject, 
+  executeSecurityProject,
+  getSecurityConfigs,
+  getSecurityProject
+} from '@/api/security'
+import api from '@/utils/api'
 
 const router = useRouter()
 
-// 搜索和筛选
+// 数据
+const scanTasks = ref([])
+const configs = ref([])
+const loading = ref(false)
 const searchQuery = ref('')
 const statusFilter = ref('')
 const dateRange = ref([])
-
-// 分页
-const pagination = ref({
+const pagination = reactive({
   currentPage: 1,
-  pageSize: 20
+  pageSize: 10,
+  total: 0
 })
-const totalTasks = ref(30)
+const totalTasks = computed(() => pagination.total)
 
-// 扫描任务数据
-const scanTasks = ref([
-  {
-    id: 1,
-    name: '电商网站安全扫描',
-    target: 'https://example.com',
-    scan_type: '深度扫描',
-    status: 'completed',
-    created_by: 'admin',
-    created_at: '2026-01-10 14:30:00',
-    finished_at: '2026-01-10 15:45:00'
-  },
-  {
-    id: 2,
-    name: '测试网站快速扫描',
-    target: 'https://test.com',
-    scan_type: '快速扫描',
-    status: 'pending',
-    created_by: 'testuser',
-    created_at: '2026-01-11 09:15:00',
-    finished_at: ''
-  },
-  {
-    id: 3,
-    name: '内部系统安全检查',
-    target: '192.168.1.100',
-    scan_type: '基础扫描',
-    status: 'running',
-    created_by: 'admin',
-    created_at: '2026-01-11 14:20:00',
-    finished_at: ''
-  },
-  {
-    id: 4,
-    name: 'API服务安全测试',
-    target: 'https://api.example.com',
-    scan_type: '深度扫描',
-    status: 'failed',
-    created_by: 'testuser',
-    created_at: '2026-01-12 10:00:00',
-    finished_at: '2026-01-12 10:15:00'
-  },
-  {
-    id: 5,
-    name: '管理后台安全审计',
-    target: 'https://admin.example.com',
-    scan_type: '深度扫描',
-    status: 'completed',
-    created_by: 'admin',
-    created_at: '2026-01-12 14:00:00',
-    finished_at: '2026-01-12 15:30:00'
+// 详情对话框
+const detailVisible = ref(false)
+const currentTask = ref({})
+
+// 获取配置列表
+const fetchConfigs = async () => {
+  try {
+    const response = await getSecurityConfigs({ page_size: 100 })
+    configs.value = response.results || []
+  } catch (error) {
+    console.error('获取配置列表失败:', error)
   }
-])
+}
+
+// 获取任务列表
+const fetchData = async () => {
+  loading.value = true
+  try {
+    const params = {
+      page: pagination.currentPage,
+      page_size: pagination.pageSize,
+      search: searchQuery.value,
+      is_active: statusFilter.value
+    }
+    const response = await getSecurityProjects(params)
+    scanTasks.value = response.results
+    pagination.total = response.count
+  } catch (error) {
+    ElMessage.error('获取扫描任务失败')
+  } finally {
+    loading.value = false
+  }
+}
 
 // 对话框
 const dialogVisible = ref(false)
 const form = ref({
   name: '',
   target: '',
-  scan_type: '',
-  description: ''
+  scan_type: 'deep',
+  description: '',
+  config: null
 })
 
 // 获取状态标签类型
@@ -256,26 +276,39 @@ const getStatusText = (status) => {
 
 // 搜索
 const handleSearch = () => {
-  ElMessage.info('搜索功能开发中')
+  pagination.currentPage = 1
+  fetchData()
 }
 
 // 处理行点击
 const handleRowClick = (row) => {
-  router.push(`/strix-security/scan-tasks/${row.id}`)
+  handleViewTask(row)
 }
 
 // 查看任务
-const handleViewTask = (row) => {
-  router.push(`/strix-security/scan-tasks/${row.id}`)
+const handleViewTask = async (row) => {
+  try {
+    const response = await getSecurityProject(row.id)
+    currentTask.value = response
+    detailVisible.value = true
+  } catch (error) {
+    ElMessage.error('获取任务详情失败')
+  }
 }
 
 // 执行任务
-const handleExecuteTask = (row) => {
-  ElNotification({
-    title: '提示',
-    message: `开始执行扫描任务：${row.name}`,
-    type: 'success'
-  })
+const handleExecuteTask = async (row) => {
+  try {
+    await executeSecurityProject(row.id)
+    ElNotification({
+      title: '提示',
+      message: `已触发扫描任务：${row.name}`,
+      type: 'success'
+    })
+    fetchData()
+  } catch (error) {
+    ElMessage.error('执行失败')
+  }
 }
 
 // 删除任务
@@ -284,11 +317,15 @@ const handleDeleteTask = (row) => {
     confirmButtonText: '确定',
     cancelButtonText: '取消',
     type: 'warning'
-  }).then(() => {
-    ElMessage.success('扫描任务删除成功')
-  }).catch(() => {
-    // 取消删除
-  })
+  }).then(async () => {
+    try {
+      await deleteSecurityProject(row.id)
+      ElMessage.success('扫描任务删除成功')
+      fetchData()
+    } catch (error) {
+      ElMessage.error('删除失败')
+    }
+  }).catch(() => {})
 }
 
 // 新建任务
@@ -297,30 +334,48 @@ const handleCreateTask = () => {
   form.value = {
     name: '',
     target: '',
-    scan_type: '',
-    description: ''
+    scan_type: 'deep',
+    description: '',
+    config: configs.value.length > 0 ? configs.value[0].id : null
   }
 }
 
-// 提交表单
-const submitForm = () => {
-  ElMessage.success('扫描任务创建成功')
-  dialogVisible.value = false
+const submitForm = async () => {
+  if (!form.value.name || !form.value.target) {
+    ElMessage.warning('请填写必要信息')
+    return
+  }
+  try {
+    await createSecurityProject(form.value)
+    ElMessage.success('创建成功')
+    dialogVisible.value = false
+    fetchData()
+  } catch (error) {
+    ElMessage.error('创建失败')
+  }
 }
 
-// 分页变化
-const handleSizeChange = (size) => {
-  pagination.value.pageSize = size
+const handleSizeChange = (val) => {
+  pagination.pageSize = val
+  fetchData()
 }
 
-const handleCurrentChange = (current) => {
-  pagination.value.currentPage = current
+const handleCurrentChange = (val) => {
+  pagination.currentPage = val
+  fetchData()
 }
+
+onMounted(() => {
+  fetchConfigs()
+  fetchData()
+})
 </script>
 
 <style scoped>
+
+
 .scan-tasks {
-  padding: 20px;
+  padding: 0px;
 }
 
 .card-header {

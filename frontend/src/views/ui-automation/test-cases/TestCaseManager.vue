@@ -85,15 +85,31 @@
               <el-select v-model="selectedEngine" placeholder="选择引擎" size="small" style="width: 130px; margin-right: 10px">
                 <el-option label="Playwright" value="playwright" />
                 <el-option label="Selenium" value="selenium" />
+                <el-option label="Airtest" value="airtest" />
                 <el-option label="Appium" value="appium" />
               </el-select>
-              <el-select v-model="selectedBrowser" placeholder="选择浏览器" size="small" style="width: 120px; margin-right: 10px" v-show="selectedEngine !== 'appium'">
+              <el-select 
+                v-model="selectedDevice" 
+                placeholder="选择设备" 
+                size="small" 
+                style="width: 150px; margin-right: 10px" 
+                v-show="selectedEngine === 'appium' || selectedEngine === 'airtest'"
+                @visible-change="(val) => { if(val) loadDevices() }"
+              >
+                <el-option 
+                  v-for="device in onlineDevices" 
+                  :key="device.id" 
+                  :label="`${device.name} (${device.serial || device.ip})`" 
+                  :value="device.id" 
+                />
+              </el-select>
+              <el-select v-model="selectedBrowser" placeholder="选择浏览器" size="small" style="width: 120px; margin-right: 10px" v-show="selectedEngine !== 'appium' && selectedEngine !== 'airtest'">
                 <el-option label="Chrome" value="chrome" />
                 <el-option label="Firefox" value="firefox" />
                 <el-option label="Safari" value="safari" />
                 <el-option label="Edge" value="edge" />
               </el-select>
-              <el-select v-model="headlessMode" placeholder="运行模式" size="small" style="width: 110px; margin-right: 10px" v-show="selectedEngine !== 'appium'">
+              <el-select v-model="headlessMode" placeholder="运行模式" size="small" style="width: 110px; margin-right: 10px" v-show="selectedEngine !== 'appium' && selectedEngine !== 'airtest'">
                 <el-option label="有头模式" :value="false" />
                 <el-option label="无头模式" :value="true" />
               </el-select>
@@ -220,6 +236,20 @@
                             :step="100"
                             size="small"
                           />
+                        </div>
+
+                        <!-- 调试数据采集 (Playwright Only) -->
+                        <div v-if="selectedEngine === 'playwright' && !['wait', 'screenshot', 'switchTab'].includes(element.action_type)" class="step-param">
+                          <label>数据采集：</label>
+                          <el-switch
+                            v-model="element.enable_debug_capture"
+                            active-text="开启"
+                            inactive-text="关闭"
+                            size="small"
+                          />
+                          <el-tooltip content="开启后将采集DOM、截图等调试数据" placement="top">
+                            <el-icon style="margin-left: 5px; color: #909399"><InfoFilled /></el-icon>
+                          </el-tooltip>
                         </div>
 
                         <!-- 断言参数 -->
@@ -419,6 +449,16 @@
                           </el-tag>
                           <span class="log-action">{{ getActionText(step.action_type) }}</span>
                           <span class="log-desc">{{ step.description }}</span>
+                          <el-button 
+                            v-if="step.debug_data" 
+                            size="small" 
+                            type="primary" 
+                            link 
+                            @click="viewDebugData(step)"
+                            style="margin-left: auto"
+                          >
+                            查看调试数据
+                          </el-button>
                         </div>
                         <div v-if="step.error" class="log-error">
                           <el-icon><WarningFilled /></el-icon>
@@ -568,6 +608,57 @@
       </div>
     </el-dialog>
 
+    <!-- 调试数据查看对话框 -->
+    <el-dialog
+      v-model="showDebugDataDialog"
+      title="调试数据详情"
+      width="800px"
+      :close-on-click-modal="false"
+    >
+      <div v-if="currentDebugData" class="debug-data-container">
+        <el-tabs v-model="debugDataTab">
+          <el-tab-pane label="执行前 (Before)" name="before" v-if="currentDebugData.before">
+            <div class="debug-content">
+              <div v-if="currentDebugData.before.screenshot" class="debug-section">
+                <h4>截图</h4>
+                <el-image 
+                  :src="currentDebugData.before.screenshot" 
+                  :preview-src-list="[currentDebugData.before.screenshot]"
+                  fit="contain"
+                  class="debug-image"
+                />
+              </div>
+              <div v-if="currentDebugData.before.data_file" class="debug-section">
+                <h4>调试信息 (JSON)</h4>
+                <div v-loading="loadingDebugJson">
+                  <pre class="json-content">{{ debugJsonContent.before }}</pre>
+                </div>
+              </div>
+            </div>
+          </el-tab-pane>
+          <el-tab-pane label="执行后 (After)" name="after" v-if="currentDebugData.after">
+            <div class="debug-content">
+              <div v-if="currentDebugData.after.screenshot" class="debug-section">
+                <h4>截图</h4>
+                <el-image 
+                  :src="currentDebugData.after.screenshot" 
+                  :preview-src-list="[currentDebugData.after.screenshot]"
+                  fit="contain"
+                  class="debug-image"
+                />
+              </div>
+              <div v-if="currentDebugData.after.data_file" class="debug-section">
+                <h4>调试信息 (JSON)</h4>
+                <div v-loading="loadingDebugJson">
+                  <pre class="json-content">{{ debugJsonContent.after }}</pre>
+                </div>
+              </div>
+            </div>
+          </el-tab-pane>
+        </el-tabs>
+      </div>
+    </el-dialog>
+
     <!-- 变量助手对话框 -->
     <el-dialog
       v-model="showVariableHelper"
@@ -606,7 +697,7 @@
 import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
-  Search, Plus, Edit, Delete, Check, CaretRight, ArrowUp, ArrowDown, Rank, Picture, Warning, View, ZoomIn, Refresh, WarningFilled, MagicStick
+  Search, Plus, Edit, Delete, Check, CaretRight, ArrowUp, ArrowDown, Rank, Picture, Warning, View, ZoomIn, Refresh, WarningFilled, MagicStick, InfoFilled
 } from '@element-plus/icons-vue'
 import draggable from 'vuedraggable'
 
@@ -619,7 +710,8 @@ import {
   getTestCases,
   runTestCase as runTestCaseApi,
   copyTestCase as copyTestCaseApi,
-  getLocatorStrategies
+  getLocatorStrategies,
+  getDeviceList
 } from '@/api/ui_automation'
 import { getVannaConfigs, generateSql } from '@/api/data-factory'
 
@@ -643,8 +735,15 @@ const currentScreenshot = ref(null)
 const isRunning = ref(false)
 const selectedEngine = ref('playwright')  // 默认使用Playwright
 const selectedBrowser = ref('chrome')  // 默认使用Chrome
+const selectedDevice = ref('') // 选中的设备
+const deviceList = ref([]) // 设备列表
 const headlessMode = ref(false)  // 默认使用有头模式
 const showVariableHelper = ref(false)
+const showDebugDataDialog = ref(false)
+const currentDebugData = ref(null)
+const debugDataTab = ref('after')
+const debugJsonContent = reactive({ before: '', after: '' })
+const loadingDebugJson = ref(false)
 const currentEditingStep = ref(null)
 const currentEditingField = ref('')
 
@@ -662,6 +761,10 @@ const filteredTestCases = computed(() => {
     tc.name.includes(searchKeyword.value) ||
     tc.description?.includes(searchKeyword.value)
   )
+})
+
+const onlineDevices = computed(() => {
+  return deviceList.value.filter(d => d.status === 'online')
 })
 
 // 解析执行日志
@@ -725,6 +828,15 @@ const loadDatabaseConfigs = async () => {
   }
 }
 
+const loadDevices = async () => {
+  try {
+    const res = await getDeviceList({ status: 'online' })
+    deviceList.value = res.data.results || res.data
+  } catch (error) {
+    console.error('加载设备列表失败', error)
+  }
+}
+
 const handleGenerateSqlInline = async (element) => {
   if (!element.prompt) {
     ElMessage.warning('请输入查询需求')
@@ -779,7 +891,8 @@ const selectTestCase = (testCase) => {
     currentSteps.value = testCase.steps.map(step => ({
       ...step,
       element_id: step.element || '',
-      expanded: false
+      expanded: false,
+      enable_debug_capture: step.enable_debug_capture || false
     }))
   } else {
     currentSteps.value = []
@@ -893,14 +1006,25 @@ const saveTestCase = async () => {
 const runTestCase = async (testCase) => {
   isRunning.value = true
   try {
-    const modeText = headlessMode.value ? '无头模式' : '有头模式'
-    ElMessage.info(`开始执行测试用例... (引擎: ${selectedEngine.value.toUpperCase()}, 浏览器: ${selectedBrowser.value.toUpperCase()}, ${modeText})`)
+    let message = `开始执行测试用例... (引擎: ${selectedEngine.value.toUpperCase()}`
+    
+    if (['appium', 'airtest'].includes(selectedEngine.value)) {
+      const device = deviceList.value.find(d => d.id === selectedDevice.value)
+      const deviceName = device ? `${device.name} (${device.ip})` : '未选择设备'
+      message += `, 设备: ${deviceName})`
+    } else {
+      const modeText = headlessMode.value ? '无头模式' : '有头模式'
+      message += `, 浏览器: ${selectedBrowser.value.toUpperCase()}, ${modeText})`
+    }
+    
+    ElMessage.info(message)
 
     const response = await runTestCaseApi(testCase.id, {
       project_id: projectId.value,
       engine: selectedEngine.value,
       browser: selectedBrowser.value,
-      headless: headlessMode.value
+      headless: headlessMode.value,
+      device_id: selectedDevice.value
     })
 
     executionResult.value = response.data
@@ -1232,10 +1356,67 @@ const previewScreenshot = (screenshot) => {
   showScreenshotPreview.value = true
 }
 
+const viewDebugData = async (step) => {
+  if (!step.debug_data) return
+  
+  currentDebugData.value = step.debug_data
+  showDebugDataDialog.value = true
+  
+  // Reset JSON content
+  debugJsonContent.before = ''
+  debugJsonContent.after = ''
+  loadingDebugJson.value = true
+  
+  try {
+    const fetchJson = async (url) => {
+      if (!url) return ''
+      try {
+        const res = await fetch(url)
+        if (res.ok) {
+          const json = await res.json()
+          return JSON.stringify(json, null, 2)
+        }
+        return `获取失败: ${res.status} ${res.statusText}`
+      } catch (e) {
+        return `解析失败: ${e.message}`
+      }
+    }
+
+    const promises = []
+    
+    // Fetch JSON content for before
+    if (step.debug_data.before && step.debug_data.before.data_file) {
+      promises.push(
+        fetchJson(step.debug_data.before.data_file).then(text => {
+          debugJsonContent.before = text
+        })
+      )
+    }
+    
+    // Fetch JSON content for after
+    if (step.debug_data.after && step.debug_data.after.data_file) {
+      promises.push(
+        fetchJson(step.debug_data.after.data_file).then(text => {
+          debugJsonContent.after = text
+        })
+      )
+    }
+    
+    await Promise.all(promises)
+    
+  } catch (error) {
+    console.error('加载调试数据失败:', error)
+    ElMessage.error('加载调试数据失败')
+  } finally {
+    loadingDebugJson.value = false
+  }
+}
+
 // 组件挂载
 onMounted(async () => {
   await loadProjects()
   loadDatabaseConfigs()
+  loadDevices()
 
   if (projects.value.length > 0) {
     projectId.value = projects.value[0].id
@@ -1245,6 +1426,13 @@ onMounted(async () => {
 </script>
 
 <style scoped>
+.page-container {
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+
+  max-width: 100%; /* 新增：覆盖全局样式的 max-width: 1600px，确保铺满 */
+}
 .test-case-manager {
   height: 100vh;
   display: flex;
@@ -1255,7 +1443,7 @@ onMounted(async () => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 20px;
+  padding: 15px 20px;
   border-bottom: 1px solid #e6e6e6;
   background: white;
 }
@@ -1927,5 +2115,41 @@ onMounted(async () => {
   align-items: center;
   justify-content: center;
   height: 100%;
+}
+
+.debug-content {
+  padding: 10px;
+  height: 500px;
+  overflow-y: auto;
+}
+
+.debug-section {
+  margin-bottom: 20px;
+}
+
+.debug-section h4 {
+  margin-top: 0;
+  margin-bottom: 10px;
+  color: #333;
+  border-left: 3px solid #409eff;
+  padding-left: 8px;
+}
+
+.debug-image {
+  max-width: 100%;
+  border: 1px solid #dcdfe6;
+  border-radius: 4px;
+}
+
+.json-content {
+  background-color: #f5f7fa;
+  padding: 10px;
+  border-radius: 4px;
+  font-family: monospace;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 300px;
+  overflow-y: auto;
+  border: 1px solid #e4e7ed;
 }
 </style>
