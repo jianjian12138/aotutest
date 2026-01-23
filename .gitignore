@@ -1,11 +1,19 @@
 # 忽略虚拟环境及项目产生的临时文件
 .venv/
+venv_py311/
+venv/
+env/
 .idea/
 .claude/
 .vscode/
+.trae/
 __pycache__/
 .DS_Store
 .pytest_cache
+*.sqlite3
+*.log
+*.png
+llm_debug.txt
 logs/*
 !logs/.gitkeep
 
