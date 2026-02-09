@@ -9,8 +9,8 @@ from drf_spectacular.views import (
     SpectacularSwaggerView,
 )
 
-admin.site.site_title = 'TestHub 管理后台'
-admin.site.site_header = 'TestHub 后台系统'
+admin.site.site_title = 'Testing 管理后台'
+admin.site.site_header = 'Testing 后台系统'
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -33,11 +33,12 @@ urlpatterns = [
     path('api/', include('apps.api_testing.urls')),
     path('api/', include('apps.performance_test.urls')),
     path('api/', include('apps.data_factory.urls')),
-    path('api/', include('apps.wharttest.urls')),
     path('api/', include('apps.midscene.urls')),
     path('api/', include('apps.strix_security.urls')),
     path('api/cicd/', include('apps.cicd.urls')),
     path('api/scheduler/', include('apps.scheduler.urls')),
+    path('api/knowledge-graph/', include('apps.knowledge_graph.urls')),
+    path('api/configuration/', include('apps.configuration.urls')),
 ]
 
 if settings.DEBUG:

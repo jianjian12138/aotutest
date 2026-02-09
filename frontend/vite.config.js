@@ -17,6 +17,8 @@ export default defineConfig({
         target: 'http://localhost:4545',
         changeOrigin: true,
         secure: false,
+        timeout: 60000,
+        proxyTimeout: 60000,
       },
       '^/media/': {
         target: 'http://localhost:4545',

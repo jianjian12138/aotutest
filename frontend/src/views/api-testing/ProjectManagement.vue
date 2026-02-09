@@ -239,7 +239,7 @@ import { ElMessage, ElMessageBox, ElDescriptions, ElDescriptionsItem } from 'ele
 import { Plus } from '@element-plus/icons-vue'
 import api from '@/utils/api'
 import dayjs from 'dayjs'
-import '@/assets/css/unified-styles.scss'
+import '@/assets/css/global.scss'
 
 const loading = ref(false)
 const projects = ref([])

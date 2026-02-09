@@ -15,24 +15,22 @@
         >
           <!-- AI用例生成模块菜单 -->
           <template v-if="currentModule === 'ai-generation'">
-            <el-sub-menu index="requirement">
-              <template #title>
-                <el-icon><MagicStick /></el-icon>
-                <span>智能用例生成</span>
-              </template>
-              <el-menu-item index="/ai-generation/requirement-analysis">
-                <el-icon><Edit /></el-icon>
-                <span>AI用例生成</span>
-              </el-menu-item>
-              <el-menu-item index="/ai-generation/generated-testcases">
-                <el-icon><List /></el-icon>
-                <span>AI生成用例记录</span>
-              </el-menu-item>
-              <el-menu-item index="/ai-generation/prompt-config">
-                <el-icon><Setting /></el-icon>
-                <span>提示词配置</span>
-              </el-menu-item>
-            </el-sub-menu>
+            <el-menu-item index="/ai-generation/requirements">
+              <el-icon><Document /></el-icon>
+              <span>需求管理</span>
+            </el-menu-item>
+            <el-menu-item index="/ai-generation/requirement-analysis">
+              <el-icon><MagicStick /></el-icon>
+              <span>智能用例生成</span>
+            </el-menu-item>
+            <el-menu-item index="/ai-generation/generated-testcases">
+              <el-icon><List /></el-icon>
+              <span>AI生成用例记录</span>
+            </el-menu-item>
+            <el-menu-item index="/ai-generation/prompt-config">
+              <el-icon><Setting /></el-icon>
+              <span>提示词配置</span>
+            </el-menu-item>
             <el-menu-item index="/ai-generation/projects">
               <el-icon><Folder /></el-icon>
               <span>项目管理</span>
@@ -41,32 +39,13 @@
               <el-icon><Document /></el-icon>
               <span>测试用例</span>
             </el-menu-item>
-            <el-menu-item index="/ai-generation/versions">
-              <el-icon><Flag /></el-icon>
-              <span>版本管理</span>
+            <el-menu-item index="/ai-generation/reviews">
+              <el-icon><Document /></el-icon>
+              <span>评审列表</span>
             </el-menu-item>
-            <el-sub-menu index="reviews">
-              <template #title>
-                <el-icon><Check /></el-icon>
-                <span>评审管理</span>
-              </template>
-              <el-menu-item index="/ai-generation/reviews">
-                <el-icon><Document /></el-icon>
-                <span>评审列表</span>
-              </el-menu-item>
-              <el-menu-item index="/ai-generation/review-templates">
-                <el-icon><DocumentCopy /></el-icon>
-                <span>评审模板</span>
-              </el-menu-item>
-            </el-sub-menu>
-
-            <el-menu-item index="/ai-generation/executions">
-              <el-icon><VideoPlay /></el-icon>
-              <span>测试计划</span>
-            </el-menu-item>
-            <el-menu-item index="/ai-generation/reports">
-              <el-icon><DataAnalysis /></el-icon>
-              <span>测试报告</span>
+            <el-menu-item index="/ai-generation/review-templates">
+              <el-icon><DocumentCopy /></el-icon>
+              <span>评审模板</span>
             </el-menu-item>
           </template>
 
@@ -83,6 +62,10 @@
             <el-menu-item index="/api-testing/interfaces">
               <el-icon><Link /></el-icon>
               <span>接口管理</span>
+            </el-menu-item>
+            <el-menu-item index="/api-testing/test-cases">
+              <el-icon><Document /></el-icon>
+              <span>用例管理</span>
             </el-menu-item>
             <el-menu-item index="/api-testing/automation">
               <el-icon><VideoPlay /></el-icon>
@@ -156,17 +139,13 @@
               <el-icon><Monitor /></el-icon>
               <span>设备管理</span>
             </el-menu-item>
+            <el-menu-item index="/ui-automation/agents">
+              <el-icon><Connection /></el-icon>
+              <span>节点管理</span>
+            </el-menu-item>
             <el-menu-item index="/ui-automation/debug-files">
               <el-icon><Folder /></el-icon>
               <span>调试文件</span>
-            </el-menu-item>
-            <el-menu-item index="/ui-automation/scheduled-tasks">
-              <el-icon><AlarmClock /></el-icon>
-              <span>定时任务</span>
-            </el-menu-item>
-            <el-menu-item index="/ui-automation/notification-logs">
-              <el-icon><Bell /></el-icon>
-              <span>通知列表</span>
             </el-menu-item>
           </template>
 
@@ -180,8 +159,16 @@
               <el-icon><Cellphone /></el-icon>
               <span>App 智能测试</span>
             </el-menu-item>
+            <el-menu-item index="/natural-language-testing/inspector">
+              <el-icon><Aim /></el-icon>
+              <span>智能元素侦测</span>
+            </el-menu-item>
+            <el-menu-item index="/natural-language-testing/api-testing">
+              <el-icon><Link /></el-icon>
+              <span>API 智能测试</span>
+            </el-menu-item>
             <el-menu-item index="/natural-language-testing/cases">
-              <el-icon><Document /></el-icon>
+              <el-icon><Collection /></el-icon>
               <span>智能用例管理</span>
             </el-menu-item>
             <el-menu-item index="/natural-language-testing/execution-records">
@@ -195,6 +182,14 @@
             <el-menu-item index="/configuration/ai-model">
               <el-icon><Cpu /></el-icon>
               <span>AI模型配置</span>
+            </el-menu-item>
+            <el-menu-item index="/configuration/parameters">
+              <el-icon><Operation /></el-icon>
+              <span>参数管理</span>
+            </el-menu-item>
+            <el-menu-item index="/configuration/common-methods">
+              <el-icon><MagicStick /></el-icon>
+              <span>公共方法管理</span>
             </el-menu-item>
             <el-menu-item index="/configuration/ui-env">
               <el-icon><Monitor /></el-icon>
@@ -220,6 +215,14 @@
               <el-icon><ChatDotRound /></el-icon>
               <span>工作流配置</span>
             </el-menu-item>
+            <el-menu-item index="/configuration/mcp">
+              <el-icon><Connection /></el-icon>
+              <span>MCP 管理</span>
+            </el-menu-item>
+            <el-menu-item index="/configuration/skills">
+              <el-icon><MagicStick /></el-icon>
+              <span>Skills 技能</span>
+            </el-menu-item>
             <el-menu-item index="/configuration/users">
               <el-icon><Document /></el-icon>
               <span>用户管理</span>
@@ -236,10 +239,6 @@
               <el-icon><ChatDotRound /></el-icon>
               <span>SQL生成</span>
             </el-menu-item>
-            <el-menu-item index="/data-factory/config">
-              <el-icon><Setting /></el-icon>
-              <span>配置管理</span>
-            </el-menu-item>
             <el-menu-item index="/data-factory/projects">
               <el-icon><Folder /></el-icon>
               <span>项目管理</span>
@@ -255,6 +254,10 @@
             <el-menu-item index="/data-factory/query-history">
               <el-icon><Timer /></el-icon>
               <span>查询历史</span>
+            </el-menu-item>
+            <el-menu-item index="/data-factory/data-generator">
+              <el-icon><MagicStick /></el-icon>
+              <span>测试数据助手</span>
             </el-menu-item>
           </template>
           
@@ -352,38 +355,6 @@
               <el-icon><Service /></el-icon>
               <span>AI 助手</span>
             </el-menu-item>
-            <el-menu-item index="/knowledge-graph/graph-viz">
-              <el-icon><Connection /></el-icon>
-              <span>图谱可视化</span>
-            </el-menu-item>
-          </template>
-          
-          <!-- WHartTest模块菜单 -->
-          <template v-else-if="currentModule === 'wharttest'">
-            <el-menu-item index="/wharttest/dashboard">
-              <el-icon><DataAnalysis /></el-icon>
-              <span>数据看板</span>
-            </el-menu-item>
-            <el-menu-item index="/wharttest/projects">
-              <el-icon><Folder /></el-icon>
-              <span>项目管理</span>
-            </el-menu-item>
-            <el-menu-item index="/wharttest/configs">
-              <el-icon><Setting /></el-icon>
-              <span>配置管理</span>
-            </el-menu-item>
-            <el-menu-item index="/wharttest/executions">
-              <el-icon><VideoPlay /></el-icon>
-              <span>执行管理</span>
-            </el-menu-item>
-            <el-menu-item index="/wharttest/tasks">
-              <el-icon><Document /></el-icon>
-              <span>任务管理</span>
-            </el-menu-item>
-            <el-menu-item index="/wharttest/integration-logs">
-              <el-icon><Timer /></el-icon>
-              <span>集成日志</span>
-            </el-menu-item>
           </template>
         </el-menu>
       </el-aside>
@@ -463,7 +434,6 @@ const currentModule = computed(() => {
   if (route.path.startsWith('/strix-security')) return 'strix-security'
   if (route.path.startsWith('/cicd')) return 'cicd'
   if (route.path.startsWith('/knowledge-graph')) return 'knowledge-graph'
-  if (route.path.startsWith('/wharttest')) return 'wharttest'
   return ''
 })
 
@@ -479,8 +449,7 @@ const moduleName = computed(() => {
     'midscene': '自然语言测试',
     'strix-security': '安全测试',
     'cicd': 'CI/CD管理',
-    'knowledge-graph': '知识图谱',
-    'wharttest': '智能化测试'
+    'knowledge-graph': '知识图谱'
   }
   return map[currentModule.value] || ''
 })
@@ -488,7 +457,8 @@ const moduleName = computed(() => {
 const breadcrumbTitle = computed(() => {
   const routeMap = {
     // 用例管理
-    '/ai-generation/requirement-analysis': 'AI用例生成',
+    '/ai-generation/requirements': '需求管理',
+    '/ai-generation/requirement-analysis': '智能用例生成',
     '/ai-generation/generated-testcases': 'AI生成用例记录',
     '/ai-generation/prompt-config': '提示词配置',
     '/ai-generation/projects': '项目管理',
@@ -504,6 +474,7 @@ const breadcrumbTitle = computed(() => {
     '/api-testing/dashboard': '数据看板',
     '/api-testing/projects': '项目管理',
     '/api-testing/interfaces': '接口管理',
+    '/api-testing/test-cases': '用例管理',
     '/api-testing/automation': '自动化测试',
     '/api-testing/history': '请求历史',
     '/api-testing/environments': '环境管理',
@@ -523,6 +494,7 @@ const breadcrumbTitle = computed(() => {
     '/ui-automation/executions': '执行记录',
     '/ui-automation/reports': '测试报告',
     '/ui-automation/devices': '设备管理',
+    '/ui-automation/agents': '节点管理',
     '/ui-automation/debug-files': '调试文件',
     '/ui-automation/scheduled-tasks': '定时任务',
     '/ui-automation/notification-logs': '通知列表',
@@ -541,11 +513,12 @@ const breadcrumbTitle = computed(() => {
     '/configuration/scheduled-tasks': '定时任务',
     '/configuration/notifications': '通知列表',
     '/configuration/dify': '工作流配置',
+    '/configuration/mcp': 'MCP 管理',
+    '/configuration/skills': 'Skills 技能',
     
     // 数据工厂
     '/data-factory/dashboard': '数据看板',
     '/data-factory/sql-generation': 'SQL生成',
-    '/data-factory/config': '配置管理',
     '/data-factory/projects': '项目管理',
     '/data-factory/saved-queries': '保存查询',
     '/data-factory/table-metadata': '表元数据',
@@ -579,14 +552,6 @@ const breadcrumbTitle = computed(() => {
     
     // 知识图谱
     '/knowledge-graph': '知识图谱',
-    
-    // WHartTest
-    '/wharttest/dashboard': '数据看板',
-    '/wharttest/projects': '项目管理',
-    '/wharttest/configs': '配置管理',
-    '/wharttest/executions': '执行管理',
-    '/wharttest/tasks': '任务管理',
-    '/wharttest/integration-logs': '集成日志',
     
     // 配置中心
     '/configuration/users': '用户管理',

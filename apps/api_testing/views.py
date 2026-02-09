@@ -26,10 +26,14 @@ from .models import (
     RequestHistory, TestSuite, TestExecution, TestSuiteRequest,
     ScheduledTask, TaskExecutionLog, NotificationConfig, NotificationLog,
     TaskNotificationSetting, OperationLog, ApiImportTask,
+    ApiTestCase, ApiTestCaseStep, ApiTestCaseExecution, TestSuiteTestCase
 )
+from apps.configuration.models import GlobalParameter
 
 from .serializers import (
     ApiProjectSerializer, ApiCollectionSerializer, ApiRequestSerializer,
+    ApiTestCaseSerializer, ApiTestCaseStepSerializer, ApiTestCaseExecutionSerializer,
+    TestSuiteTestCaseSerializer,
     EnvironmentSerializer, RequestHistorySerializer, TestSuiteSerializer,
     TestSuiteRequestSerializer, TestExecutionSerializer, UserSerializer,
     ScheduledTaskSerializer, TaskExecutionLogSerializer,
@@ -40,14 +44,8 @@ from .serializers import (
 
 logger = logging.getLogger(__name__)
 
-from .utils import execute_assertions
+from .utils import execute_assertions, execute_test_case
 from .operation_logger import log_operation
-from .serializers import (
-    ApiProjectSerializer, ApiCollectionSerializer, ApiRequestSerializer,
-    EnvironmentSerializer, RequestHistorySerializer, TestSuiteSerializer,
-    TestSuiteRequestSerializer, TestExecutionSerializer, UserSerializer,
-    ScheduledTaskSerializer, ScheduledTaskSerializer
-)
 
 User = get_user_model()
 
@@ -64,6 +62,7 @@ class ApiProjectViewSet(viewsets.ModelViewSet):
     queryset = ApiProject.objects.all()
     serializer_class = ApiProjectSerializer
     permission_classes = [IsAuthenticated]
+    pagination_class = StandardPagination
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['project_type', 'status', 'owner']
     search_fields = ['name', 'description']
@@ -940,6 +939,7 @@ class ApiCollectionViewSet(viewsets.ModelViewSet):
     queryset = ApiCollection.objects.all()
     serializer_class = ApiCollectionSerializer
     permission_classes = [IsAuthenticated]
+    pagination_class = StandardPagination
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['project', 'parent']
     
@@ -989,9 +989,12 @@ class ApiRequestViewSet(viewsets.ModelViewSet):
     queryset = ApiRequest.objects.all()
     serializer_class = ApiRequestSerializer
     permission_classes = [IsAuthenticated]
+    pagination_class = StandardPagination
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
     filterset_fields = ['collection', 'method', 'request_type', 'collection__project']
     search_fields = ['name', 'url']
+    ordering_fields = ['name', 'url', 'created_at']
+    ordering = ['-created_at']
     
     def get_queryset(self):
         user = self.request.user
@@ -1049,17 +1052,39 @@ class ApiRequestViewSet(viewsets.ModelViewSet):
         engine = request.data.get('engine', 'requests')
         
         if engine == 'httprunner':
-            return Response(
-                {'error': '后端环境尚未安装或配置 HttpRunner 引擎，目前仅支持 Requests 引擎。请联系管理员安装相关依赖。'}, 
-                status=status.HTTP_501_NOT_IMPLEMENTED
-            )
+            from .utils import execute_api_request_httprunner
+            try:
+                environment = None
+                if environment_id:
+                    try:
+                        environment = Environment.objects.get(id=environment_id)
+                    except Environment.DoesNotExist:
+                        pass
+                
+                result = execute_api_request_httprunner(api_request, environment, request.user)
+                
+                if result.get('success'):
+                    return Response(result)
+                else:
+                    return Response(result, status=status.HTTP_400_BAD_REQUEST)
+            except Exception as e:
+                return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
         try:
             # 解析环境变量
             variables = {}
             if environment_id:
-                env = Environment.objects.get(id=environment_id)
-                variables.update(env.variables)
+                try:
+                    env = Environment.objects.get(id=environment_id)
+                    variables.update(env.variables)
+                except Environment.DoesNotExist:
+                    pass
+            
+            # 获取全局参数作为兜底
+            global_params = GlobalParameter.objects.all()
+            for param in global_params:
+                if param.key not in variables:
+                    variables[param.key] = param.value
             
             # 替换URL中的变量
             url = self._replace_variables(api_request.url or '', variables)
@@ -1126,7 +1151,8 @@ class ApiRequestViewSet(viewsets.ModelViewSet):
                 response_data={
                     'headers': dict(response.headers),
                     'body': response.text,
-                    'json': response.json() if response.headers.get('content-type', '').startswith('application/json') else None
+                    'json': response.json() if response.headers.get('content-type', '').startswith('application/json') else None,
+                    'size': len(response.content)
                 },
                 status_code=response.status_code,
                 response_time=response_time,
@@ -1266,6 +1292,110 @@ class EnvironmentViewSet(viewsets.ModelViewSet):
         instance.delete()
 
 
+class ApiTestCaseViewSet(viewsets.ModelViewSet):
+    queryset = ApiTestCase.objects.all()
+    serializer_class = ApiTestCaseSerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['project', 'status', 'priority']
+    search_fields = ['name', 'description']
+    ordering_fields = ['created_at', 'updated_at', 'priority']
+    ordering = ['-created_at']
+    
+    def get_queryset(self):
+        user = self.request.user
+        return ApiTestCase.objects.filter(
+            project__in=ApiProject.objects.filter(
+                models.Q(owner=user) | models.Q(members=user)
+            )
+        ).distinct()
+        
+    def perform_create(self, serializer):
+        serializer.save(created_by=self.request.user)
+        
+    def perform_update(self, serializer):
+        serializer.save()
+
+    @action(detail=True, methods=['get'], url_path='latest-execution')
+    def get_latest_execution(self, request, pk=None):
+        """获取用例最新的执行结果"""
+        test_case = self.get_object()
+        execution = ApiTestCaseExecution.objects.filter(test_case=test_case).first()
+        if execution:
+            return Response(ApiTestCaseExecutionSerializer(execution).data)
+        return Response(None)
+
+    @action(detail=True, methods=['get'], url_path='executions')
+    def get_executions(self, request, pk=None):
+        """获取用例的执行历史"""
+        test_case = self.get_object()
+        executions = ApiTestCaseExecution.objects.filter(test_case=test_case).order_by('-created_at')[:20]
+        return Response(ApiTestCaseExecutionSerializer(executions, many=True).data)
+
+    @action(detail=True, methods=['post'])
+    def execute(self, request, pk=None):
+        """执行测试用例"""
+        test_case = self.get_object()
+        environment_id = request.data.get('environment_id')
+        engine = request.data.get('engine', 'requests')
+        
+        if engine == 'httprunner':
+            # 使用HttpRunner执行
+            from .utils import execute_test_case_httprunner
+            try:
+                environment = None
+                if environment_id:
+                    try:
+                        environment = Environment.objects.get(id=environment_id)
+                    except Environment.DoesNotExist:
+                        pass
+                
+                result = execute_test_case_httprunner(test_case, environment, request.user)
+                
+                if result.get('success'):
+                    return Response(result)
+                else:
+                    return Response(result, status=status.HTTP_400_BAD_REQUEST)
+            except Exception as e:
+                return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+        try:
+            environment = None
+            if environment_id:
+                try:
+                    environment = Environment.objects.get(id=environment_id)
+                except Environment.DoesNotExist:
+                    pass
+            
+            result = execute_test_case(test_case, environment, request.user)
+            
+            if result.get('success'):
+                return Response(result)
+            else:
+                return Response(result, status=status.HTTP_400_BAD_REQUEST)
+                
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class ApiTestCaseStepViewSet(viewsets.ModelViewSet):
+    queryset = ApiTestCaseStep.objects.all()
+    serializer_class = ApiTestCaseStepSerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ['test_case']
+    ordering = ['step_number']
+
+
+class TestSuiteTestCaseViewSet(viewsets.ModelViewSet):
+    queryset = TestSuiteTestCase.objects.all()
+    serializer_class = TestSuiteTestCaseSerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ['test_suite']
+    ordering = ['order']
+
+
 class RequestHistoryViewSet(viewsets.ModelViewSet):
     queryset = RequestHistory.objects.all()
     serializer_class = RequestHistorySerializer
@@ -1333,148 +1463,57 @@ class TestSuiteViewSet(viewsets.ModelViewSet):
                 executed_by=request.user
             )
             
-            # 获取套件中的请求
-            suite_requests = TestSuiteRequest.objects.filter(
+            # 获取套件中的测试用例
+            suite_test_cases = TestSuiteTestCase.objects.filter(
                 test_suite=test_suite,
                 enabled=True
             ).order_by('order')
             
-            execution.total_requests = suite_requests.count()
+            # 如果没有测试用例，尝试执行旧的请求关联（向前兼容）
+            if not suite_test_cases.exists():
+                return self._execute_deprecated_requests(test_suite, execution, request.user)
+            
+            execution.total_requests = 0 # 统计总步数
             execution.save()
             
             results = []
             passed_count = 0
             failed_count = 0
             
-            # 执行每个请求
-            for suite_request in suite_requests:
-                api_request = suite_request.request
+            from .utils import execute_test_case
+            
+            # 执行每个测试用例
+            for suite_tc in suite_test_cases:
+                test_case = suite_tc.test_case
                 
                 try:
-                    # 解析环境变量
-                    variables = {}
-                    if test_suite.environment:
-                        variables.update(test_suite.environment.variables)
+                    # 执行单个测试用例
+                    case_result = execute_test_case(test_case, test_suite.environment, request.user)
                     
-                    # 替换URL中的变量
-                    url = self._replace_variables(api_request.url, variables)
+                    execution.total_requests += case_result.get('total_steps', 0)
                     
-                    # 准备请求头
-                    headers = {}
-                    # 支持新的数组格式和旧的对象格式
-                    if isinstance(api_request.headers, list):
-                        # 新的数组格式 [{"key": "Authorization", "value": "Bearer {{token}}", "enabled": true, "description": "..."}]
-                        for header_item in api_request.headers:
-                            if header_item.get('enabled', True) and header_item.get('key'):
-                                key = header_item['key']
-                                value = self._replace_variables(str(header_item.get('value', '')), variables)
-                                headers[key] = value
-                    else:
-                        # 旧的对象格式 {"Authorization": "Bearer {{token}}"}
-                        headers = api_request.headers.copy()
-                        for key, value in headers.items():
-                            headers[key] = self._replace_variables(str(value), variables)
-                    
-                    params = api_request.params.copy()
-                    for key, value in params.items():
-                        params[key] = self._replace_variables(str(value), variables)
-                    
-                    body_data = None
-                    if api_request.body and api_request.method in ['POST', 'PUT', 'PATCH']:
-                        if api_request.body.get('type') == 'json':
-                            body_data = api_request.body.get('data', {})
-                            body_data = self._replace_variables_in_dict(body_data, variables)
-                    
-                    # 执行请求
-                    start_time = time.time()
-                    response = requests.request(
-                        method=api_request.method,
-                        url=url,
-                        headers=headers,
-                        params=params,
-                        json=body_data,
-                        timeout=30
-                    )
-                    end_time = time.time()
-                    response_time = (end_time - start_time) * 1000
-                    
-                    # 执行断言验证
-                    assertions = api_request.assertions or []
-                    # 添加响应时间到断言中
-                    for assertion in assertions:
-                        if assertion.get('type') == 'response_time':
-                            assertion['actual_time'] = response_time
-                    
-                    # 使用共享的断言执行方法
-                    assertions_results = execute_assertions(response, assertions)
-                    
-                    # 检查所有断言是否通过
-                    passed = True
-                    error_message = ''
-                    
-                    # 检查套件请求的断言
-                    for assertion in suite_request.assertions:
-                        # 简单的状态码断言
-                        if assertion.get('type') == 'status_code':
-                            expected = assertion.get('value')
-                            if response.status_code != expected:
-                                passed = False
-                                error_message = f'状态码断言失败: 期望 {expected}, 实际 {response.status_code}'
-                                break
-                    
-                    # 检查接口自身的断言
-                    if passed and assertions_results:
-                        for assertion_result in assertions_results:
-                            if not assertion_result.get('passed', True):
-                                passed = False
-                                error_message = f"断言失败: {assertion_result.get('name', '未命名断言')} - {assertion_result.get('error', '断言不通过')}"
-                                break
-                    
-                    if passed:
-                        passed_count += 1
-                    else:
-                        failed_count += 1
+                    passed_count += case_result.get('passed_steps', 0)
+                    failed_count += case_result.get('failed_steps', 0)
                     
                     results.append({
-                        'name': api_request.name,
-                        'method': api_request.method,
-                        'url': url,
-                        'status_code': response.status_code,
-                        'response_time': response_time,
-                        'passed': passed,
-                        'error': error_message,
-                        'assertions_results': assertions_results
+                        'type': 'test_case',
+                        'id': test_case.id,
+                        'name': test_case.name,
+                        'status': case_result.get('status'),
+                        'passed_count': case_result.get('passed_steps', 0),
+                        'failed_count': case_result.get('failed_steps', 0),
+                        'total_count': case_result.get('total_steps', 0),
+                        'execution_time': case_result.get('execution_time', 0),
+                        'results': case_result.get('results', [])
                     })
-                    
-                    # 保存请求历史
-                    RequestHistory.objects.create(
-                        request=api_request,
-                        environment=test_suite.environment,
-                        request_data={
-                            'url': url,
-                            'method': api_request.method,
-                            'headers': headers,
-                            'params': params,
-                            'body': body_data
-                        },
-                        response_data={
-                            'headers': dict(response.headers),
-                            'body': response.text,
-                            'json': response.json() if response.headers.get('content-type', '').startswith('application/json') else None
-                        },
-                        status_code=response.status_code,
-                        response_time=response_time,
-                        assertions_results=assertions_results,
-                        executed_by=request.user
-                    )
                     
                 except Exception as e:
                     failed_count += 1
                     results.append({
-                        'name': api_request.name,
-                        'method': api_request.method,
-                        'url': api_request.url,
-                        'passed': False,
+                        'type': 'test_case',
+                        'id': test_case.id,
+                        'name': test_case.name,
+                        'status': 'error',
                         'error': str(e)
                     })
             
@@ -1498,9 +1537,10 @@ class TestSuiteViewSet(viewsets.ModelViewSet):
             return Response(TestExecutionSerializer(execution).data)
             
         except Exception as e:
-            execution.status = 'FAILED'
-            execution.end_time = timezone.now()
-            execution.save()
+            if 'execution' in locals():
+                execution.status = 'FAILED'
+                execution.end_time = timezone.now()
+                execution.save()
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
     def perform_create(self, serializer):
@@ -1536,22 +1576,21 @@ class TestSuiteViewSet(viewsets.ModelViewSet):
         )
         instance.delete()
 
-    @action(detail=True, methods=['post'], url_path='add-requests')
-    def add_requests(self, request, pk=None):
-        """添加请求到测试套件"""
+    @action(detail=True, methods=['post'], url_path='add-test-cases')
+    def add_test_cases(self, request, pk=None):
+        """添加测试用例到测试套件"""
         test_suite = self.get_object()
-        request_ids = request.data.get('request_ids', [])
+        test_case_ids = request.data.get('test_case_ids', [])
         
         try:
-            for request_id in request_ids:
-                api_request = ApiRequest.objects.get(id=request_id)
-                TestSuiteRequest.objects.get_or_create(
+            for tc_id in test_case_ids:
+                test_case = ApiTestCase.objects.get(id=tc_id)
+                TestSuiteTestCase.objects.get_or_create(
                     test_suite=test_suite,
-                    request=api_request,
+                    test_case=test_case,
                     defaults={
-                        'order': TestSuiteRequest.objects.filter(test_suite=test_suite).count(),
-                        'enabled': True,
-                        'assertions': []
+                        'order': TestSuiteTestCase.objects.filter(test_suite=test_suite).count(),
+                        'enabled': True
                     }
                 )
             
@@ -1969,16 +2008,37 @@ class TestExecutionViewSet(viewsets.ReadOnlyModelViewSet):
             # 添加测试结果列表
             if execution.results:
                 for i, result in enumerate(execution.results):
-                    result_class = "passed" if result.get('passed', False) else "failed"
-                    method_class = f"method-{result.get('method', 'GET').lower()}"
+                    # Check if this is a test case result (new format) or a simple request result (old format)
+                    is_test_case = result.get('type') == 'test_case'
+                    
+                    if is_test_case:
+                        is_passed = result.get('status') == 'passed'
+                        result_class = "passed" if is_passed else "failed"
+                        method_class = "method-post"  # Use green for test case
+                        method_name = "CASE"
+                        name = result.get('name', f'测试用例 {i+1}')
+                        # Show passed/failed count for test case
+                        passed_count = result.get('passed_count', 0)
+                        failed_count = result.get('failed_count', 0)
+                        url = f"Steps: {len(result.get('results', []))} (Passed: {passed_count}, Failed: {failed_count})"
+                        status_text = '通过' if is_passed else '失败'
+                    else:
+                        is_passed = result.get('passed', False)
+                        result_class = "passed" if is_passed else "failed"
+                        method_class = f"method-{result.get('method', 'GET').lower()}"
+                        method_name = result.get('method', 'GET')
+                        name = result.get('name', f'测试请求 {i+1}')
+                        url = result.get('url', '')
+                        status_text = '通过' if is_passed else '失败'
+
                     index_content += f"""
             <div class="test-result-item {result_class}">
                 <div class="test-header">
-                    <span class="test-method {method_class}">{result.get('method', 'GET')}</span>
-                    <span class="test-name">{result.get('name', f'测试请求 {i+1}')}</span>
+                    <span class="test-method {method_class}">{method_name}</span>
+                    <span class="test-name">{name}</span>
                 </div>
-                <div class="test-url">{result.get('url', '')}</div>
-                <div><strong>状态:</strong> {'通过' if result.get('passed', False) else '失败'}</div>
+                <div class="test-url">{url}</div>
+                <div><strong>状态:</strong> {status_text}</div>
                 {f'<div class="test-error"><strong>错误:</strong> {result.get("error", "")}</div>' if result.get('error') else ""}
             </div>
 """
@@ -2026,14 +2086,61 @@ class TestExecutionViewSet(viewsets.ReadOnlyModelViewSet):
         # 只生成每个测试请求的结果文件，不生成测试套件的结果文件
         if execution.results:
             for i, result in enumerate(execution.results):
+                # Check if this is a test case result (new format) or a simple request result (old format)
+                is_test_case = result.get('type') == 'test_case'
+                
+                if is_test_case:
+                    status_str = "passed" if result.get('status') == 'passed' else "failed"
+                    description = f"Test Case: {result.get('name')}"
+                    steps_data = []
+                    
+                    # Convert test case steps to Allure steps
+                    for step_idx, step in enumerate(result.get('results', [])):
+                        step_status = "passed" if step.get('passed', False) else "failed"
+                        steps_data.append({
+                            "name": step.get('name', f"Step {step_idx + 1}"),
+                            "status": step_status,
+                            "stage": "finished",
+                            "start": int(time.time() * 1000) - 500,  # Approximate time
+                            "stop": int(time.time() * 1000),
+                            "parameters": [
+                                {"name": "method", "value": step.get('method', 'GET')},
+                                {"name": "url", "value": step.get('url', '')},
+                                {"name": "status_code", "value": str(step.get('status_code', ''))}
+                            ],
+                            "steps": []
+                        })
+                else:
+                    # Old format (deprecated)
+                    status_str = "passed" if result.get('passed', False) else "failed"
+                    description = f"Method: {result.get('method', 'GET')}\nURL: {result.get('url', '')}"
+                    steps_data = [
+                        {
+                            "name": "发送请求",
+                            "status": "passed",
+                            "stage": "finished",
+                            "start": int(time.time() * 1000) - 1000,
+                            "stop": int(time.time() * 1000) - 500,
+                            "steps": []
+                        },
+                        {
+                            "name": "验证响应",
+                            "status": status_str,
+                            "stage": "finished",
+                            "start": int(time.time() * 1000) - 500,
+                            "stop": int(time.time() * 1000),
+                            "steps": []
+                        }
+                    ]
+
                 request_result = {
                     "uuid": f"{execution.id}-{i}",
                     "name": result.get('name', f'测试请求 {i+1}'),
-                    "status": "passed" if result.get('passed', False) else "failed",
+                    "status": status_str,
                     "stage": "finished",
                     "start": int(time.time() * 1000) - 1000,  # 模拟开始时间
                     "stop": int(time.time() * 1000),  # 模拟结束时间
-                    "description": f"Method: {result.get('method', 'GET')}\nURL: {result.get('url', '')}",
+                    "description": description,
                     "historyId": f"{execution.test_suite.id}-{i}",
                     "fullName": f"{execution.test_suite.name} / {result.get('name', f'请求 {i+1}')}",
                     "links": [],
@@ -2047,24 +2154,7 @@ class TestExecutionViewSet(viewsets.ReadOnlyModelViewSet):
                         {"name": "method", "value": result.get('method', 'GET')},
                         {"name": "url", "value": result.get('url', '')}
                     ],
-                    "steps": [
-                        {
-                            "name": "发送请求",
-                            "status": "passed",
-                            "stage": "finished",
-                            "start": int(time.time() * 1000) - 1000,
-                            "stop": int(time.time() * 1000) - 500,
-                            "steps": []
-                        },
-                        {
-                            "name": "验证响应",
-                            "status": "passed" if result.get('passed', False) else "failed",
-                            "stage": "finished",
-                            "start": int(time.time() * 1000) - 500,
-                            "stop": int(time.time() * 1000),
-                            "steps": []
-                        }
-                    ]
+                    "steps": steps_data
                 }
                 
                 # 添加错误信息（如果有的话）
@@ -2399,9 +2489,10 @@ class ScheduledTaskViewSet(viewsets.ModelViewSet):
             has_config = notification_config is not None
             has_custom_bots = bool(notification_setting.custom_webhook_bots)
             has_custom_recipients = notification_setting.custom_recipients.exists()
+            has_task_emails = hasattr(task, 'notify_emails') and bool(task.notify_emails)
             
-            if not (has_config or has_custom_bots or has_custom_recipients):
-                logger.warning("没有找到通知配置且无自定义设置")
+            if not (has_config or has_custom_bots or has_custom_recipients or has_task_emails):
+                logger.warning("没有找到通知配置且无自定义设置（任务邮箱列表也为空）")
                 return
 
             if notification_config:
@@ -2925,35 +3016,70 @@ class ApiDashboardViewSet(viewsets.ViewSet):
     @action(detail=False, methods=['get'])
     def stats(self, request):
         """获取仪表盘统计数据"""
-        user = request.user
-        
-        # 获取用户可访问的项目ID列表
-        accessible_projects = ApiProject.objects.filter(
-            models.Q(owner=user) | models.Q(members=user)
+        try:
+            user = request.user
+            
+            # 获取用户可访问的项目ID列表
+            accessible_projects = ApiProject.objects.filter(
+                models.Q(owner=user) | models.Q(members=user)
+            ).distinct()
+            project_ids = accessible_projects.values_list('id', flat=True)
+
+            # 统计数据
+            project_count = accessible_projects.count()
+            
+            # 接口数量 (通过项目关联)
+            interface_count = ApiRequest.objects.filter(
+                collection__project_id__in=project_ids
+            ).count()
+            
+            # 测试套件数量
+            suite_count = TestSuite.objects.filter(
+                project_id__in=project_ids
+            ).count()
+            
+            # 执行记录数量 (包括单次请求历史和测试用例执行记录)
+            request_history_count = RequestHistory.objects.filter(
+                request__collection__project_id__in=project_ids
+            ).count()
+            
+            case_execution_count = ApiTestCaseExecution.objects.filter(
+                test_case__project_id__in=project_ids
+            ).count()
+            
+            history_count = request_history_count + case_execution_count
+
+            return Response({
+                'project_count': project_count,
+                'interface_count': interface_count,
+                'suite_count': suite_count,
+                'history_count': history_count
+            })
+        except Exception as e:
+            import traceback
+            print(f"Error in ApiDashboardViewSet.stats: {str(e)}")
+            traceback.print_exc()
+            return Response({
+                'project_count': 0,
+                'interface_count': 0,
+                'suite_count': 0,
+                'history_count': 0
+            }, status=200)
+
+
+class ApiTestCaseExecutionViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = ApiTestCaseExecution.objects.all()
+    serializer_class = ApiTestCaseExecutionSerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
+    filterset_fields = ['test_case', 'status']
+    ordering = ['-created_at']
+    pagination_class = StandardPagination
+
+    def get_queryset(self):
+        user = self.request.user
+        return ApiTestCaseExecution.objects.filter(
+            test_case__project__in=ApiProject.objects.filter(
+                models.Q(owner=user) | models.Q(members=user)
+            )
         ).distinct()
-        project_ids = accessible_projects.values_list('id', flat=True)
-
-        # 统计数据
-        project_count = accessible_projects.count()
-        
-        # 接口数量 (通过项目关联)
-        interface_count = ApiRequest.objects.filter(
-            collection__project_id__in=project_ids
-        ).count()
-        
-        # 测试套件数量
-        suite_count = TestSuite.objects.filter(
-            project_id__in=project_ids
-        ).count()
-        
-        # 执行记录数量 (仅统计当前用户有权访问的)
-        history_count = RequestHistory.objects.filter(
-            request__collection__project_id__in=project_ids
-        ).count()
-
-        return Response({
-            'project_count': project_count,
-            'interface_count': interface_count,
-            'suite_count': suite_count,
-            'history_count': history_count
-        })

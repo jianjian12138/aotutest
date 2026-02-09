@@ -333,6 +333,9 @@ class ScriptStep(models.Model):
         ('NAVIGATE', '导航'),
         ('SCREENSHOT', '截图'),
         ('SWITCH_TAB', '切换标签页'),
+        ('AI_ACT', 'AI操作(Stagehand)'),
+        ('AI_EXTRACT', 'AI提取(Stagehand)'),
+        ('AI_VISION', 'AI视觉操作(Magnitude)'),
         ('CUSTOM', '自定义'),
     ]
 
@@ -545,6 +548,7 @@ class TestEnvironment(models.Model):
     os_type = models.CharField(max_length=50, blank=True, verbose_name='操作系统')
     os_version = models.CharField(max_length=50, blank=True, verbose_name='操作系统版本')
     capabilities = models.JSONField(blank=True, null=True, verbose_name='浏览器能力配置')
+    browser_configs = models.JSONField(default=list, blank=True, verbose_name='多浏览器配置', help_text='支持多浏览器并行执行，例如 ["chromium", "firefox"]')
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='创建时间')
     updated_at = models.DateTimeField(auto_now=True, verbose_name='更新时间')
 
@@ -624,6 +628,10 @@ class TestCaseStep(models.Model):
         ('assert', '断言'),
         ('wait', '等待'),
         ('switchTab', '切换标签页'),
+        ('ai_act', 'AI智能操作'),
+        ('ai_extract', 'AI智能提取'),
+        ('ai_vision', 'AI视觉操作(Magnitude)'),
+        ('custom', '自定义'),
     ]
 
     ASSERT_TYPE_CHOICES = [
@@ -1063,7 +1071,7 @@ class AICase(models.Model):
     name = models.CharField(max_length=200, verbose_name='用例名称')
     description = models.TextField(blank=True, null=True, verbose_name='描述')
     task_description = models.TextField(verbose_name='任务描述', help_text='自然语言任务描述')
-    execution_mode = models.CharField(max_length=20, choices=[('web', 'Web'), ('mobile', 'Mobile')], default='web', verbose_name='执行模式')
+    execution_mode = models.CharField(max_length=20, choices=[('web', 'Web'), ('mobile', 'Mobile'), ('api', 'API')], default='web', verbose_name='执行模式')
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='创建时间')
     updated_at = models.DateTimeField(auto_now=True, verbose_name='更新时间')
     created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, verbose_name='创建者')
@@ -1111,6 +1119,40 @@ class AIExecutionRecord(models.Model):
 
     def __str__(self):
         return f"{self.case_name} - {self.get_status_display()}"
+
+
+class ExecutionNode(models.Model):
+    """执行节点模型 (Agent)"""
+    STATUS_CHOICES = [
+        ('online', '在线'),
+        ('offline', '离线'),
+        ('busy', '忙碌'),
+    ]
+
+    NODE_TYPE_CHOICES = [
+        ('execution', '执行节点'),
+        ('recorder', '录制节点'),
+    ]
+
+    name = models.CharField(max_length=200, verbose_name='节点名称')
+    token = models.CharField(max_length=100, unique=True, verbose_name='认证令牌')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='offline', verbose_name='状态')
+    node_type = models.CharField(max_length=20, choices=NODE_TYPE_CHOICES, default='execution', verbose_name='节点类型')
+    ip_address = models.GenericIPAddressField(null=True, blank=True, verbose_name='IP地址')
+    last_heartbeat = models.DateTimeField(null=True, blank=True, verbose_name='最后心跳时间')
+    capabilities = models.JSONField(default=dict, blank=True, verbose_name='能力配置')
+    
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='创建时间')
+    updated_at = models.DateTimeField(auto_now=True, verbose_name='更新时间')
+
+    class Meta:
+        db_table = 'ui_execution_nodes'
+        verbose_name = '执行节点'
+        verbose_name_plural = '执行节点'
+        ordering = ['-last_heartbeat']
+
+    def __str__(self):
+        return f"{self.name} ({self.get_status_display()})"
 
 
 class UiDevice(models.Model):

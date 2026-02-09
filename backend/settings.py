@@ -53,12 +53,12 @@ LOCAL_APPS = [
     'apps.ui_automation.apps.UiAutomationConfig',
     'apps.data_factory',
     'apps.performance_test',
-    'apps.wharttest',
     'apps.midscene',
     'apps.strix_security',
     'apps.cicd',
     'apps.knowledge_graph',
     'apps.scheduler',
+    'apps.configuration',
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -235,7 +235,7 @@ CSRF_TRUSTED_ORIGINS = [
 
 # Spectacular Settings
 SPECTACULAR_SETTINGS = {
-    'TITLE': 'TestHub API',
+    'TITLE': 'Testing API',
     'DESCRIPTION': 'Test Case Management Platform API',
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,
@@ -271,24 +271,28 @@ CELERY_TASK_SOFT_TIME_LIMIT = 25 * 60  # 软超时时间(秒) - 25分钟
 CELERY_WORKER_PREFETCH_MULTIPLIER = 1  # Worker预取任务数量
 CELERY_WORKER_MAX_TASKS_PER_CHILD = 1000  # Worker执行多少任务后重启
 
-# Email Configuration
+# 邮件配置（可选）
 EMAIL_BACKEND = 'apps.api_testing.custom_email_backend.CustomEmailBackend'
-EMAIL_HOST = config('EMAIL_HOST', default='smtp.gmail.com')
-EMAIL_PORT = config('EMAIL_PORT', default=587, cast=int)
-EMAIL_USE_TLS = config('EMAIL_USE_TLS', default=True, cast=bool)
-EMAIL_USE_SSL = config('EMAIL_USE_SSL', default=False, cast=bool)
-EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
-EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
-DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='webmaster@localhost')
+EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.163.com')
+EMAIL_PORT = int(os.getenv('EMAIL_PORT', 465))
+EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True') == 'True'
+EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', EMAIL_HOST_USER)
 
-# For 163 email with SSL, you might need this setting
-EMAIL_TIMEOUT = 30
+# Celery Configuration
+CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', 'redis://localhost:6379/0')
+CELERY_RESULT_BACKEND = os.getenv('CELERY_RESULT_BACKEND', 'redis://localhost:6379/0')
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = TIME_ZONE
 
 # 确保日志目录存在
 log_dir = os.path.join(BASE_DIR, 'logs')
 os.makedirs(log_dir, exist_ok=True)
 
-# Logging
+# Logging Configuration
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,

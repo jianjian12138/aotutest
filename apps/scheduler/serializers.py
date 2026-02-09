@@ -4,6 +4,7 @@ from apps.projects.models import Project
 
 class NotificationConfigSerializer(serializers.ModelSerializer):
     created_by_name = serializers.CharField(source='created_by.username', read_only=True)
+    api_project_name = serializers.CharField(source='api_project.name', read_only=True, allow_null=True)
     
     class Meta:
         model = NotificationConfig
@@ -12,7 +13,8 @@ class NotificationConfigSerializer(serializers.ModelSerializer):
 
 class ScheduledTaskSerializer(serializers.ModelSerializer):
     created_by_name = serializers.CharField(source='created_by.username', read_only=True)
-    project_name = serializers.CharField(source='project.name', read_only=True)
+    project_name = serializers.CharField(source='project.name', read_only=True, allow_null=True)
+    api_project_name = serializers.CharField(source='api_project.name', read_only=True, allow_null=True)
     notification_config_name = serializers.CharField(source='notification_config.name', read_only=True, allow_null=True)
     
     # Target names for display

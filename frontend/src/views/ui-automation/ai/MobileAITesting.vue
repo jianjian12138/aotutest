@@ -3,6 +3,11 @@
     <div class="page-header">
       <h1 class="page-title">AI 智能测试实验室</h1>
       <div class="header-controls">
+        <el-radio-group v-model="activeTab" style="margin-right: 20px" v-if="false">
+            <el-radio-button label="app">App 智能测试</el-radio-button>
+            <el-radio-button label="web">Web 智能测试</el-radio-button>
+        </el-radio-group>
+
         <el-select v-model="projectId" placeholder="选择项目" style="width: 200px" @change="onProjectChange">
           <el-option v-for="project in projects" :key="project?.id" :label="project?.name" :value="project?.id" />
         </el-select>
@@ -135,12 +140,30 @@
                   />
                 </el-form-item>
 
+                <el-form-item label="参考图片 (可选)">
+                  <el-upload
+                    class="upload-demo"
+                    drag
+                    action="#"
+                    :auto-upload="false"
+                    :limit="1"
+                    :on-change="(file) => webTaskForm.referenceImage = file.raw"
+                    :on-remove="() => webTaskForm.referenceImage = null"
+                    list-type="picture"
+                  >
+                    <el-icon class="el-icon--upload"><UploadFilled /></el-icon>
+                    <div class="el-upload__text">
+                      将文件拖到此处或 <em>点击上传</em>
+                    </div>
+                  </el-upload>
+                </el-form-item>
+
                 <el-row :gutter="20">
                     <el-col :span="12">
-                         <el-form-item label="执行浏览器">
-                            <el-select v-model="webTaskForm.browserType" style="width: 100%">
-                                <el-option label="Google Chrome" value="chrome" />
-                                <el-option label="Microsoft Edge" value="edge" />
+                         <el-form-item label="执行模式">
+                            <el-select v-model="webTaskForm.executionMode" style="width: 100%" @change="handleWebModeChange">
+                                <el-option label="Vision Web (多模态视觉)" value="vision_web" />
+                                <el-option label="Standard Web (文本生成脚本)" value="text" />
                             </el-select>
                         </el-form-item>
                     </el-col>
@@ -209,15 +232,29 @@
               </el-form>
               
               <el-alert
-                title="Browser Use 模式提示"
+                v-if="webTaskForm.executionMode === 'vision_web'"
+                title="Vision Web 模式 (实验性)"
+                type="success"
+                :closable="false"
+                style="margin-top: 20px;"
+                show-icon
+              >
+                <template #default>
+                  <div>使用多模态大模型 (Vision LLM) 实时理解页面截图并执行操作。</div>
+                  <div>适合复杂动态页面、Canvas 游戏或非标准控件。</div>
+                </template>
+              </el-alert>
+              <el-alert
+                v-else
+                title="Browser Use 模式"
                 type="info"
                 :closable="false"
                 style="margin-top: 20px;"
                 show-icon
               >
                 <template #default>
-                  <div>Web 模式使用 Browser Use 框架控制 Chrome 浏览器。</div>
-                  <div>请确保服务器已安装 `browser_use` 和 `playwright` 依赖。</div>
+                  <div>通过 LLM 将自然语言转换为 Playwright 脚本执行。</div>
+                  <div>适合标准 Web 应用，执行速度快。</div>
                 </template>
               </el-alert>
               
@@ -278,6 +315,12 @@
         <el-form-item label="用例描述">
           <el-input v-model="saveCaseForm.description" type="textarea" :rows="3" />
         </el-form-item>
+        <el-form-item>
+          <el-checkbox v-model="saveCaseForm.save_as_script">同时保存为 UI 自动化脚本 (Playwright)</el-checkbox>
+          <div class="form-tip">
+            勾选后，系统将自动把自然语言描述转换为 Playwright Python 代码。
+          </div>
+        </el-form-item>
       </el-form>
       <template #footer>
         <span class="dialog-footer">
@@ -293,7 +336,7 @@
 import { ref, reactive, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { Cellphone, SwitchButton, VideoPlay, CircleCheckFilled, CircleCheck, Loading, DocumentAdd } from '@element-plus/icons-vue'
+import { Cellphone, SwitchButton, VideoPlay, CircleCheckFilled, CircleCheck, Loading, DocumentAdd, UploadFilled, Search } from '@element-plus/icons-vue'
 import request from '@/utils/api' // 直接使用 request 实例
 import { 
   getUiProjects, 
@@ -331,7 +374,8 @@ const savingCase = ref(false)
 const saveCaseForm = reactive({
   name: '',
   project: '',
-  description: ''
+  description: '',
+  save_as_script: false
 })
 
 const appTaskForm = reactive({
@@ -341,7 +385,9 @@ const appTaskForm = reactive({
 const webTaskForm = reactive({
   description: '',
   browserType: 'chrome',
+  executionMode: 'text', // text, vision_web
   enableGif: true,
+  referenceImage: null,
   gifParams: {
     frameRate: '15',
     resolution: '1280x720',
@@ -349,6 +395,14 @@ const webTaskForm = reactive({
     maxDuration: 30
   }
 })
+
+const handleWebModeChange = (val) => {
+    // 切换模式时自动选择合适的模型
+    if (val === 'vision_web') {
+        const match = modelConfigs.value.find(c => c.model_type.includes('gpt-4') || c.model_type.includes('claude-3') || c.name.toLowerCase().includes('vision'))
+        if (match) selectedModelConfigId.value = match.id
+    }
+}
 
 // 加载 AI 模型配置
 const loadModelConfigs = async () => {
@@ -536,15 +590,30 @@ const handleRun = async () => {
   plannedTasks.value = []
 
   try {
-      const payload = {
-        project_id: projectId.value,
-        task_description: taskDesc,
-        execution_mode: isMobile ? 'mobile' : 'text',
-        model_config_id: selectedModelConfigId.value, // 传递模型配置ID
-        device_id: isMobile ? selectedDeviceId.value : null,
-        browser_type: isMobile ? null : webTaskForm.browserType, // 传递浏览器类型
-        enable_gif: isMobile ? false : webTaskForm.enableGif,
-        gif_params: isMobile ? null : webTaskForm.gifParams
+      let payload;
+      
+      // 如果有图片，使用 FormData
+      if (!isMobile && webTaskForm.referenceImage) {
+          payload = new FormData();
+          payload.append('project_id', projectId.value);
+          payload.append('task_description', taskDesc);
+          payload.append('execution_mode', webTaskForm.executionMode);
+          payload.append('model_config_id', selectedModelConfigId.value);
+          if (webTaskForm.browserType) payload.append('browser_type', webTaskForm.browserType);
+          payload.append('enable_gif', webTaskForm.enableGif);
+          payload.append('reference_image', webTaskForm.referenceImage);
+          // GIF Params handling if needed
+      } else {
+          payload = {
+            project_id: projectId.value,
+            task_description: taskDesc,
+            execution_mode: isMobile ? 'mobile' : webTaskForm.executionMode,
+            model_config_id: selectedModelConfigId.value, // 传递模型配置ID
+            device_id: isMobile ? selectedDeviceId.value : null,
+            browser_type: isMobile ? null : webTaskForm.browserType, // 传递浏览器类型
+            enable_gif: isMobile ? false : webTaskForm.enableGif,
+            gif_params: isMobile ? null : webTaskForm.gifParams
+          }
       }
 
       const response = await runAdhocAITask(payload)
@@ -651,12 +720,15 @@ const confirmSaveCase = async () => {
   
   savingCase.value = true
   try {
+    const isMobile = activeTab.value === 'app'
     const payload = {
       project_id: saveCaseForm.project,
       name: saveCaseForm.name,
       // saveCaseForm.description 实际上是任务描述（Prompt）
       task_description: saveCaseForm.description,
-      description: '' // 可选的备注描述，暂时留空
+      description: '', // 可选的备注描述，暂时留空
+      execution_mode: isMobile ? 'mobile' : 'web', // 显式传递 execution_mode
+      save_as_script: saveCaseForm.save_as_script
     }
     
     await createAICase(payload)

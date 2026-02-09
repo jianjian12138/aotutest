@@ -118,6 +118,12 @@
             />
           </el-select>
         </el-form-item>
+        <el-form-item label="Worker数量">
+          <el-input-number v-model="form.worker_count" :min="0" :max="10" placeholder="0为单机模式" />
+          <div class="form-tip" style="font-size: 12px; color: #999; margin-left: 10px; display: inline-block;">
+            0表示单机模式，大于0表示分布式模式的Worker进程数
+          </div>
+        </el-form-item>
         <el-form-item label="套件描述">
           <el-input
             v-model="form.description"
@@ -201,7 +207,8 @@ const form = reactive({
   id: null,
   name: '',
   project_id: '',
-  description: ''
+  description: '',
+  worker_count: 0
 })
 
 // 搜索
@@ -289,7 +296,8 @@ const submitForm = async () => {
     const data = {
       name: form.name,
       project: form.project_id,
-      description: form.description
+      description: form.description,
+      worker_count: form.worker_count
     }
     
     if (dialogType.value === 'create') {

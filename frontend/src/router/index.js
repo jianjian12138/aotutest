@@ -46,6 +46,11 @@ const routes = [
         redirect: 'requirement-analysis'
       },
       {
+        path: 'requirements',
+        name: 'RequirementList',
+        component: () => import('@/views/requirement-analysis/RequirementDocumentList.vue')
+      },
+      {
         path: 'requirement-analysis',
         name: 'RequirementAnalysis',
         component: () => import('@/views/requirement-analysis/RequirementAnalysisView.vue')
@@ -178,6 +183,11 @@ const routes = [
         component: () => import('@/views/api-testing/InterfaceManagement.vue')
       },
       {
+        path: 'test-cases',
+        name: 'ApiTestCases',
+        component: () => import('@/views/api-testing/TestCaseManagement.vue')
+      },
+      {
         path: 'automation',
         name: 'ApiAutomation',
         component: () => import('@/views/api-testing/AutomationTesting.vue')
@@ -274,6 +284,11 @@ const routes = [
         component: () => import('@/views/ui-automation/device/DeviceManagement.vue')
       },
       {
+        path: 'agents',
+        name: 'UiAgents',
+        component: () => import('@/views/ui-automation/agent/AgentManagement.vue')
+      },
+      {
         path: 'debug-files',
         name: 'UiDebugFiles',
         component: () => import('@/views/ui-automation/debug/DebugFileManager.vue')
@@ -295,7 +310,7 @@ const routes = [
     component: Layout,
     meta: { requiresAuth: true },
     children: [
-      {
+    {
         path: '',
         redirect: 'web-testing'
       },
@@ -308,6 +323,17 @@ const routes = [
         path: 'app-testing',
         name: 'MobileAITesting',
         component: () => import('@/views/ui-automation/ai/MobileAITesting.vue')
+      },
+      {
+        path: 'inspector',
+        name: 'SmartInspector',
+        component: () => import('@/views/ui-automation/ai/SmartInspector.vue')
+      },
+      {
+        path: 'api-testing',
+        name: 'ApiAITesting',
+        component: () => import('@/views/ui-automation/ai/ApiAITesting.vue'),
+        meta: { mode: 'api' }
       },
       {
         path: 'cases',
@@ -375,9 +401,29 @@ const routes = [
             component: () => import('@/views/configuration/DifyConfig.vue')
           },
           {
+            path: 'mcp',
+            name: 'MCPConfig',
+            component: () => import('@/views/configuration/MCPConfig.vue')
+          },
+          {
+            path: 'skills',
+            name: 'SkillsConfig',
+            component: () => import('@/views/configuration/SkillsConfig.vue')
+          },
+          {
             path: 'users',
             name: 'UserManagement',
             component: () => import('@/views/system/UserManagement.vue')
+          },
+          {
+            path: 'parameters',
+            name: 'ParameterManagement',
+            component: () => import('@/views/configuration/ParameterManagement.vue')
+          },
+          {
+            path: 'common-methods',
+            name: 'CommonMethodManagement',
+            component: () => import('@/views/configuration/CommonMethodManagement.vue')
           }
         ]
       }
@@ -400,11 +446,11 @@ const routes = [
       { path: '', redirect: 'dashboard' },
       { path: 'dashboard', name: 'DataFactoryDashboard', component: () => import('@/views/data-factory/Dashboard.vue') },
       { path: 'sql-generation', name: 'SqlGeneration', component: () => import('@/views/data-factory/SqlGeneration.vue') },
-      { path: 'config', name: 'VannaConfig', component: () => import('@/views/data-factory/VannaConfig.vue') },
       { path: 'projects', name: 'ProjectManagement', component: () => import('@/views/data-factory/ProjectManagement.vue') },
       { path: 'saved-queries', name: 'SavedQueries', component: () => import('@/views/data-factory/SavedQueries.vue') },
       { path: 'table-metadata', name: 'TableMetadata', component: () => import('@/views/data-factory/TableMetadata.vue') },
-      { path: 'query-history', name: 'QueryHistory', component: () => import('@/views/data-factory/QueryHistory.vue') }
+      { path: 'query-history', name: 'QueryHistory', component: () => import('@/views/data-factory/QueryHistory.vue') },
+      { path: 'data-generator', name: 'TestDataGenerator', component: () => import('@/views/data-factory/TestDataGenerator.vue') }
     ]
   },
   {
@@ -435,9 +481,10 @@ const routes = [
       { path: 'collections', name: 'PerformanceCollections', component: () => import('@/views/performance-test/CollectionManagement.vue') },
       { path: 'requests', name: 'PerformanceRequests', component: () => import('@/views/performance-test/RequestManagement.vue') },
       { path: 'test-suites', name: 'PerformanceTestSuites', component: () => import('@/views/performance-test/TestSuiteManagement.vue') },
-      { path: 'executions', name: 'PerformanceExecutions', component: () => import('@/views/performance-test/ExecutionManagement.vue') },
-      { path: 'scheduled-tasks', name: 'PerformanceScheduledTasks', component: () => import('@/views/performance-test/ScheduledTaskManagement.vue') }
-    ]
+    { path: 'executions', name: 'PerformanceExecutions', component: () => import('@/views/performance-test/ExecutionManagement.vue') },
+    { path: 'executions/:id/report', name: 'PerformanceExecutionReport', component: () => import('@/views/performance-test/ExecutionReport.vue') },
+    { path: 'scheduled-tasks', name: 'PerformanceScheduledTasks', component: () => import('@/views/performance-test/ScheduledTaskManagement.vue') }
+  ]
   },
   {
     path: '/knowledge-graph',
@@ -461,28 +508,9 @@ const routes = [
             path: 'ai-agent',
             name: 'KGAIAgent',
             component: () => import('@/views/knowledge-graph/components/AIAgent.vue')
-          },
-          {
-            path: 'graph-viz',
-            name: 'KGGraphViz',
-            component: () => import('@/views/knowledge-graph/components/GraphViz.vue')
           }
         ]
       }
-    ]
-  },
-  {
-    path: '/wharttest',
-    component: Layout,
-    meta: { requiresAuth: true },
-    children: [
-      { path: '', redirect: 'dashboard' },
-      { path: 'dashboard', name: 'WHartTestDashboard', component: () => import('@/views/wharttest/Dashboard.vue') },
-      { path: 'projects', name: 'WHartTestProjects', component: () => import('@/views/wharttest/ProjectManagement.vue') },
-      { path: 'configs', name: 'WHartTestConfigs', component: () => import('@/views/wharttest/ConfigManagement.vue') },
-      { path: 'executions', name: 'WHartTestExecutions', component: () => import('@/views/wharttest/ExecutionManagement.vue') },
-      { path: 'tasks', name: 'WHartTestTasks', component: () => import('@/views/wharttest/TaskManagement.vue') },
-      { path: 'integration-logs', name: 'WHartTestIntegrationLogs', component: () => import('@/views/wharttest/IntegrationLogManagement.vue') }
     ]
   }
 ]

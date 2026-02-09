@@ -23,7 +23,8 @@ from .views import (
     UiNotificationLogViewSet,
     OperationRecordViewSet,
     UiDashboardViewSet,
-    UiDeviceViewSet
+    UiDeviceViewSet,
+    ExecutionNodeViewSet
 )
 from .views_config import EnvironmentConfigViewSet, AIIntelligentModeConfigViewSet
 from .debug_views import DebugFileViewSet
@@ -32,6 +33,7 @@ router = DefaultRouter()
 router.register(r'debug-files', DebugFileViewSet, basename='debug-files')
 router.register(r'dashboard', UiDashboardViewSet, basename='dashboard')
 router.register(r'devices', UiDeviceViewSet)
+router.register(r'execution-nodes', ExecutionNodeViewSet)
 router.register(r'projects', UiProjectViewSet)
 router.register(r'locator-strategies', LocatorStrategyViewSet)
 router.register(r'element-groups', ElementGroupViewSet)

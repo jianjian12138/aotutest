@@ -39,6 +39,10 @@ class ApiProject(models.Model):
     def __str__(self):
         return self.name
 
+    @property
+    def steps_count(self):
+        return self.steps.filter(enable=True).count()
+
 
 class ApiCollection(models.Model):
     """API集合模型"""
@@ -136,6 +140,97 @@ class Environment(models.Model):
         return f"{self.name} ({self.get_scope_display()})"
 
 
+class ApiTestCase(models.Model):
+    """API测试用例模型"""
+    STATUS_CHOICES = [
+        ('draft', '草稿'),
+        ('ready', '就绪'),
+        ('running', '执行中'),
+        ('passed', '通过'),
+        ('failed', '失败'),
+    ]
+
+    PRIORITY_CHOICES = [
+        ('high', '高'),
+        ('medium', '中'),
+        ('low', '低'),
+    ]
+
+    project = models.ForeignKey(ApiProject, on_delete=models.CASCADE, related_name='test_cases', verbose_name='所属项目')
+    name = models.CharField(max_length=200, verbose_name='用例名称')
+    description = models.TextField(blank=True, verbose_name='用例描述')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft', verbose_name='状态')
+    priority = models.CharField(max_length=10, choices=PRIORITY_CHOICES, default='medium', verbose_name='优先级')
+    created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='created_api_test_cases', verbose_name='创建人')
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='创建时间')
+    updated_at = models.DateTimeField(auto_now=True, verbose_name='更新时间')
+
+    class Meta:
+        db_table = 'api_test_cases'
+        verbose_name = 'API测试用例'
+        verbose_name_plural = 'API测试用例'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return self.name
+
+    @property
+    def steps_count(self):
+        return self.steps.filter(enable=True).count()
+
+
+class ApiTestCaseStep(models.Model):
+    """API测试用例步骤模型"""
+    HTTP_METHODS = [
+        ('GET', 'GET'),
+        ('POST', 'POST'),
+        ('PUT', 'PUT'),
+        ('DELETE', 'DELETE'),
+        ('PATCH', 'PATCH'),
+        ('HEAD', 'HEAD'),
+        ('OPTIONS', 'OPTIONS'),
+    ]
+
+    test_case = models.ForeignKey(ApiTestCase, on_delete=models.CASCADE, related_name='steps', verbose_name='测试用例')
+    step_number = models.IntegerField(verbose_name='步骤序号')
+    name = models.CharField(max_length=200, verbose_name='步骤名称')
+    description = models.TextField(blank=True, verbose_name='步骤描述')
+    
+    # 请求详情 (可以关联现有的ApiRequest，也可以独立定义)
+    api_request = models.ForeignKey(ApiRequest, on_delete=models.SET_NULL, null=True, blank=True, verbose_name='引用接口')
+    
+    # 如果不引用接口，则使用以下字段
+    method = models.CharField(max_length=10, choices=HTTP_METHODS, default='GET', verbose_name='请求方法')
+    url = models.TextField(verbose_name='请求URL')
+    headers = models.JSONField(default=dict, verbose_name='请求头')
+    params = models.JSONField(default=dict, verbose_name='URL参数')
+    body = models.JSONField(default=dict, verbose_name='请求体')
+    auth = models.JSONField(default=dict, verbose_name='认证信息')
+    
+    # 脚本与断言
+    pre_request_script = models.TextField(blank=True, verbose_name='请求前脚本')
+    post_request_script = models.TextField(blank=True, verbose_name='请求后脚本')
+    assertions = models.JSONField(default=list, verbose_name='断言规则')
+    extract_rules = models.JSONField(default=list, verbose_name='变量提取规则')
+    
+    # 执行控制
+    wait_time = models.IntegerField(default=0, verbose_name='等待时间(ms)')
+    enable = models.BooleanField(default=True, verbose_name='是否启用')
+    
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='创建时间')
+    updated_at = models.DateTimeField(auto_now=True, verbose_name='更新时间')
+
+    class Meta:
+        db_table = 'api_test_case_steps'
+        verbose_name = 'API测试用例步骤'
+        verbose_name_plural = 'API测试用例步骤'
+        ordering = ['step_number']
+        unique_together = ['test_case', 'step_number']
+
+    def __str__(self):
+        return f"{self.test_case.name} - 步骤{self.step_number}"
+
+
 class RequestHistory(models.Model):
     """请求历史模型"""
     request = models.ForeignKey(ApiRequest, on_delete=models.CASCADE, related_name='histories', verbose_name='关联请求')
@@ -167,6 +262,7 @@ class TestSuite(models.Model):
     name = models.CharField(max_length=200, verbose_name='套件名称')
     description = models.TextField(blank=True, verbose_name='套件描述')
     requests = models.ManyToManyField(ApiRequest, through='TestSuiteRequest', verbose_name='包含请求')
+    test_cases = models.ManyToManyField(ApiTestCase, through='TestSuiteTestCase', verbose_name='包含测试用例')
     environment = models.ForeignKey(Environment, on_delete=models.SET_NULL, null=True, blank=True,
                                     verbose_name='执行环境')
     created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='api_test_suites',
@@ -185,7 +281,7 @@ class TestSuite(models.Model):
 
 
 class TestSuiteRequest(models.Model):
-    """测试套件中的请求关联模型"""
+    """测试套件中的请求关联模型 (已弃用，建议使用TestSuiteTestCase)"""
     test_suite = models.ForeignKey(TestSuite, on_delete=models.CASCADE, verbose_name='测试套件')
     request = models.ForeignKey(ApiRequest, on_delete=models.CASCADE, verbose_name='API请求')
     order = models.IntegerField(default=0, verbose_name='执行顺序')
@@ -201,6 +297,24 @@ class TestSuiteRequest(models.Model):
 
     def __str__(self):
         return f"{self.test_suite.name} - {self.request.name}"
+
+
+class TestSuiteTestCase(models.Model):
+    """测试套件中的测试用例关联模型"""
+    test_suite = models.ForeignKey(TestSuite, on_delete=models.CASCADE, verbose_name='测试套件')
+    test_case = models.ForeignKey(ApiTestCase, on_delete=models.CASCADE, verbose_name='测试用例')
+    order = models.IntegerField(default=0, verbose_name='执行顺序')
+    enabled = models.BooleanField(default=True, verbose_name='是否启用')
+
+    class Meta:
+        db_table = 'api_test_suite_test_cases'
+        verbose_name = '套件测试用例'
+        verbose_name_plural = '套件测试用例'
+        unique_together = ['test_suite', 'test_case']
+        ordering = ['order']
+
+    def __str__(self):
+        return f"{self.test_suite.name} - {self.test_case.name}"
 
 
 class TestExecution(models.Model):
@@ -314,7 +428,8 @@ class ScheduledTask(models.Model):
         from datetime import datetime, timedelta
         from croniter import croniter
 
-        now = timezone.now()
+        # 使用本地时间进行计算，确保 Cron 表达式符合直觉
+        now = timezone.localtime()
 
         if self.trigger_type == 'CRON' and self.cron_expression:
             try:
@@ -686,3 +801,31 @@ class ApiImportTask(models.Model):
 
     def __str__(self):
         return f"{self.file_name} - {self.get_status_display()}"
+
+
+class ApiTestCaseExecution(models.Model):
+    """API测试用例执行记录模型"""
+    STATUS_CHOICES = [
+        ('passed', '通过'),
+        ('failed', '失败'),
+        ('error', '错误'),
+    ]
+
+    test_case = models.ForeignKey(ApiTestCase, on_delete=models.CASCADE, related_name='executions', verbose_name='测试用例')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, verbose_name='执行状态')
+    total_steps = models.IntegerField(default=0, verbose_name='总步骤数')
+    passed_steps = models.IntegerField(default=0, verbose_name='通过步骤数')
+    failed_steps = models.IntegerField(default=0, verbose_name='失败步骤数')
+    results = models.JSONField(default=list, verbose_name='详细结果')
+    execution_time = models.FloatField(default=0, verbose_name='执行耗时(ms)')
+    executed_by = models.ForeignKey(User, on_delete=models.CASCADE, verbose_name='执行者')
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='执行时间')
+
+    class Meta:
+        db_table = 'api_test_case_executions'
+        verbose_name = 'API测试用例执行记录'
+        verbose_name_plural = 'API测试用例执行记录'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.test_case.name} - {self.created_at}"

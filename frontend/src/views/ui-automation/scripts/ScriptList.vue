@@ -53,6 +53,10 @@
                   <el-icon><View /></el-icon>
                   查看
                 </el-button>
+                <el-button size="small" text @click.stop="convertToTestCase(script)">
+                  <el-icon><DocumentAdd /></el-icon>
+                  转为用例
+                </el-button>
                 <el-button size="small" text @click.stop="editScript(script)">
                   <el-icon><Edit /></el-icon>
                   编辑
@@ -180,6 +184,30 @@
       </template>
     </el-dialog>
 
+    <!-- 转换用例对话框 -->
+    <el-dialog v-model="showConvertDialog" title="转换为测试用例" width="500px">
+      <el-form :model="convertForm" label-width="80px">
+        <el-form-item label="用例名称" required>
+          <el-input v-model="convertForm.name" placeholder="请输入测试用例名称" />
+        </el-form-item>
+        <el-form-item label="优先级">
+          <el-select v-model="convertForm.priority" style="width: 100%">
+            <el-option label="P0 (最高)" value="P0" />
+            <el-option label="P1 (高)" value="P1" />
+            <el-option label="P2 (中)" value="P2" />
+            <el-option label="P3 (低)" value="P3" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="描述">
+          <el-input type="textarea" v-model="convertForm.description" :rows="3" placeholder="请输入用例描述" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showConvertDialog = false">取消</el-button>
+        <el-button type="primary" @click="confirmConvert" :loading="converting">确定转换</el-button>
+      </template>
+    </el-dialog>
+
     <!-- 编辑对话框 -->
     <el-dialog v-model="showEditDialog" title="编辑脚本" width="80%" :close-on-click-modal="false">
       <div v-if="editingScript" class="script-editor">
@@ -213,14 +241,15 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, View, Edit, Delete, EditPen, Search } from '@element-plus/icons-vue'
+import { Plus, View, Edit, Delete, EditPen, Search, DocumentAdd } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
 
 import {
   getUiProjects,
   getTestScripts,
   updateTestScript,
-  deleteTestScript
+  deleteTestScript,
+  createTestCase
 } from '@/api/ui_automation'
 
 const router = useRouter()
@@ -238,13 +267,21 @@ const searchKeyword = ref('')
 const showDetailDialog = ref(false)
 const showRenameDialog = ref(false)
 const showEditDialog = ref(false)
+const showConvertDialog = ref(false)
 
 // 当前操作的脚本
 const currentScript = ref(null)
 const editingScript = ref(null)
 const saving = ref(false)
+const converting = ref(false)
 
-// 重命名表单
+// 转换表单
+const convertForm = reactive({
+  scriptId: null,
+  name: '',
+  description: '',
+  priority: 'P1'
+})
 const renameForm = reactive({
   scriptId: null,
   newName: ''
@@ -389,6 +426,227 @@ const confirmRename = async () => {
   } catch (error) {
     ElMessage.error('重命名失败')
     console.error('重命名失败:', error)
+  }
+}
+
+// 转换相关方法
+const convertToTestCase = (script) => {
+  convertForm.scriptId = script.id
+  convertForm.name = script.name
+  convertForm.description = `Generated from script: ${script.name}`
+  convertForm.priority = 'P1'
+  showConvertDialog.value = true
+}
+
+const confirmConvert = async () => {
+  if (!convertForm.name.trim()) {
+    ElMessage.warning('请输入用例名称')
+    return
+  }
+
+  try {
+    converting.value = true
+    
+    // 准备测试用例数据
+    const testCaseData = {
+      name: convertForm.name,
+      project_id: selectedProject.value,
+      description: convertForm.description,
+      priority: convertForm.priority,
+      status: 'ready',
+      // 这里 priority 字段必须是后端接受的有效值之一
+      // 后端 models.py 定义 PRIORITY_CHOICES = [('high', '高'), ('medium', '中'), ('low', '低')]
+      // 前端传的是 P0/P1/P2/P3，需要映射一下
+    }
+    
+    // 映射优先级
+    const priorityMap = {
+      'P0': 'high',
+      'P1': 'high',
+      'P2': 'medium',
+      'P3': 'low'
+    }
+    testCaseData.priority = priorityMap[convertForm.priority] || 'medium'
+    // 查找对应的脚本对象
+    const script = scripts.value.find(s => s.id === convertForm.scriptId)
+    
+    // 简单的脚本解析器
+    const parseScriptToSteps = (content) => {
+        const steps = []
+        if (!content) return steps
+        
+        const lines = content.split('\n')
+        let stepCount = 1
+        
+        // 添加一个初始步骤：执行脚本
+        steps.push({
+            step_number: stepCount++,
+            action_type: 'custom',
+            description: `Start executing script: ${script ? script.name : 'Unknown'}`,
+            input_value: `Script ID: ${convertForm.scriptId}`
+        })
+        
+        for (const line of lines) {
+            const trimmedLine = line.trim()
+            if (!trimmedLine || trimmedLine.startsWith('#') || trimmedLine.startsWith('//')) continue
+            
+            // 解析 page.goto
+            const gotoMatch = trimmedLine.match(/page\.goto\(['"](.+?)['"]\)/)
+            if (gotoMatch) {
+                steps.push({
+                    step_number: stepCount++,
+                    action_type: 'custom', // 使用 custom 类型，因为 navigate 不是标准 action_type
+                    description: `Navigate to URL: ${gotoMatch[1]}`,
+                    input_value: gotoMatch[1]
+                })
+                continue
+            }
+            
+            // 解析 page.click
+            const clickMatch = trimmedLine.match(/page\.click\(['"](.+?)['"]\)/)
+            if (clickMatch) {
+                // 如果定位器不是 CSS，尝试自动识别
+                let strategy = 'css'
+                let locator = clickMatch[1]
+                
+                if (locator.startsWith('//') || locator.startsWith('xpath=')) {
+                    strategy = 'xpath'
+                } else if (locator.startsWith('id=')) {
+                    strategy = 'id'
+                    locator = locator.replace('id=', '')
+                } else if (locator.startsWith('text=')) {
+                    strategy = 'text'
+                    locator = locator.replace('text=', '')
+                }
+                
+                steps.push({
+                    step_number: stepCount++,
+                    action_type: 'click',
+                    description: `Click element: ${locator}`,
+                    input_value: '',
+                    temp_locator: locator, 
+                    temp_strategy: strategy,        
+                    force_action: true           // 默认开启强制点击，防止被遮挡
+                })
+                continue
+            }
+            
+            // 解析 page.fill
+            const fillMatch = trimmedLine.match(/page\.fill\(['"](.+?)['"],\s*['"](.+?)['"]\)/)
+            if (fillMatch) {
+                steps.push({
+                    step_number: stepCount++,
+                    action_type: 'fill',
+                    description: `Fill element ${fillMatch[1]} with "${fillMatch[2]}"`,
+                    input_value: fillMatch[2],
+                    temp_locator: fillMatch[1],
+                    temp_strategy: 'css'
+                })
+                continue
+            }
+
+            // 解析 page.select_option
+            // 支持 label="xxx", value="xxx" 或直接 "xxx"
+            const selectOptionMatch = trimmedLine.match(/page\.select_option\(['"](.+?)['"],\s*(?:label=['"](.+?)['"]|value=['"](.+?)['"]|['"](.+?)['"])/)
+            if (selectOptionMatch) {
+                const locator = selectOptionMatch[1]
+                const value = selectOptionMatch[2] || selectOptionMatch[3] || selectOptionMatch[4]
+                steps.push({
+                    step_number: stepCount++,
+                    action_type: 'selectOption',
+                    description: `Select option "${value}" in ${locator}`,
+                    input_value: value,
+                    temp_locator: locator,
+                    temp_strategy: 'css',
+                    force_action: true 
+                })
+                continue
+            }
+            
+            // 解析 page.locator().click()
+            const locatorClickMatch = trimmedLine.match(/page\.locator\(['"](.+?)['"]\)\.click\(\)/)
+            if (locatorClickMatch) {
+                let strategy = 'css'
+                let locator = locatorClickMatch[1]
+                
+                if (locator.startsWith('//') || locator.startsWith('xpath=')) {
+                    strategy = 'xpath'
+                } else if (locator.startsWith('id=')) {
+                    strategy = 'id'
+                    locator = locator.replace('id=', '')
+                }
+                
+                steps.push({
+                    step_number: stepCount++,
+                    action_type: 'click',
+                    description: `Click element: ${locator}`,
+                    input_value: '',
+                    temp_locator: locator,
+                    temp_strategy: strategy,
+                    force_action: true
+                })
+                continue
+            }
+             // 解析 page.locator().fill()
+            const locatorFillMatch = trimmedLine.match(/page\.locator\(['"](.+?)['"]\)\.fill\(['"](.+?)['"]\)/)
+            if (locatorFillMatch) {
+                let strategy = 'css'
+                let locator = locatorFillMatch[1]
+                
+                if (locator.startsWith('//') || locator.startsWith('xpath=')) {
+                    strategy = 'xpath'
+                } else if (locator.startsWith('id=')) {
+                    strategy = 'id'
+                    locator = locator.replace('id=', '')
+                }
+                
+                steps.push({
+                    step_number: stepCount++,
+                    action_type: 'fill',
+                    description: `Fill element ${locator} with "${locatorFillMatch[2]}"`,
+                    input_value: locatorFillMatch[2],
+                    temp_locator: locator,
+                    temp_strategy: strategy
+                })
+                continue
+            }
+        }
+        
+        return steps
+    }
+    
+    testCaseData.steps = parseScriptToSteps(script ? script.content : '')
+
+    await createTestCase(testCaseData)
+    
+    ElMessage.success('用例创建成功')
+    showConvertDialog.value = false
+    
+    // 询问是否跳转到用例列表
+    ElMessageBox.confirm(
+      '测试用例已生成，是否前往用例列表查看？',
+      '提示',
+      {
+        confirmButtonText: '前往查看',
+        cancelButtonText: '留在当前页',
+        type: 'success'
+      }
+    ).then(() => {
+      router.push('/ui-automation/test-cases')
+    }).catch(() => {})
+
+  } catch (error) {
+    console.error('转换失败:', error)
+    // 详细打印后端返回的错误信息
+    if (error.response && error.response.data) {
+        console.error('后端返回错误详情:', error.response.data)
+        const errorMsg = JSON.stringify(error.response.data)
+        ElMessage.error('转换失败: ' + errorMsg)
+    } else {
+        ElMessage.error('转换失败: ' + (error.message || '未知错误'))
+    }
+  } finally {
+    converting.value = false
   }
 }
 

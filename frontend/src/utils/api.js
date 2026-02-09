@@ -1,10 +1,11 @@
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
-import { useUserStore } from '@/stores/user'
+// Remove top-level import to avoid circular dependency with user store
+// import { useUserStore } from '@/stores/user'
 
 const api = axios.create({
   baseURL: '/api',
-  timeout: 10000,
+  timeout: 60000,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -31,6 +32,8 @@ const processQueue = (error, token = null) => {
 // 请求拦截器
 api.interceptors.request.use(
   async (config) => {
+    // Dynamically import user store to avoid circular dependency
+    const { useUserStore } = await import('@/stores/user')
     const userStore = useUserStore()
 
     // 检查是否是刷新token的请求
@@ -94,6 +97,8 @@ api.interceptors.response.use(
     return response
   },
   async (error) => {
+    // Dynamically import user store to avoid circular dependency
+    const { useUserStore } = await import('@/stores/user')
     const userStore = useUserStore()
     const originalRequest = error.config
 

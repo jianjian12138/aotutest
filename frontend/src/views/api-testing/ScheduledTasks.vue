@@ -500,9 +500,36 @@ const submitTaskForm = async () => {
 
     // 根据任务类型添加对应字段
     if (taskForm.task_type === 'TEST_SUITE') {
+      if (!taskForm.test_suite) {
+        ElMessage.warning('请选择测试套件')
+        submitting.value = false
+        return
+      }
       submitData.test_suite = taskForm.test_suite
     } else if (taskForm.task_type === 'API_REQUEST') {
+      if (!taskForm.api_request) {
+        ElMessage.warning('请选择API请求')
+        submitting.value = false
+        return
+      }
       submitData.api_request = taskForm.api_request
+    }
+
+    // Cron 表达式基础校验
+    if (taskForm.trigger_type === 'CRON') {
+      const parts = taskForm.cron_expression.trim().split(/\s+/)
+      if (parts.length < 5) {
+        ElMessage.warning('Cron 表达式格式错误，至少需要 5 位 (分 时 日 月 周)')
+        submitting.value = false
+        return
+      }
+      
+      const hour = parseInt(parts[1])
+      if (isNaN(hour) || hour < 0 || hour > 23) {
+        ElMessage.warning(`无效的小时: ${parts[1]}。小时范围应为 0-23。如果您想设置 11:44，请使用 "44 11 * * *"`)
+        submitting.value = false
+        return
+      }
     }
 
     if (editingTask.value) {

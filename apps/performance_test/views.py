@@ -299,6 +299,8 @@ class PerformanceEnvironmentViewSet(viewsets.ModelViewSet):
         return Response({'message': '环境已激活'})
 
 
+from .services import LocustService
+
 class PerformanceTestSuiteViewSet(viewsets.ModelViewSet):
     """性能测试套件视图集"""
     queryset = PerformanceTestSuite.objects.all()
@@ -326,8 +328,9 @@ class PerformanceTestSuiteViewSet(viewsets.ModelViewSet):
     def execute(self, request, pk=None):
         """执行性能测试套件"""
         test_suite = self.get_object()
-        concurrency = request.data.get('concurrency', 10)
-        duration = request.data.get('duration', 60)
+        concurrency = int(request.data.get('concurrency', 10))
+        duration = int(request.data.get('duration', 60))
+        worker_count = int(request.data.get('worker_count', test_suite.worker_count))
         
         try:
             # 创建执行记录
@@ -340,181 +343,30 @@ class PerformanceTestSuiteViewSet(viewsets.ModelViewSet):
                 passed_requests=0,
                 failed_requests=0,
                 concurrency=concurrency,
-                duration=duration
+                duration=duration,
+                # results={'worker_count': worker_count}
             )
             
-            # 获取套件中的请求
-            suite_requests = PerformanceTestSuiteRequest.objects.filter(
-                test_suite=test_suite,
-                enabled=True
-            ).order_by('order')
-            
-            execution.total_requests = suite_requests.count()
-            execution.save()
-            
-            # 准备Locust测试脚本内容
-            locust_script = f"""
-from locust import HttpUser, task, between
-import json
-
-class PerformanceTestUser(HttpUser):
-    wait_time = between(1, 3)
-
-    """
-            
-            # 为每个请求添加任务
-            for idx, suite_request in enumerate(suite_requests):
-                performance_request = suite_request.request
-                method = performance_request.method
-                url = performance_request.url or ''
-                headers = performance_request.headers or {}
-                params = performance_request.params or {}
-                body = performance_request.body or {}
-                
-                # 将URL中的变量替换占位符
-                formatted_url = url.replace('{', '{{').replace('}', '}}')
-                
-                # 构建任务代码
-                task_code = f"""
-    @task({suite_request.weight})
-    def test_request_{idx}(self):
-        url = "{formatted_url}"
-        headers = {json.dumps(headers)}
-        params = {json.dumps(params)}
-        """
-                
-                # 根据请求方法添加不同的请求逻辑
-                if method == 'GET':
-                    task_code += f"        self.client.get(url, headers=headers, params=params)"
-                elif method in ['POST', 'PUT', 'PATCH', 'DELETE']:
-                    body_json = json.dumps(body)
-                    task_code += f"        body = {body_json}\n        self.client.{method.lower()}(url, headers=headers, params=params, json=body)"
-        
-                locust_script += task_code + "\n\n"
-            
-            locust_script += """
-"""
-            
-            # 尝试在函数内部导入Locust，避免启动时的monkey patching
-            try:
-                # 导入Locust库
-                from locust import HttpUser, task, between
-                locust_available = True
-            except ImportError:
-                locust_available = False
-                logging.warning("Locust库未安装，将使用模拟数据")
-            
-            if locust_available:
-                # 实际使用Locust执行性能测试
-                # 创建临时目录和脚本文件
-                temp_dir = tempfile.mkdtemp()
-                script_path = os.path.join(temp_dir, 'locustfile.py')
-                results_path = os.path.join(temp_dir, 'results.json')
-                
-                with open(script_path, 'w') as f:
-                    f.write(locust_script)
-                
-                # 构建Locust命令
-                locust_cmd = [
-                    'locust',
-                    '-f', script_path,
-                    '--headless',
-                    '-u', str(concurrency),
-                    '-r', str(concurrency // 2),
-                    '--run-time', f'{duration}s',
-                    '--json',
-                    '--out', results_path
-                ]
-                
-                # 执行Locust命令
-                process = subprocess.Popen(
-                    locust_cmd,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    text=True
-                )
-                
-                stdout, stderr = process.communicate()
-                
-                # 读取测试结果
-                if os.path.exists(results_path):
-                    with open(results_path, 'r') as f:
-                        locust_results = json.load(f)
-                    
-                    # 解析结果
-                    total_requests = locust_results.get('user_count', 0) * duration
-                    passed_requests = locust_results.get('num_requests', 0)
-                    failed_requests = locust_results.get('num_failures', 0)
-                    response_time_avg = locust_results.get('avg_response_time', 0)
-                    response_time_min = locust_results.get('min_response_time', 0)
-                    response_time_max = locust_results.get('max_response_time', 0)
-                    rps = locust_results.get('requests_per_second', 0)
-                    
-                    # 清理临时文件
-                    shutil.rmtree(temp_dir)
-                else:
-                    # 模拟结果（当Locust执行失败时）
-                    total_requests = concurrency * duration
-                    passed_requests = total_requests - int(total_requests * 0.05)  # 95%成功率
-                    failed_requests = total_requests - passed_requests
-                    response_time_avg = 180.5
-                    response_time_min = 45.2
-                    response_time_max = 650.8
-                    rps = concurrency * 3.2
-                    
-                    # 清理临时文件
-                    shutil.rmtree(temp_dir)
-            else:
-                # 模拟Locust执行（当Locust库未安装时）
-                time.sleep(2)  # 模拟执行延迟
-                
-                total_requests = concurrency * duration
-                passed_requests = total_requests - int(total_requests * 0.05)  # 95%成功率
-                failed_requests = total_requests - passed_requests
-                response_time_avg = 180.5
-                response_time_min = 45.2
-                response_time_max = 650.8
-                rps = concurrency * 3.2
-            
-            # 更新执行记录
-            execution.status = 'COMPLETED'
-            execution.end_time = timezone.now()
-            execution.total_requests = total_requests
-            execution.passed_requests = passed_requests
-            execution.failed_requests = failed_requests
-            execution.response_time_avg = response_time_avg
-            execution.response_time_min = response_time_min
-            execution.response_time_max = response_time_max
-            execution.rps = rps
-            execution.results = {
-                'requests_per_second': rps,
-                'response_times': {
-                    'avg': response_time_avg,
-                    'min': response_time_min,
-                    'max': response_time_max
-                },
-                'success_rate': passed_requests / total_requests * 100 if total_requests > 0 else 0,
-                'requests': [
-                    {
-                        'name': suite_request.request.name,
-                        'method': suite_request.request.method,
-                        'url': suite_request.request.url,
-                        'rps': rps / len(suite_requests) if len(suite_requests) > 0 else 0,
-                        'response_time': response_time_avg
-                    } for suite_request in suite_requests
-                ]
-            }
-            execution.locust_logs = f'Locust执行成功\n并发数: {concurrency}\n持续时间: {duration}秒\n总请求数: {total_requests}\n成功请求数: {passed_requests}\n失败请求数: {failed_requests}'
-            execution.save()
+            # 使用LocustService执行
+            # 这里的执行应该是异步的，但为了简化，我们暂时同步执行
+            # 在生产环境中，应该使用Celery任务
+            LocustService.execute_test_suite(
+                test_suite, 
+                execution, 
+                concurrency, 
+                duration, 
+                worker_count
+            )
             
             return Response(PerformanceTestExecutionSerializer(execution).data)
             
         except Exception as e:
             logger.error(f"执行性能测试套件失败: {str(e)}")
-            # 更新执行记录为失败
-            execution.status = 'FAILED'
-            execution.end_time = timezone.now()
-            execution.save()
+            if 'execution' in locals():
+                execution.status = 'FAILED'
+                execution.end_time = timezone.now()
+                execution.locust_logs = str(e)
+                execution.save()
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
     @action(detail=True, methods=['post'], url_path='add-requests')

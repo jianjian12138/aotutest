@@ -112,6 +112,7 @@ import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Plus, Search } from '@element-plus/icons-vue'
 import router from '@/router'
+import api from '@/utils/api'
 
 // 状态管理
 const loading = ref(false)
@@ -122,55 +123,6 @@ const pageSize = ref(10)
 
 // 项目数据
 const projects = ref([])
-
-// 模拟项目数据
-const mockProjects = [
-  {
-    id: 1,
-    name: '电商平台数据分析',
-    description: '电商平台销售数据实时分析',
-    status: 'ACTIVE',
-    created_by: { username: 'admin' },
-    created_at: '2023-11-15T10:30:00Z',
-    updated_at: '2023-11-15T14:20:00Z'
-  },
-  {
-    id: 2,
-    name: '用户行为分析',
-    description: '用户访问行为和转化漏斗分析',
-    status: 'ACTIVE',
-    created_by: { username: 'test' },
-    created_at: '2023-11-14T09:15:00Z',
-    updated_at: '2023-11-14T16:45:00Z'
-  },
-  {
-    id: 3,
-    name: '订单数据仓库',
-    description: '历史订单数据存储和查询',
-    status: 'INACTIVE',
-    created_by: { username: 'admin' },
-    created_at: '2023-11-13T11:20:00Z',
-    updated_at: '2023-11-13T15:30:00Z'
-  },
-  {
-    id: 4,
-    name: '商品库存监控',
-    description: '实时监控商品库存变化',
-    status: 'ACTIVE',
-    created_by: { username: 'user1' },
-    created_at: '2023-11-12T13:45:00Z',
-    updated_at: '2023-11-12T17:15:00Z'
-  },
-  {
-    id: 5,
-    name: '广告效果分析',
-    description: '广告投放效果和ROI分析',
-    status: 'ACTIVE',
-    created_by: { username: 'user2' },
-    created_at: '2023-11-11T10:00:00Z',
-    updated_at: '2023-11-11T14:50:00Z'
-  }
-]
 
 // 过滤后的项目
 const filteredProjects = computed(() => {
@@ -201,19 +153,17 @@ const paginatedProjects = computed(() => {
 })
 
 // 加载项目数据
-const loadProjects = () => {
+const loadProjects = async () => {
   loading.value = true
   
   try {
-    // 模拟API调用
-    // 这里可以替换为实际的API调用
-    setTimeout(() => {
-      projects.value = mockProjects
-      loading.value = false
-    }, 500)
+    // 使用真实API调用
+    const response = await api.get('/data-factory/projects/')
+    projects.value = response.data.results || response.data
   } catch (error) {
     console.error('加载项目失败:', error)
     ElMessage.error('加载项目失败')
+  } finally {
     loading.value = false
   }
 }

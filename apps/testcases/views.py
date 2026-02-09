@@ -1,6 +1,8 @@
 from rest_framework import generics, permissions, status
+from rest_framework.views import APIView
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
+from django.http import HttpResponse
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters
 from django.db import models
@@ -110,3 +112,73 @@ class TestCaseDetailView(generics.RetrieveUpdateDestroyAPIView):
         else:
             # 没有指定项目，保持原项目不变
             serializer.save()
+
+class ImportTestCaseView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        file = request.FILES.get('file')
+        file_type = request.data.get('file_type', 'excel')
+        project_id = request.data.get('project_id')
+        
+        if not file:
+            return Response({'error': 'No file uploaded'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            if project_id:
+                project = Project.objects.get(id=project_id)
+                # Check permission
+                if not (request.user == project.owner or request.user in project.members.all()):
+                    return Response({'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
+            else:
+                # Default to first accessible project
+                project = Project.objects.filter(
+                    models.Q(owner=request.user) | models.Q(members=request.user)
+                ).distinct().first()
+                if not project:
+                    return Response({'error': 'No accessible project found'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            count = ImportService.import_cases(file, file_type, project, request.user)
+            return Response({'message': f'Successfully imported {count} test cases'})
+            
+        except Exception as e:
+            logger.error(f"Import failed: {e}")
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class ExportTestCaseView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        project_id = request.query_params.get('project_id')
+        file_type = request.query_params.get('file_type', 'excel')
+        
+        queryset = TestCase.objects.filter(
+            models.Q(project__owner=request.user) | models.Q(project__members=request.user)
+        ).distinct()
+        
+        if project_id:
+            queryset = queryset.filter(project_id=project_id)
+            
+        try:
+            if file_type == 'excel':
+                wb = ExportService.export_cases(queryset, file_type)
+                response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+                response['Content-Disposition'] = 'attachment; filename="test_cases.xlsx"'
+                wb.save(response)
+                return response
+            elif file_type == 'json':
+                data = ExportService.export_cases(queryset, file_type)
+                response = HttpResponse(data, content_type='application/json')
+                response['Content-Disposition'] = 'attachment; filename="test_cases.json"'
+                return response
+            elif file_type == 'yaml':
+                data = ExportService.export_cases(queryset, file_type)
+                response = HttpResponse(data, content_type='application/x-yaml')
+                response['Content-Disposition'] = 'attachment; filename="test_cases.yaml"'
+                return response
+            else:
+                return Response({'error': 'Unsupported file type'}, status=status.HTTP_400_BAD_REQUEST)
+                
+        except Exception as e:
+            logger.error(f"Export failed: {e}")
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

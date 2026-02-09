@@ -17,13 +17,11 @@ import uuid
 import subprocess
 from datetime import datetime, timedelta
 
-# 导入Vanna AI库
-try:
-    import vanna
-    vanna_available = True
-except ImportError:
-    vanna_available = False
-    logging.warning("Vanna AI库未安装，将使用模拟数据")
+from .services.sql_agent import SQLGenerationService
+from .services.data_generator import TestDataGeneratorService
+
+# Mock vanna_available to avoid breaking existing code temporarily
+vanna_available = False
 
 from .models import (
     VannaConfig,
@@ -40,8 +38,7 @@ from .serializers import (
     DataFactoryProjectSerializer,
     SavedQuerySerializer,
     QueryHistorySerializer,
-    TableMetadataSerializer,
-    UserSerializer
+    TableMetadataSerializer
 )
 
 logger = logging.getLogger(__name__)
@@ -307,65 +304,33 @@ class SqlGenerationViewSet(viewsets.ModelViewSet):
                 created_by=request.user
             )
 
-            generated_sql = None
-            
-            # 优先使用Vanna库生成SQL
-            if vanna_available:
-                try:
-                    logger.info(f"使用Vanna库生成SQL，提供商: {config.provider}, 模型: {config.model}")
-                    
-                    # 根据提供商类型初始化Vanna
-                    if config.provider == 'openai':
-                        # OpenAI提供商初始化
-                        os.environ['OPENAI_API_KEY'] = config.api_key
-                        vn = vanna.OpenAI(api_key=config.api_key, model=config.model)
-                    elif config.provider == 'deepseek':
-                        # DeepSeek提供商初始化 - 使用Vanna的通用API方式
-                        os.environ['OPENAI_API_KEY'] = config.api_key  # DeepSeek兼容OpenAI接口格式
-                        os.environ['OPENAI_BASE_URL'] = 'https://api.deepseek.com/v1'  # DeepSeek API地址
-                        vn = vanna.OpenAI(
-                            api_key=config.api_key, 
-                            model=config.model,
-                            base_url='https://api.deepseek.com/v1'
-                        )
-                    else:
-                        # 其他提供商，使用默认初始化
-                        vn = vanna.OpenAI(api_key=config.api_key, model=config.model)
-                    
-                    # 连接到数据库
-                    db_config = config.db_connection
-                    vn.connect_to_mysql(
-                        host=db_config.get('host', 'localhost'),
-                        port=db_config.get('port', 3306),
-                        database=db_config.get('database', ''),
-                        user=db_config.get('username', ''),
-                        password=db_config.get('password', '')
-                    )
-                    
-                    # 生成SQL
-                    generated_sql = vn.generate_sql(natural_language)
-                    logger.info(f"Vanna库生成SQL成功: {generated_sql}")
-                except Exception as e:
-                    # Vanna库生成失败，记录日志
-                    logger.error(f"使用Vanna库生成SQL失败: {str(e)}")
-            
-            # 如果Vanna库生成失败或不可用，使用动态SQL生成作为fallback
-            if generated_sql is None:
-                logger.warning(f"Vanna库不可用或生成失败，使用动态SQL生成")
-                time.sleep(1)  # 模拟生成延迟
+            try:
+                # 使用SQLGenerationService
+                service = SQLGenerationService(config)
+                generated_sql = service.generate_sql(natural_language)
+                
+                # 更新生成结果
+                sql_generation.generated_sql = generated_sql
+                sql_generation.status = 'SUCCESS'
+                sql_generation.save()
+                
+                return Response(SqlGenerationSerializer(sql_generation).data)
+                
+            except Exception as e:
+                logger.error(f"SQL生成服务失败: {str(e)}")
+                # 降级到基于规则的生成
+                logger.warning("SQL Agent failed, falling back to rule-based generation")
                 generated_sql = self._generate_dynamic_sql(natural_language)
-            
-            # 更新生成结果
-            sql_generation.generated_sql = generated_sql
-            sql_generation.status = 'SUCCESS'
-            sql_generation.save()
+                
+                sql_generation.generated_sql = generated_sql
+                sql_generation.status = 'SUCCESS'
+                sql_generation.save()
+                return Response(SqlGenerationSerializer(sql_generation).data)
 
-            return Response(SqlGenerationSerializer(sql_generation).data)
         except VannaConfig.DoesNotExist:
             return Response({'error': 'Vanna配置不存在'}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
             logger.error(f"生成SQL失败: {str(e)}")
-            # 检查sql_generation是否存在，只有存在时才更新
             if 'sql_generation' in locals():
                 sql_generation.status = 'FAILED'
                 sql_generation.error_message = str(e)
@@ -670,3 +635,31 @@ class DataFactoryDashboardViewSet(viewsets.ViewSet):
             'total_queries': total_queries,
             'recent_generations': SqlGenerationSerializer(recent_generations, many=True).data
         })
+
+
+class TestDataGeneratorViewSet(viewsets.ViewSet):
+    """测试数据生成视图集"""
+    permission_classes = [IsAuthenticated]
+    
+    @action(detail=False, methods=['post'])
+    def generate(self, request):
+        """生成测试数据"""
+        schema = request.data.get('schema')
+        count = int(request.data.get('count', 10))
+        locale = request.data.get('locale', 'zh_CN')
+        
+        if not schema:
+            return Response({'error': 'Schema is required'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        try:
+            service = TestDataGeneratorService(locale=locale)
+            data = service.generate_data(schema, count)
+            return Response({'data': data})
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            
+    @action(detail=False, methods=['get'])
+    def providers(self, request):
+        """获取可用的数据类型"""
+        service = TestDataGeneratorService()
+        return Response({'providers': service.get_available_providers()})

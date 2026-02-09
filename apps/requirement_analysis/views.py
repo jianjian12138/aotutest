@@ -1072,15 +1072,22 @@ class TestCaseGenerationTaskViewSet(viewsets.ModelViewSet):
             
             validated_data = serializer.validated_data
             
-            # 获取活跃的配置
-            writer_config = None
-            reviewer_config = None
-            writer_prompt = None
-            reviewer_prompt = None
-            
-            if validated_data.get('use_writer_model', True):
+            # 处理模型配置
+            if validated_data.get('writer_model_config_id'):
+                try:
+                    writer_config = AIModelConfig.objects.get(id=validated_data['writer_model_config_id'])
+                except AIModelConfig.DoesNotExist:
+                    # 如果指定的模型不存在，回退到默认逻辑
+                    logger.warning(f"指定的编写模型配置 {validated_data['writer_model_config_id']} 不存在，使用默认配置")
+                    pass
+
+            if validated_data.get('use_writer_model', True) and not writer_config:
                 # 优先查找任意启用的编写模型配置
                 writer_config = AIModelConfig.objects.filter(role='writer', is_active=True).first()
+                
+                if not writer_config:
+                    # 如果没有writer角色的模型，尝试找任何deepseek模型作为备选
+                    writer_config = AIModelConfig.objects.filter(model_type='deepseek', is_active=True).first()
                 
                 if not writer_config:
                     return Response(
@@ -1098,6 +1105,10 @@ class TestCaseGenerationTaskViewSet(viewsets.ModelViewSet):
             if validated_data.get('use_reviewer_model', True):
                 # 优先查找任意启用的评审模型配置
                 reviewer_config = AIModelConfig.objects.filter(role='reviewer', is_active=True).first()
+                
+                if not reviewer_config:
+                    # 如果没有reviewer角色的模型，使用writer_config或者找其他模型
+                    reviewer_config = writer_config or AIModelConfig.objects.filter(is_active=True).first()
                 
                 if not reviewer_config:
                     return Response(
@@ -1302,6 +1313,105 @@ class TestCaseGenerationTaskViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
     
+    @action(detail=True, methods=['get'])
+    def export_cases(self, request, task_id=None):
+        """导出测试用例为Excel"""
+        try:
+            task = self.get_object()
+            if not task.final_test_cases:
+                return Response({'error': '没有可导出的测试用例'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            # 创建工作簿
+            wb = openpyxl.Workbook()
+            ws = wb.active
+            ws.title = "测试用例"
+            
+            # 设置表头
+            headers = ['用例编号', '测试标题', '前置条件', '测试步骤', '预期结果', '优先级', '测试类型']
+            header_font = Font(bold=True, color="FFFFFF")
+            header_fill = PatternFill(start_color="409EFF", end_color="409EFF", fill_type="solid")
+            
+            for col_num, header in enumerate(headers, 1):
+                cell = ws.cell(row=1, column=col_num, value=header)
+                cell.font = header_font
+                cell.fill = header_fill
+                cell.alignment = Alignment(horizontal='center', vertical='center')
+            
+            # 解析测试用例
+            test_cases = self._parse_test_cases_content(task.final_test_cases)
+            
+            # 写入数据
+            for row_num, case in enumerate(test_cases, 2):
+                ws.cell(row=row_num, column=1, value=case.get('caseId', f'TC-{row_num-1:03d}'))
+                ws.cell(row=row_num, column=2, value=case.get('scenario', ''))
+                ws.cell(row=row_num, column=3, value=case.get('precondition', ''))
+                ws.cell(row=row_num, column=4, value=case.get('steps', ''))
+                ws.cell(row=row_num, column=5, value=case.get('expected', ''))
+                ws.cell(row=row_num, column=6, value=case.get('priority', '中'))
+                ws.cell(row=row_num, column=7, value='功能测试')
+                
+                # 设置自动换行
+                for col in range(1, 8):
+                    ws.cell(row=row_num, column=col).alignment = Alignment(wrap_text=True, vertical='top')
+            
+            # 调整列宽
+            ws.column_dimensions['A'].width = 15
+            ws.column_dimensions['B'].width = 40
+            ws.column_dimensions['C'].width = 30
+            ws.column_dimensions['D'].width = 50
+            ws.column_dimensions['E'].width = 50
+            ws.column_dimensions['F'].width = 10
+            ws.column_dimensions['G'].width = 15
+            
+            # 准备响应
+            response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+            filename = f"test_cases_{task.task_id}.xlsx"
+            response['Content-Disposition'] = f'attachment; filename="{filename}"'
+            wb.save(response)
+            return response
+            
+        except Exception as e:
+            logger.error(f"导出测试用例失败: {e}")
+            return Response({'error': f'导出失败: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @action(detail=True, methods=['post'])
+    def regenerate(self, request, task_id=None):
+        """重新生成测试用例（基于现有任务创建新任务）"""
+        try:
+            original_task = self.get_object()
+            
+            # 获取新的需求文本（如果提供）或使用原来的
+            requirement_text = request.data.get('requirement_text', original_task.requirement_text)
+            
+            # 构建新任务数据
+            new_task_data = {
+                'title': f"{original_task.title} (重新生成)",
+                'requirement_text': requirement_text,
+                'use_writer_model': True,
+                'use_reviewer_model': True,
+                # 复制关联信息
+                'project': original_task.project.id if original_task.project else None,
+            }
+            
+            # 添加Prompt配置ID（如果提供）
+            if request.data.get('prompt_config_id'):
+                new_task_data['prompt_config_id'] = request.data.get('prompt_config_id')
+            elif original_task.writer_prompt_config:
+                new_task_data['prompt_config_id'] = original_task.writer_prompt_config.id
+                
+            # 调用generate接口的逻辑
+            # 这里我们构造一个新的request对象或者直接调用Service
+            # 为了简单起见，我们直接返回这些数据给前端，让前端调用generate接口
+            
+            return Response({
+                'message': '准备重新生成',
+                'regenerate_data': new_task_data
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            logger.error(f"准备重新生成失败: {e}")
+            return Response({'error': f'操作失败: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
     @action(detail=True, methods=['post'])
     def save_to_records(self, request, task_id=None):
         """保存测试用例到AI生成用例记录并导入到测试用例管理系统"""

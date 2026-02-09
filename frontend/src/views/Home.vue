@@ -87,7 +87,7 @@ const userStore = useUserStore()
 const isPaused = ref(false)
 
 const allCards = [
-  { type: 'case', title: '用例管理', icon: DocumentChecked, iconClass: 'case-icon' },
+  { type: 'case', title: '需求与用例', icon: DocumentChecked, iconClass: 'case-icon' },
   { type: 'api', title: '接口测试', icon: Link, iconClass: 'api-icon' },
   { type: 'ui', title: 'UI自动化', icon: Monitor, iconClass: 'ui-icon' },
   { type: 'midscene', title: '自然语言测试', icon: Operation, iconClass: 'midscene-icon' },
@@ -95,7 +95,6 @@ const allCards = [
   { type: 'knowledge', title: '知识图谱', icon: MagicStick, iconClass: 'knowledge-icon' },
   { type: 'data', title: '数据工厂', icon: DataLine, iconClass: 'data-icon' },
   { type: 'performance', title: '性能测试', icon: Cpu, iconClass: 'performance-icon' },
-  { type: 'wharttest', title: '智能化测试', icon: Connection, iconClass: 'wharttest-icon' },
   { type: 'config', title: '配置中心', icon: Setting, iconClass: 'config-icon' }
 ]
 
@@ -138,7 +137,6 @@ const handleNavigate = (type) => {
     knowledge: '/knowledge-graph/dashboard',
     data: '/data-factory/dashboard',
     performance: '/performance-test/dashboard',
-    wharttest: '/wharttest/dashboard',
     config: '/configuration/ai-model'
   }
 
@@ -361,7 +359,6 @@ const handleNavigate = (type) => {
   &.midscene-icon { color: #818cf8; border-color: rgba(99, 102, 241, 0.3); }
   &.security-icon { color: #f97316; border-color: rgba(249, 115, 22, 0.3); }
   &.knowledge-icon { color: #22c55e; border-color: rgba(34, 197, 94, 0.3); }
-  &.wharttest-icon { color: #2dd4bf; border-color: rgba(20, 184, 166, 0.3); }
   &.assistant-icon { color: #fb923c; border-color: rgba(249, 115, 22, 0.3); }
   &.config-icon { color: #94a3b8; border-color: rgba(100, 116, 139, 0.3); }
   &.system-icon { color: #cbd5e1; border-color: rgba(71, 85, 105, 0.3); }

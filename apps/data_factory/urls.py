@@ -7,7 +7,8 @@ from .views import (
     SavedQueryViewSet,
     QueryHistoryViewSet,
     TableMetadataViewSet,
-    DataFactoryDashboardViewSet
+    DataFactoryDashboardViewSet,
+    TestDataGeneratorViewSet
 )
 
 router = DefaultRouter()
@@ -18,6 +19,7 @@ router.register(r'saved-queries', SavedQueryViewSet, basename='saved-query')
 router.register(r'query-histories', QueryHistoryViewSet, basename='query-history')
 router.register(r'table-metadata', TableMetadataViewSet, basename='table-metadata')
 router.register(r'dashboard', DataFactoryDashboardViewSet, basename='data-factory-dashboard')
+router.register(r'data-generator', TestDataGeneratorViewSet, basename='data-generator')
 
 urlpatterns = [
     path('data-factory/', include(router.urls)),

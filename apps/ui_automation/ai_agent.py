@@ -1,6 +1,10 @@
 import logging
 import asyncio
+import json
+import re
 from .ai_base import BaseBrowserAgent
+from langchain_openai import ChatOpenAI
+from langchain_core.messages import SystemMessage, HumanMessage
 
 logger = logging.getLogger('django')
 
@@ -13,6 +17,41 @@ class BrowserAgent(BaseBrowserAgent):
         self.enable_gif = enable_gif
         self.case_name = case_name or "Adhoc Task"
         super().__init__(execution_mode='text', enable_gif=enable_gif, case_name=case_name, model_config_id=model_config_id, browser_type=browser_type)
+
+    async def generate_script(self, task_description, mode='web'):
+        """
+        Generate Playwright script from task description using LLM
+        """
+        try:
+            prompt = f"""
+            Generate a complete, runnable Python Playwright script for the following test task.
+            
+            Task: {task_description}
+            Mode: {mode}
+            
+            Requirements:
+            1. Use 'playwright.sync_api' or 'playwright.async_api'.
+            2. Include necessary imports.
+            3. Handle browser launch and context creation.
+            4. Include comments explaining steps.
+            5. Return ONLY the code, no markdown formatting.
+            """
+            
+            response = await self.llm.ainvoke([
+                SystemMessage(content="You are an expert Test Automation Engineer specializing in Playwright."),
+                HumanMessage(content=prompt)
+            ])
+            
+            content = response.content.strip()
+            # Clean Markdown
+            content = re.sub(r'^```python\s*', '', content)
+            content = re.sub(r'^```\s*', '', content)
+            content = re.sub(r'\s*```$', '', content)
+            
+            return content
+        except Exception as e:
+            logger.error(f"Failed to generate script: {e}")
+            return f"# Failed to generate script: {str(e)}"
 
 # ============================================================================
 # EXPORTED FUNCTIONS (FACTORY)
@@ -37,3 +76,7 @@ def run_full_process_sync(task_description: str, analysis_callback=None, step_ca
 
     logger.info(f"DEBUG: Agent created successfully ({type(agent).__name__}), starting asyncio.run")
     return asyncio.run(agent.run_full_process(task_description, analysis_callback, step_callback, should_stop))
+
+def generate_script_content_sync(task_description: str, mode='web', model_config_id=None):
+    agent = BrowserAgent(execution_mode='text', model_config_id=model_config_id)
+    return asyncio.run(agent.generate_script(task_description, mode))

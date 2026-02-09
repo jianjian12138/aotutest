@@ -57,52 +57,21 @@
             <el-option label="Coze" value="coze" />
             <el-option label="Dify" value="dify" />
             <el-option label="n8n" value="n8n" />
-            <el-option label="Skills" value="skills" />
-            <el-option label="MCP" value="mcp" />
           </el-select>
         </el-form-item>
 
-        <!-- 部署模式选择 (非MCP) -->
-        <el-form-item label="部署模式" v-if="currentConfigForm.provider !== 'mcp'">
+        <!-- 部署模式选择 -->
+        <el-form-item label="部署模式">
           <el-radio-group v-model="currentConfigForm.deploy_mode" @change="handleDeployModeChange">
             <el-radio label="online">线上 (Cloud)</el-radio>
             <el-radio label="local">本地 (Self-hosted)</el-radio>
           </el-radio-group>
         </el-form-item>
 
-        <!-- MCP 特有配置 -->
-        <template v-if="currentConfigForm.provider === 'mcp'">
-          <el-form-item label="连接类型">
-            <el-radio-group v-model="currentConfigForm.mcp_type">
-              <el-radio label="sse">远程 (SSE)</el-radio>
-              <el-radio label="stdio">本地 (Stdio)</el-radio>
-            </el-radio-group>
-          </el-form-item>
-
-
-          <template v-if="currentConfigForm.mcp_type === 'stdio'">
-            <el-form-item label="命令" prop="mcp_command">
-              <el-input v-model="currentConfigForm.mcp_command" placeholder="例如: npx, python, uvx" />
-            </el-form-item>
-            <el-form-item label="参数" prop="mcp_args">
-              <el-input v-model="currentConfigForm.mcp_args" placeholder="例如: -y @modelcontextprotocol/server-filesystem" />
-            </el-form-item>
-            <el-form-item label="环境变量">
-               <el-input 
-                 v-model="currentConfigForm.mcp_env" 
-                 type="textarea" 
-                 :rows="3"
-                 placeholder='JSON格式, 例如: {"KEY": "VALUE"}' 
-               />
-            </el-form-item>
-          </template>
-        </template>
-
-        <!-- 通用配置 (非MCP Stdio模式显示) -->
+        <!-- 通用配置 -->
         <el-form-item 
           label="API URL" 
           prop="api_url" 
-          v-if="!(currentConfigForm.provider === 'mcp' && currentConfigForm.mcp_type === 'stdio')"
         >
           <el-input v-model="currentConfigForm.api_url" placeholder="API地址" />
         </el-form-item>
@@ -110,7 +79,6 @@
         <el-form-item 
           label="API Key" 
           prop="api_key"
-          v-if="!(currentConfigForm.provider === 'mcp' && currentConfigForm.mcp_type === 'stdio')"
         >
           <el-input 
             v-model="currentConfigForm.api_key" 
@@ -171,20 +139,11 @@ const currentConfigForm = ref({
 const rules = computed(() => {
   const commonRules = {
     name: [{ required: true, message: '请输入配置名称', trigger: 'blur' }],
-    provider: [{ required: true, message: '请选择提供商', trigger: 'change' }]
+    provider: [{ required: true, message: '请选择提供商', trigger: 'change' }],
+    api_url: [{ required: true, message: '请输入API URL', trigger: 'blur' }]
   }
 
-  if (currentConfigForm.value.provider === 'mcp' && currentConfigForm.value.mcp_type === 'stdio') {
-    return {
-      ...commonRules,
-      mcp_command: [{ required: true, message: '请输入命令', trigger: 'blur' }]
-    }
-  } else {
-    return {
-      ...commonRules,
-      api_url: [{ required: true, message: '请输入API URL', trigger: 'blur' }]
-    }
-  }
+  return commonRules
 })
 
 const handleProviderChange = (val) => {
@@ -192,12 +151,8 @@ const handleProviderChange = (val) => {
   currentConfigForm.value.api_url = ''
   currentConfigForm.value.api_key = ''
   
-  if (val === 'mcp') {
-    currentConfigForm.value.mcp_type = 'sse'
-  } else {
-    currentConfigForm.value.deploy_mode = 'online'
-    handleDeployModeChange('online')
-  }
+  currentConfigForm.value.deploy_mode = 'online'
+  handleDeployModeChange('online')
   
   // 清除验证状态
   if (configFormRef.value) {
@@ -296,33 +251,8 @@ const saveConfig = async () => {
       
       data.additional_config = data.additional_config || {}
       
-      // Handle MCP specific logic
-      if (data.provider === 'mcp') {
-        data.additional_config = {
-          ...data.additional_config,
-          mcp_type: data.mcp_type,
-          mcp_command: data.mcp_command,
-          mcp_args: data.mcp_args,
-        }
-        
-        try {
-          if (data.mcp_env) {
-            data.additional_config.mcp_env = JSON.parse(data.mcp_env)
-          }
-        } catch (e) {
-          ElMessage.error('环境变量格式不正确，请输入有效的JSON')
-          saving.value = false
-          return
-        }
-        
-        if (data.mcp_type === 'stdio') {
-          // Dummy URL for validation if backend requires it
-          data.api_url = 'stdio://localhost'
-        }
-      } else {
-        // Handle other providers (deploy_mode)
-        data.additional_config.deploy_mode = data.deploy_mode
-      }
+      // Handle deploy_mode
+      data.additional_config.deploy_mode = data.deploy_mode
       
       // Remove temporary fields
       delete data.deploy_mode

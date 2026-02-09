@@ -191,7 +191,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Delete, Setting } from '@element-plus/icons-vue'
 import api from '@/utils/api'
 import EnvironmentTable from './components/EnvironmentTable.vue'
-import '@/assets/css/unified-styles.scss'
+import '@/assets/css/global.scss'
 
 const activeTab = ref('GLOBAL')
 const globalEnvironments = ref([])

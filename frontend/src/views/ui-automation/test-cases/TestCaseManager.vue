@@ -6,6 +6,10 @@
         <el-select v-model="projectId" placeholder="选择项目" style="width: 200px; margin-right: 15px" @change="onProjectChange">
           <el-option v-for="project in projects" :key="project.id" :label="project.name" :value="project.id" />
         </el-select>
+        <el-button type="warning" @click="openRecorderDialog" style="margin-right: 10px">
+          <el-icon><VideoCamera /></el-icon>
+          录制用例
+        </el-button>
         <el-button type="primary" @click="showCreateDialog = true">
           <el-icon><Plus /></el-icon>
           新建测试用例
@@ -174,6 +178,9 @@
                             <el-option label="断言" value="assert" />
                             <el-option label="等待" value="wait" />
                             <el-option label="切换标签页" value="switchTab" />
+                            <el-option label="AI智能操作" value="ai_act" />
+                            <el-option label="AI智能提取" value="ai_extract" />
+                            <el-option label="AI视觉操作" value="ai_vision" />
                           </el-select>
                           <el-select
                             v-if="needsElement(element)"
@@ -589,6 +596,49 @@
       </template>
     </el-dialog>
 
+    <!-- 录制用例对话框 -->
+    <el-dialog
+      v-model="showRecorderDialog"
+      title="录制测试用例"
+      width="650px"
+    >
+      <div class="recorder-guide">
+        <el-alert
+          title="录制功能说明"
+          type="info"
+          description="由于浏览器安全限制，无法直接在网页中启动本地浏览器。请下载录制代理工具并在本地运行。"
+          show-icon
+          :closable="false"
+          style="margin-bottom: 20px"
+        />
+        
+        <el-steps direction="vertical" :active="1" finish-status="success">
+          <el-step title="准备环境" description="确保本地已安装 Python 3 和 Playwright (pip install playwright)。" />
+          <el-step title="运行录制代理" status="process">
+            <template #description>
+              <div class="command-box">
+                <p>请在终端(项目根目录)运行以下命令：</p>
+                <div class="code-block">
+                  <code>{{ recorderCommand }}</code>
+                  <el-button link type="primary" @click="copyCommand">
+                    <el-icon><CopyDocument /></el-icon> 复制
+                  </el-button>
+                </div>
+                <p class="tip">提示：该命令将启动 Playwright 录制器。在弹出的浏览器中进行操作，关闭浏览器后用例将自动上传。</p>
+              </div>
+            </template>
+          </el-step>
+          <el-step title="完成录制" description="录制完成后，点击下方刷新按钮查看新用例。" />
+        </el-steps>
+      </div>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="showRecorderDialog = false">关闭</el-button>
+          <el-button type="primary" @click="loadTestCases">刷新列表</el-button>
+        </span>
+      </template>
+    </el-dialog>
+
     <!-- 截图预览对话框 -->
     <el-dialog
       v-model="showScreenshotPreview"
@@ -697,9 +747,10 @@
 import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
-  Search, Plus, Edit, Delete, Check, CaretRight, ArrowUp, ArrowDown, Rank, Picture, Warning, View, ZoomIn, Refresh, WarningFilled, MagicStick, InfoFilled
+  Search, Plus, Edit, Delete, Check, CaretRight, ArrowUp, ArrowDown, Rank, Picture, Warning, View, ZoomIn, Refresh, WarningFilled, MagicStick, InfoFilled, VideoCamera, CopyDocument
 } from '@element-plus/icons-vue'
 import draggable from 'vuedraggable'
+import { useUserStore } from '@/stores/user'
 
 import {
   getUiProjects,
@@ -746,6 +797,33 @@ const debugJsonContent = reactive({ before: '', after: '' })
 const loadingDebugJson = ref(false)
 const currentEditingStep = ref(null)
 const currentEditingField = ref('')
+
+// 录制相关
+const userStore = useUserStore()
+const showRecorderDialog = ref(false)
+
+const recorderCommand = computed(() => {
+  const origin = window.location.origin
+  const token = userStore.accessToken || '<YOUR_TOKEN>'
+  const pid = projectId.value || '<PROJECT_ID>'
+  return `python tools/recorder_agent.py --server ${origin} --project ${pid} --token ${token}`
+})
+
+const openRecorderDialog = () => {
+  if (!projectId.value) {
+    ElMessage.warning('请先选择项目')
+    return
+  }
+  showRecorderDialog.value = true
+}
+
+const copyCommand = () => {
+  navigator.clipboard.writeText(recorderCommand.value).then(() => {
+    ElMessage.success('命令已复制到剪贴板')
+  }).catch(() => {
+    ElMessage.error('复制失败')
+  })
+}
 
 // 表单数据
 const testCaseForm = reactive({
@@ -956,7 +1034,7 @@ const onElementChange = (step) => {
 }
 
 const needsInputValue = (actionType) => {
-  return ['fill', 'switchTab'].includes(actionType)
+  return ['fill', 'switchTab', 'ai_act', 'ai_extract', 'ai_vision'].includes(actionType)
 }
 
 const needsWaitTime = (actionType) => {
@@ -969,7 +1047,7 @@ const needsElement = (step) => {
   if (actionType === 'assert' && step.assert_type === 'database') {
     return false
   }
-  return !['wait', 'switchTab', 'screenshot', 'database_assert'].includes(actionType)
+  return !['wait', 'switchTab', 'screenshot', 'database_assert', 'ai_act', 'ai_extract', 'ai_vision'].includes(actionType)
 }
 
 const expandAllSteps = () => {
@@ -1234,7 +1312,7 @@ const saveTestCaseForm = async () => {
       name: testCaseForm.name,
       description: testCaseForm.description,
       priority: testCaseForm.priority,
-      project: projectId.value,
+      project_id: projectId.value,
       steps: []
     }
 
@@ -1250,6 +1328,11 @@ const saveTestCaseForm = async () => {
       }
     } else {
       // 创建新用例
+      // 后端字段可能要求 status 字段，如果报错 status 400，通常是缺少必填字段
+      // 根据之前的代码，data 中并没有 status 字段，这里补上
+      data.status = 'ready'
+      // 移除 created_by，因为后端 serializer 的 create 方法中已经通过 request.user 自动设置了
+      
       const response = await createTestCase(data)
       ElMessage.success('测试用例创建成功')
       testCases.value.push(response.data)
@@ -1260,7 +1343,14 @@ const saveTestCaseForm = async () => {
     resetForm()
   } catch (error) {
     console.error('保存测试用例失败:', error)
-    ElMessage.error('保存失败')
+    // 详细打印后端返回的错误信息，方便调试
+    if (error.response && error.response.data) {
+        console.error('后端返回错误详情:', error.response.data)
+        const errorMsg = JSON.stringify(error.response.data)
+        ElMessage.error('保存失败: ' + errorMsg)
+    } else {
+        ElMessage.error('保存失败: ' + (error.message || '未知错误'))
+    }
   }
 }
 
@@ -1304,7 +1394,10 @@ const getActionTypeText = (actionType) => {
     'screenshot': '截图',
     'assert': '断言',
     'wait': '等待',
-    'database_assert': '数据库断言'
+    'database_assert': '数据库断言',
+    'ai_act': 'AI操作',
+    'ai_extract': 'AI提取',
+    'ai_vision': 'AI视觉'
   }
   return textMap[actionType] || actionType
 }
@@ -1327,7 +1420,10 @@ const getActionText = (actionType) => {
     'screenshot': '截图',
     'assert': '断言',
     'wait': '等待',
-    'database_assert': '数据库断言'
+    'database_assert': '数据库断言',
+    'ai_act': 'AI操作',
+    'ai_extract': 'AI提取',
+    'ai_vision': 'AI视觉'
   }
   return actionMap[actionType] || actionType
 }
@@ -2151,5 +2247,39 @@ onMounted(async () => {
   max-height: 300px;
   overflow-y: auto;
   border: 1px solid #e4e7ed;
+}
+
+.recorder-guide {
+  padding: 10px;
+}
+
+.command-box {
+  background: #f5f7fa;
+  padding: 15px;
+  border-radius: 6px;
+  border: 1px solid #e4e7ed;
+}
+
+.code-block {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #2d2d2d;
+  padding: 10px 15px;
+  border-radius: 4px;
+  margin: 10px 0;
+}
+
+.code-block code {
+  color: #67c23a;
+  font-family: monospace;
+  word-break: break-all;
+  margin-right: 10px;
+}
+
+.tip {
+  font-size: 12px;
+  color: #909399;
+  margin: 5px 0 0 0;
 }
 </style>

@@ -100,13 +100,17 @@ class BasePhoneAgent:
             logger.warning(f"ADB Error: {stderr.decode()}")
 
     async def _perform_action(self, action: Dict[str, Any]):
-        """Execute action on device"""
+        """Execute action on device using Appium if available, fallback to ADB"""
         action_type = action.get('type')
+        
+        # Check if we have an appium driver (To be implemented in DeviceManager)
+        # For now, we enhance the ADB implementation to be more robust and prepare for Appium
         
         if action_type == 'tap':
             x = action.get('x')
             y = action.get('y')
             if x is not None and y is not None:
+                # TODO: If self.driver: use W3C actions
                 await self._execute_adb_command(f"input tap {x} {y}")
         
         elif action_type == 'swipe':
@@ -116,6 +120,7 @@ class BasePhoneAgent:
             end_y = action.get('end_y')
             duration = action.get('duration', 300)
             if all([start_x, start_y, end_x, end_y]):
+                # TODO: If self.driver: use W3C actions
                 await self._execute_adb_command(f"input swipe {start_x} {start_y} {end_x} {end_y} {duration}")
                 
         elif action_type == 'input':

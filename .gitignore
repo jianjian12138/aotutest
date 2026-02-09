@@ -19,7 +19,6 @@ logs/*
 
 # 忽略所有 app/*/migrations/ 目录下的所有内容 (包括文件和子目录)
 apps/*/migrations/*
-# 使用否定模式，例外地跟踪 __init__.py 文件
 !apps/*/migrations/__init__.py
 
 # 忽略media下的子目录及文件，但保留.gitkeep文件
@@ -31,8 +30,18 @@ media/requirement_docs/*
 !media/requirement_docs/.gitkeep
 media/ai_recording/*
 !media/ai_recording/.gitkeep
+media/knowledge_docs/*
 
 # 忽略前端文件
 frontend/node_modules/
 frontend/.DS_Store
 frontend/*.log
+frontend/dist/
+
+# User specific exclusions
+scripts/
+recorded_script.py
+.env
+temp/
+insert_sample_data.py
+debug_sync.py

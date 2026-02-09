@@ -4,7 +4,10 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from .models import DifyConfig, AIWorkflowConfig
 from .serializers import DifyConfigSerializer, AIWorkflowConfigSerializer
+from .mcp_service import MCPService
+from .skills_service import SkillsService
 import requests
+import json
 
 
 class DifyConfigViewSet(viewsets.ModelViewSet):
@@ -12,6 +15,7 @@ class DifyConfigViewSet(viewsets.ModelViewSet):
     queryset = DifyConfig.objects.all()
     serializer_class = DifyConfigSerializer
     permission_classes = [IsAuthenticated]
+    pagination_class = None
     
     def list(self, request):
         """获取激活的配置"""
@@ -116,20 +120,23 @@ class AIWorkflowConfigViewSet(viewsets.ModelViewSet):
     queryset = AIWorkflowConfig.objects.all()
     serializer_class = AIWorkflowConfigSerializer
     permission_classes = [IsAuthenticated]
+    pagination_class = None
     
     def perform_create(self, serializer):
-        # 如果设置为激活，先将同类型的其他配置设为不激活
-        if serializer.validated_data.get('is_active', True):
-            provider = serializer.validated_data.get('provider')
-            if provider:
-                AIWorkflowConfig.objects.filter(provider=provider).update(is_active=False)
+        # 如果设置为激活，先将同类型的其他配置设为不激活 (MCP除外，支持多个同时激活)
+        is_active = serializer.validated_data.get('is_active', True)
+        provider = serializer.validated_data.get('provider')
+        if is_active and provider and provider != 'mcp':
+            AIWorkflowConfig.objects.filter(provider=provider).update(is_active=False)
         serializer.save()
     
     def perform_update(self, serializer):
-        # 如果设置为激活，先将同类型的其他配置设为不激活
-        if serializer.validated_data.get('is_active', False):
+        # 如果设置为激活，先将同类型的其他配置设为不激活 (MCP除外)
+        is_active = serializer.validated_data.get('is_active', False)
+        if is_active:
             instance = self.get_object()
-            AIWorkflowConfig.objects.filter(provider=instance.provider).exclude(pk=instance.pk).update(is_active=False)
+            if instance.provider != 'mcp':
+                AIWorkflowConfig.objects.filter(provider=instance.provider).exclude(pk=instance.pk).update(is_active=False)
         serializer.save()
         
     @action(detail=False, methods=['get'])
@@ -146,7 +153,7 @@ class AIWorkflowConfigViewSet(viewsets.ModelViewSet):
         api_url = request.data.get('api_url')
         api_key = request.data.get('api_key')
         
-        if not all([provider, api_url, api_key]):
+        if not all([provider, api_url]):
             return Response({'error': '缺少必要参数'}, status=status.HTTP_400_BAD_REQUEST)
             
         try:
@@ -161,12 +168,35 @@ class AIWorkflowConfigViewSet(viewsets.ModelViewSet):
                 else:
                     return Response({'success': False, 'message': f'Dify连接失败: {response.status_code}'})
             
+            elif provider == 'mcp':
+                # MCP测试
+                mcp_type = request.data.get('mcp_type', 'remote')
+                result = MCPService.get_tools(api_url, api_key, mcp_type)
+                if isinstance(result, list) or (isinstance(result, dict) and "error" not in result):
+                    # 如果测试成功，且提供了ID，更新数据库中的工具数量
+                    config_id = request.data.get('id')
+                    tools_count = len(result) if isinstance(result, list) else 0
+                    if config_id:
+                        AIWorkflowConfig.objects.filter(pk=config_id).update(tools_count=tools_count)
+                    return Response({'success': True, 'message': 'MCP连接成功', 'tools': result, 'tools_count': tools_count})
+                else:
+                    error_msg = result.get('error') if isinstance(result, dict) else 'Unknown error'
+                    return Response({'success': False, 'message': f"MCP连接失败: {error_msg}"})
+
+            elif provider == 'skills':
+                # Skills测试 (简单执行一段代码)
+                test_code = "print('Skill execution test success'); result = 'OK'"
+                result = SkillsService.execute_skill(test_code)
+                if result['success']:
+                    return Response({'success': True, 'message': 'Skills执行引擎正常'})
+                else:
+                    return Response({'success': False, 'message': f"Skills引擎异常: {result['error']}"})
+
             elif provider == 'coze':
                 # Coze测试逻辑 (假设API)
                 headers = {'Authorization': f'Bearer {api_key}', 'Content-Type': 'application/json'}
-                # Coze API可能有所不同，这里仅作示例
                 response = requests.get(api_url, headers=headers, timeout=10)
-                if response.status_code in [200, 401, 403]: # 只要能通，即使认证失败也算连接通了(401说明URL对)
+                if response.status_code in [200, 401, 403]:
                      return Response({'success': True, 'message': 'Coze连接测试完成'})
             
             # 其他提供商暂只做简单URL连通性测试
@@ -178,3 +208,45 @@ class AIWorkflowConfigViewSet(viewsets.ModelViewSet):
                 
         except Exception as e:
             return Response({'success': False, 'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=['get'])
+    def mcp_tools(self, request, pk=None):
+        """获取MCP服务器的工具列表"""
+        config = self.get_object()
+        if config.provider != 'mcp':
+            return Response({'error': '只有MCP类型的配置才支持获取工具'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        result = MCPService.get_tools(config.api_url, config.api_key, config.mcp_type)
+        return Response(result)
+
+    @action(detail=True, methods=['post'])
+    def call_mcp_tool(self, request, pk=None):
+        """调用MCP工具"""
+        config = self.get_object()
+        if config.provider != 'mcp':
+            return Response({'error': '只有MCP类型的配置才支持调用工具'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        tool_name = request.data.get('tool_name')
+        arguments = request.data.get('arguments', {})
+        
+        if not tool_name:
+            return Response({'error': 'tool_name是必填项'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        result = MCPService.call_tool(config.api_url, tool_name, arguments, config.api_key, config.mcp_type)
+        return Response(result)
+
+    @action(detail=True, methods=['post'])
+    def run_skill(self, request, pk=None):
+        """执行Skill脚本"""
+        config = self.get_object()
+        if config.provider != 'skills':
+            return Response({'error': '只有Skills类型的配置才支持执行脚本'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        code = request.data.get('code') or config.additional_config.get('code')
+        context = request.data.get('context', {})
+        
+        if not code:
+            return Response({'error': '代码不能为空'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        result = SkillsService.execute_skill(code, context)
+        return Response(result)

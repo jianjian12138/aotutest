@@ -34,7 +34,13 @@
         <!-- 任务列表 -->
         <el-table :data="tasks" v-loading="loading" style="width: 100%; flex: 1;">
         <el-table-column prop="name" label="任务名称" min-width="150" />
-        <el-table-column prop="project_name" label="所属项目" width="120" />
+        <el-table-column label="所属项目" width="150">
+          <template #default="{ row }">
+            <el-tag v-if="row.api_project_name" type="success">API: {{ row.api_project_name }}</el-tag>
+            <el-tag v-else-if="row.project_name" type="info">通用: {{ row.project_name }}</el-tag>
+            <span v-else>-</span>
+          </template>
+        </el-table-column>
         <el-table-column prop="task_type" label="类型" width="100">
           <template #default="{ row }">
             <el-tag :type="getTaskTypeTag(row.task_type)">{{ row.task_type }}</el-tag>
@@ -82,14 +88,24 @@
         <el-form-item label="任务名称" prop="name">
           <el-input v-model="form.name" />
         </el-form-item>
-        <el-form-item label="所属项目" prop="project">
-          <el-select v-model="form.project" placeholder="选择项目" style="width: 100%">
-            <el-option
-              v-for="item in projects"
-              :key="item.id"
-              :label="item.name"
-              :value="item.id"
-            />
+        <el-form-item label="所属项目" prop="project_id_combined">
+          <el-select v-model="form.project_id_combined" placeholder="选择项目" style="width: 100%" @change="handleProjectChange">
+            <el-option-group label="接口测试项目">
+              <el-option
+                v-for="item in apiProjects"
+                :key="'api_' + item.id"
+                :label="item.name"
+                :value="'api_' + item.id"
+              />
+            </el-option-group>
+            <el-option-group label="通用项目">
+              <el-option
+                v-for="item in projects"
+                :key="'gen_' + item.id"
+                :label="item.name"
+                :value="'gen_' + item.id"
+              />
+            </el-option-group>
           </el-select>
         </el-form-item>
         <el-form-item label="任务类型" prop="task_type">
@@ -176,6 +192,7 @@ const isEdit = ref(false)
 const formRef = ref(null)
 
 const projects = ref([])
+const apiProjects = ref([])
 const notificationConfigs = ref([])
 
 const filters = reactive({
@@ -187,6 +204,8 @@ const form = reactive({
   id: null,
   name: '',
   project: null,
+  api_project: null,
+  project_id_combined: '',
   task_type: 'API',
   trigger_type: 'CRON',
   cron_expression: '',
@@ -200,7 +219,7 @@ const form = reactive({
 
 const rules = {
   name: [{ required: true, message: '请输入任务名称', trigger: 'blur' }],
-  project: [{ required: true, message: '请选择项目', trigger: 'change' }],
+  project_id_combined: [{ required: true, message: '请选择项目', trigger: 'change' }],
   task_type: [{ required: true, message: '请选择任务类型', trigger: 'change' }]
 }
 
@@ -225,10 +244,31 @@ const loadData = async () => {
 
 const loadProjects = async () => {
   try {
+    // 加载通用项目
     const res = await api.get('/projects/')
     projects.value = res.data.results || res.data
+    
+    // 加载接口测试项目
+    const apiRes = await api.get('/api-testing/projects/')
+    apiProjects.value = apiRes.data.results || apiRes.data
   } catch (error) {
-    console.error(error)
+    console.error('加载项目失败:', error)
+  }
+}
+
+const handleProjectChange = (val) => {
+  if (!val) {
+    form.project = null
+    form.api_project = null
+    return
+  }
+  
+  if (val.startsWith('api_')) {
+    form.api_project = parseInt(val.replace('api_', ''))
+    form.project = null
+  } else if (val.startsWith('gen_')) {
+    form.project = parseInt(val.replace('gen_', ''))
+    form.api_project = null
   }
 }
 
@@ -262,6 +302,16 @@ const handleAdd = () => {
 const handleEdit = (row) => {
   isEdit.value = true
   Object.assign(form, row)
+  
+  // 设置组合项目 ID
+  if (row.api_project) {
+    form.project_id_combined = 'api_' + row.api_project
+  } else if (row.project) {
+    form.project_id_combined = 'gen_' + row.project
+  } else {
+    form.project_id_combined = ''
+  }
+  
   dialogVisible.value = true
 }
 
@@ -294,17 +344,21 @@ const handleSubmit = async () => {
     if (valid) {
       submitting.value = true
       try {
+        const submitData = { ...form }
+        delete submitData.project_id_combined
+        
         if (isEdit.value) {
-          await schedulerApi.updateTask(form.id, form)
+          await schedulerApi.updateTask(form.id, submitData)
           ElMessage.success('更新成功')
         } else {
-          await schedulerApi.createTask(form)
+          await schedulerApi.createTask(submitData)
           ElMessage.success('创建成功')
         }
         dialogVisible.value = false
         loadData()
       } catch (error) {
-        ElMessage.error(isEdit.value ? '更新失败' : '创建失败')
+        console.error('保存任务失败:', error)
+        ElMessage.error(error.response?.data?.detail || (isEdit.value ? '更新失败' : '创建失败'))
       } finally {
         submitting.value = false
       }

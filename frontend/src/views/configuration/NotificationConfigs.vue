@@ -19,12 +19,23 @@
           </template>
         </el-table-column>
         <el-table-column prop="webhook_url" label="Webhook URL" min-width="200" show-overflow-tooltip />
+        <el-table-column label="关联项目" width="150">
+          <template #default="{ row }">
+            <el-tag v-if="row.api_project_name" type="success">API: {{ row.api_project_name }}</el-tag>
+            <el-tag v-else-if="row.project_name" type="info">通用: {{ row.project_name }}</el-tag>
+            <span v-else>全局配置</span>
+          </template>
+        </el-table-column>
         <el-table-column prop="is_active" label="状态" width="100">
           <template #default="{ row }">
             <el-tag :type="row.is_active ? 'success' : 'info'">{{ row.is_active ? '启用' : '禁用' }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="created_at" label="创建时间" width="180" />
+        <el-table-column prop="created_at" label="创建时间" width="180">
+          <template #default="{ row }">
+            {{ formatDateTime(row.created_at) }}
+          </template>
+        </el-table-column>
         <el-table-column label="操作" width="150" fixed="right">
           <template #default="{ row }">
             <el-button link type="primary" @click="handleEdit(row)">编辑</el-button>
@@ -62,14 +73,78 @@
           </el-form-item>
         </template>
         
-        <el-form-item label="关联项目" prop="project">
-          <el-select v-model="form.project" placeholder="全局配置(可选)" clearable style="width: 100%">
-            <el-option
-              v-for="item in projects"
-              :key="item.id"
-              :label="item.name"
-              :value="item.id"
-            />
+        <template v-if="form.config_type === 'email'">
+          <el-row :gutter="20">
+            <el-col :span="16">
+              <el-form-item label="SMTP服务器" prop="smtp_server">
+                <el-input v-model="form.smtp_server" placeholder="例如 smtp.163.com" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="8">
+              <el-form-item label="端口" prop="smtp_port">
+                <el-input v-model.number="form.smtp_port" type="number" placeholder="465" />
+              </el-form-item>
+            </el-col>
+          </el-row>
+          
+          <el-form-item label="用户名" prop="smtp_user">
+            <el-input v-model="form.smtp_user" placeholder="邮箱账号" />
+          </el-form-item>
+          
+          <el-form-item label="密码" prop="smtp_password">
+            <el-input v-model="form.smtp_password" type="password" show-password placeholder="邮箱授权码/密码" />
+          </el-form-item>
+          
+          <el-form-item label="发件人邮箱" prop="email_from">
+            <el-input v-model="form.email_from" placeholder="显示的发送者邮箱" />
+          </el-form-item>
+          
+          <el-form-item label="加密方式">
+            <el-radio-group v-model="form.encryption">
+              <el-radio label="ssl">SSL (推荐 465)</el-radio>
+              <el-radio label="tls">TLS (587)</el-radio>
+              <el-radio label="none">无</el-radio>
+            </el-radio-group>
+          </el-form-item>
+
+          <el-form-item label="默认收件人" prop="email_recipients">
+            <el-select
+              v-model="form.email_recipients"
+              multiple
+              filterable
+              allow-create
+              default-first-option
+              placeholder="请输入并按回车添加收件人"
+              style="width: 100%"
+            >
+              <el-option
+                v-for="item in form.email_recipients"
+                :key="item"
+                :label="item"
+                :value="item"
+              />
+            </el-select>
+          </el-form-item>
+        </template>
+        
+        <el-form-item label="关联项目" prop="project_id_combined">
+          <el-select v-model="form.project_id_combined" placeholder="全局配置(可选)" clearable style="width: 100%" @change="handleProjectChange">
+            <el-option-group label="接口测试项目">
+              <el-option
+                v-for="item in apiProjects"
+                :key="'api_' + item.id"
+                :label="item.name"
+                :value="'api_' + item.id"
+              />
+            </el-option-group>
+            <el-option-group label="通用项目">
+              <el-option
+                v-for="item in projects"
+                :key="'gen_' + item.id"
+                :label="item.name"
+                :value="'gen_' + item.id"
+              />
+            </el-option-group>
           </el-select>
         </el-form-item>
         
@@ -101,6 +176,7 @@ import api from '@/utils/api'
 const loading = ref(false)
 const configs = ref([])
 const projects = ref([])
+const apiProjects = ref([])
 const dialogVisible = ref(false)
 const submitting = ref(false)
 const isEdit = ref(false)
@@ -112,7 +188,18 @@ const form = reactive({
   config_type: 'webhook_feishu',
   webhook_url: '',
   secret: '',
+  smtp_server: '',
+  smtp_port: 465,
+  smtp_user: '',
+  smtp_password: '',
+  email_from: '',
+  use_ssl: true,
+  use_tls: false,
+  encryption: 'ssl',
+  email_recipients: [],
   project: null,
+  api_project: null,
+  project_id_combined: '',
   is_active: true,
   description: ''
 })
@@ -137,10 +224,31 @@ const loadData = async () => {
 
 const loadProjects = async () => {
   try {
+    // 加载通用项目
     const res = await api.get('/projects/')
     projects.value = res.data.results || res.data
+    
+    // 加载接口测试项目
+    const apiRes = await api.get('/api-testing/projects/')
+    apiProjects.value = apiRes.data.results || apiRes.data
   } catch (error) {
-    console.error(error)
+    console.error('加载项目失败:', error)
+  }
+}
+
+const handleProjectChange = (val) => {
+  if (!val) {
+    form.project = null
+    form.api_project = null
+    return
+  }
+  
+  if (val.startsWith('api_')) {
+    form.api_project = parseInt(val.replace('api_', ''))
+    form.project = null
+  } else if (val.startsWith('gen_')) {
+    form.project = parseInt(val.replace('gen_', ''))
+    form.api_project = null
   }
 }
 
@@ -158,8 +266,19 @@ const handleAdd = () => {
   isEdit.value = false
   form.id = null
   form.name = ''
+  form.config_type = 'webhook_feishu'
   form.webhook_url = ''
   form.secret = ''
+  form.smtp_server = ''
+  form.smtp_port = 465
+  form.smtp_user = ''
+  form.smtp_password = ''
+  form.email_from = ''
+  form.encryption = 'ssl'
+  form.email_recipients = []
+  form.project = null
+  form.api_project = null
+  form.project_id_combined = ''
   form.description = ''
   form.is_active = true
   dialogVisible.value = true
@@ -168,6 +287,24 @@ const handleAdd = () => {
 const handleEdit = (row) => {
   isEdit.value = true
   Object.assign(form, row)
+  // 确保收件人是数组
+  if (!Array.isArray(form.email_recipients)) {
+    form.email_recipients = []
+  }
+  
+  // 设置组合项目 ID
+  if (row.api_project) {
+    form.project_id_combined = 'api_' + row.api_project
+  } else if (row.project) {
+    form.project_id_combined = 'gen_' + row.project
+  } else {
+    form.project_id_combined = ''
+  }
+
+  // 设置加密方式显示
+  if (row.use_ssl) form.encryption = 'ssl'
+  else if (row.use_tls) form.encryption = 'tls'
+  else form.encryption = 'none'
   dialogVisible.value = true
 }
 
@@ -191,22 +328,47 @@ const handleSubmit = async () => {
     if (valid) {
       submitting.value = true
       try {
+        // 准备提交的数据，过滤掉前端专用的 encryption 字段
+        const submitData = { ...form }
+        submitData.use_ssl = form.encryption === 'ssl'
+        submitData.use_tls = form.encryption === 'tls'
+        delete submitData.encryption
+        delete submitData.project_id_combined
+        
         if (isEdit.value) {
-          await schedulerApi.updateNotificationConfig(form.id, form)
+          await schedulerApi.updateNotificationConfig(form.id, submitData)
           ElMessage.success('更新成功')
         } else {
-          await schedulerApi.createNotificationConfig(form)
+          await schedulerApi.createNotificationConfig(submitData)
           ElMessage.success('创建成功')
         }
         dialogVisible.value = false
         loadData()
       } catch (error) {
-        ElMessage.error(isEdit.value ? '更新失败' : '创建失败')
+        console.error('保存通知配置失败:', error)
+        ElMessage.error(error.response?.data?.detail || (isEdit.value ? '更新失败' : '创建失败'))
       } finally {
         submitting.value = false
       }
     }
   })
+}
+
+const formatDateTime = (dateStr) => {
+  if (!dateStr) return '-'
+  try {
+    const date = new Date(dateStr)
+    return date.toLocaleString('zh-CN', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    })
+  } catch (e) {
+    return dateStr
+  }
 }
 
 onMounted(() => {

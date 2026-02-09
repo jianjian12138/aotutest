@@ -59,7 +59,10 @@ class PlaywrightTestEngine:
             # 启动浏览器
             launch_args = {
                 'headless': self.headless,
-                'args': ['--disable-blink-features=AutomationControlled']
+                'args': [
+                    '--disable-blink-features=AutomationControlled',
+                    '--start-maximized' # 启动时最大化窗口
+                ]
             }
             if channel:
                 launch_args['channel'] = channel
@@ -92,10 +95,13 @@ class PlaywrightTestEngine:
                     raise e
 
             # 创建浏览器上下文
+            # viewport=None 是必须的，配合 --start-maximized 使用，否则窗口会被裁剪
             self.context = await self.browser.new_context(
-                viewport={'width': 1920, 'height': 1080},
+                viewport=None, 
                 user_agent='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36'
             )
+            
+            logger.info("浏览器上下文已创建 (Viewport=None, 最大化模式)")
 
             # 创建页面
             self.page = await self.context.new_page()
@@ -318,6 +324,65 @@ class PlaywrightTestEngine:
                 # 步骤后采集
                 debug_data['after'] = await self._capture_debug_data(step, project_config, timing='after')
                 return True, log, None, debug_data
+
+            elif action_type == 'ai_act':
+                from .services.stagehand_service import StagehandService
+                service = StagehandService(self.page)
+                
+                # Use resolved_input_value as the action description
+                action_desc = resolved_input_value or "Interact with element"
+                
+                success, msg = await service.act(action_desc)
+                execution_time = round(time.time() - start_time, 2)
+                
+                # Capture debug data
+                debug_data['after'] = await self._capture_debug_data(step, project_config, timing='after')
+                
+                if success:
+                    return True, f"✓ {msg}\n  - 耗时: {execution_time}秒", None, debug_data
+                else:
+                    screenshot = await self.page.screenshot()
+                    screenshot_base64 = f"data:image/png;base64,{base64.b64encode(screenshot).decode()}"
+                    return False, f"✗ AI操作失败: {msg}\n  - 耗时: {execution_time}秒", screenshot_base64, debug_data
+
+            elif action_type == 'ai_extract':
+                from .services.stagehand_service import StagehandService
+                service = StagehandService(self.page)
+                
+                instruction = resolved_input_value or "Extract data"
+                # Use assert_value as schema description if available
+                schema = resolved_assert_value or "Extract all relevant fields as key-value pairs"
+                
+                success, data = await service.extract(instruction, schema)
+                execution_time = round(time.time() - start_time, 2)
+                
+                debug_data['after'] = await self._capture_debug_data(step, project_config, timing='after')
+                
+                if success:
+                    formatted_json = json.dumps(data, indent=2, ensure_ascii=False)
+                    return True, f"✓ AI提取成功\n  - 数据: {formatted_json}\n  - 耗时: {execution_time}秒", None, debug_data
+                else:
+                    screenshot = await self.page.screenshot()
+                    screenshot_base64 = f"data:image/png;base64,{base64.b64encode(screenshot).decode()}"
+                    return False, f"✗ AI提取失败: {data}\n  - 耗时: {execution_time}秒", screenshot_base64, debug_data
+
+            elif action_type == 'ai_vision':
+                from .services.stagehand_service import StagehandService
+                service = StagehandService(self.page)
+                
+                instruction = resolved_input_value or "Click target"
+                
+                success, msg = await service.vision_act(instruction)
+                execution_time = round(time.time() - start_time, 2)
+                
+                debug_data['after'] = await self._capture_debug_data(step, project_config, timing='after')
+                
+                if success:
+                    return True, f"✓ {msg}\n  - 耗时: {execution_time}秒", None, debug_data
+                else:
+                    screenshot = await self.page.screenshot()
+                    screenshot_base64 = f"data:image/png;base64,{base64.b64encode(screenshot).decode()}"
+                    return False, f"✗ AI视觉操作失败: {msg}\n  - 耗时: {execution_time}秒", screenshot_base64, debug_data
 
             # 其他操作需要元素定位器
             # 获取元素定位器
@@ -629,6 +694,8 @@ class PlaywrightTestEngine:
                         return False, error_log, screenshot_base64, debug_data
                 else:
                     # 普通元素：正常点击
+                    click_method_note = ""
+                    
                     # 如果启用了强制操作，先等待元素在 DOM 中，不要求可见
                     if force_action:
                         try:
@@ -636,9 +703,139 @@ class PlaywrightTestEngine:
                         except:
                             pass  # 如果已经在 DOM 中，继续
                     
-                    await locator.click(timeout=timeout_ms, force=force_action)
+                    # 特殊处理：如果点击的是隐藏的 <select> 元素 (常见于 UI 库如 Element Plus)
+                    # 尝试自动重定向点击到其关联的可见 Trigger 元素
+                    redirected_click = False
+                    
+                    try:
+                        # 检查是否为 SELECT 标签（不依赖可见性，因为即使被拦截，tag_name 也是 SELECT）
+                        tag_name = await locator.evaluate("el => el.tagName", timeout=1000)
+                        
+                        if tag_name == 'SELECT':
+                            logger.info("检测到 SELECT 标签，尝试查找并点击关联的 UI 组件...")
+                            # 查找父级容器
+                            parent = locator.locator('..')
+                            # 查找常见 Trigger 类名
+                            trigger = parent.locator('.el-select__wrapper, .el-input, .el-select__input, .ant-select-selector').first
+                            
+                            if await trigger.count() > 0 and await trigger.is_visible():
+                                await trigger.click(timeout=timeout_ms)
+                                redirected_click = True
+                                click_method_note += "  - 提示: 目标是隐藏Select，已自动点击关联的UI组件\n"
+                            else:
+                                logger.info("未找到关联的可见 UI 组件，尝试继续点击原元素...")
+                    except Exception as e_redirect:
+                        logger.warning(f"尝试重定向点击失败: {e_redirect}")
+
+                    if not redirected_click:
+                        try:
+                            await locator.click(timeout=timeout_ms, force=force_action)
+                        except Exception as e:
+                            error_msg = str(e)
+                            # 如果点击失败（被拦截 或 超时），尝试使用 JavaScript 点击
+                            # Timeout 可能是因为元素存在但不满足点击条件（如被遮挡、动画中、disabled等），或者元素根本不存在
+                            # 如果是 Timeout，我们尝试 JS 点击，但给一个较短的超时，避免长时间等待不存在的元素
+                            if force_action or "intercepts pointer events" in error_msg or "Timeout" in error_msg:
+                                logger.warning(f"Playwright 常规点击失败 ({error_msg})，尝试使用 JS 强制点击")
+                                
+                                # 启发式重试：如果主选择器失败且是超时，尝试查找替代按钮（针对登录等常见场景）
+                                heuristic_success = False
+                                if "Timeout" in error_msg and await locator.count() == 0:
+                                    # 常见登录按钮特征
+                                    heuristic_selectors = [
+                                        "button:has-text('登录')",
+                                        "button:has-text('Login')",
+                                        "button:has-text('Sign in')",
+                                        "button[type='submit']", # 再次尝试，也许现在加载出来了
+                                        "div[role='button']:has-text('登录')"
+                                    ]
+                                    
+                                    logger.info(f"主定位器 {locator_value} 未找到元素，尝试启发式搜索...")
+                                    for h_selector in heuristic_selectors:
+                                        # 跳过与原选择器完全相同的
+                                        if h_selector == locator_value:
+                                            continue
+                                            
+                                        h_locator = self.page.locator(h_selector).first
+                                        if await h_locator.count() > 0 and await h_locator.is_visible():
+                                            logger.info(f"启发式搜索找到替代元素: {h_selector}")
+                                            try:
+                                                # 使用 dispatchEvent 模拟更真实的点击
+                                                await h_locator.evaluate("""
+                                                    element => {
+                                                        element.dispatchEvent(new MouseEvent('mousedown', {bubbles: true}));
+                                                        element.dispatchEvent(new MouseEvent('mouseup', {bubbles: true}));
+                                                        element.dispatchEvent(new MouseEvent('click', {bubbles: true}));
+                                                    }
+                                                """)
+                                                click_method_note += f"  - 提示: 原定位器失败，使用替代定位器 '{h_selector}' JS模拟点击成功\n"
+                                                heuristic_success = True
+                                                break
+                                            except:
+                                                pass
+                                
+                                if not heuristic_success:
+                                    try:
+                                        # 尝试先 scroll into view
+                                        try:
+                                            await locator.scroll_into_view_if_needed(timeout=1000)
+                                        except:
+                                            pass
+                                            
+                                        # 使用 evaluate 模拟完整点击事件
+                                        # 单纯的 element.click() 有时会被 React/Vue 的合成事件系统忽略
+                                        await locator.evaluate("""
+                                            element => {
+                                                // 1. 尝试原生 click
+                                                element.click();
+                                                
+                                                // 2. 如果没反应，手动派发事件
+                                                const clickEvent = new MouseEvent('click', {
+                                                    bubbles: true,
+                                                    cancelable: true,
+                                                    view: window
+                                                });
+                                                element.dispatchEvent(clickEvent);
+                                            }
+                                        """, timeout=2000)
+                                        click_method_note += f"  - 提示: 常规点击失败，已使用 JS 增强型点击成功\n"
+                                    except Exception as js_e:
+                                        logger.warning(f"JS 点击也失败: {js_e}")
+                                        # 如果 JS 点击也失败，抛出原始异常（通常更有意义）
+                                        raise e
+                            else:
+                                raise e
+                    
+                    # 关键修复：点击后等待页面导航或 URL 变化
+                    # 仅针对可能是提交操作的点击（type=submit 或包含 '登录'/'Login'）
+                    is_submit_action = (
+                        'type=\'submit\'' in locator_value or 
+                        'type="submit"' in locator_value or
+                        '登录' in element_name or 
+                        'Login' in element_name
+                    )
+                    
+                    if is_submit_action:
+                         logger.info("检测到可能是提交/登录操作，等待页面加载...")
+                         try:
+                             # 等待 load 事件，最长 5 秒
+                             # 只要发生任何网络空闲或 load 事件即可，不要太严格
+                             # 修改为等待 url 变化或网络空闲
+                             current_url = self.page.url
+                             try:
+                                 # 尝试等待 URL 变化
+                                 await self.page.wait_for_url(lambda url: url != current_url, timeout=3000)
+                                 click_method_note += "  - 提示: 检测到 URL 变化，跳转成功\n"
+                             except:
+                                 # 如果 URL 没变，尝试等待网络空闲
+                                 await self.page.wait_for_load_state('networkidle', timeout=3000)
+                                 click_method_note += "  - 提示: 等待网络空闲完成\n"
+                         except:
+                             pass # 超时也没关系，可能页面已经加载完了或者只是 AJAX 跳转
+
                     execution_time = round(time.time() - start_time, 2)
                     log = f"✓ 点击元素 '{element_name}' 成功\n"
+                    log += click_method_note
                     log += f"  - 定位器: {locator_strategy}={locator_value}\n"
                     log += f"  - 超时设置: {timeout_ms/1000}秒\n"
                     if force_action:
@@ -655,6 +852,23 @@ class PlaywrightTestEngine:
                 # 输入成功后短暂等待，确保表单验证生效
                 # 特别是在服务器环境下，需要给Vue/React等框架时间处理
                 await asyncio.sleep(0.3)
+                
+                # 手动触发事件，确保 Vue/React 监听到变化
+                try:
+                    await locator.evaluate("""
+                        element => {
+                            element.dispatchEvent(new Event('input', { bubbles: true }));
+                            element.dispatchEvent(new Event('change', { bubbles: true }));
+                        }
+                    """)
+                except Exception as e_event:
+                    logger.warning(f"手动触发事件失败: {e_event}")
+
+                # 尝试触发 blur 事件，确保验证被触发
+                try:
+                    await locator.blur(timeout=1000)
+                except:
+                    pass
 
                 log = f"✓ 在元素 '{element_name}' 中输入文本成功\n"
                 log += f"  - 定位器: {locator_strategy}={locator_value}\n"
@@ -713,6 +927,84 @@ class PlaywrightTestEngine:
                 log += f"  - 超时设置: {timeout_ms/1000}秒\n"
                 log += f"  - 执行时间: {execution_time}秒"
                 return True, log, None
+
+            elif action_type == 'selectOption':
+                # 尝试选择选项
+                try:
+                    # 优先尝试 label (因为常见用法)
+                    await locator.select_option(label=resolved_input_value, timeout=timeout_ms, force=force_action)
+                    method = "label"
+                except Exception:
+                    try:
+                        # 尝试 value
+                        await locator.select_option(value=resolved_input_value, timeout=timeout_ms, force=force_action)
+                        method = "value"
+                    except Exception:
+                        try:
+                            # 尝试直接传值 (Playwright 自动匹配)
+                            await locator.select_option(resolved_input_value, timeout=timeout_ms, force=force_action)
+                            method = "auto"
+                        except Exception as e3:
+                            raise Exception(f"选择选项失败: {str(e3)}")
+
+                execution_time = round(time.time() - start_time, 2)
+                log = f"✓ 选择选项 '{resolved_input_value}' 成功 ({method})\n"
+                
+                # 尝试点击视觉选项 (针对 Element UI 等隐藏 Select 的情况)
+                try:
+                    # 检查 select 是否隐藏
+                    if not await locator.is_visible():
+                         # 如果是 label 方式，尝试查找并点击可见的选项元素
+                         if method == "label":
+                             option_text = resolved_input_value
+                             
+                             # 尝试查找对应的视觉选项
+                             # 1. 尝试 .el-select-dropdown__item (Element Plus)
+                             # 尝试多种选择器
+                             visual_option = self.page.locator(f".el-select-dropdown__item >> text='{option_text}'").first
+                             
+                             # 2. 尝试使用 get_by_text (更鲁棒)
+                             if await visual_option.count() == 0:
+                                 visual_option = self.page.get_by_text(option_text, exact=True).first
+                                 if await visual_option.count() == 0:
+                                     # 尝试非精确匹配
+                                     visual_option = self.page.get_by_text(option_text, exact=False).first
+
+                             # 3. 如果没找到，尝试 role=option (通用 ARIA)
+                             if await visual_option.count() == 0:
+                                 visual_option = self.page.get_by_role("option", name=option_text).first
+                             
+                             # 4. 如果还是没找到，尝试 li 包含文本
+                             if await visual_option.count() == 0:
+                                 visual_option = self.page.locator(f"li:has-text('{option_text}')").first
+
+                             # 尝试点击
+                             if await visual_option.count() > 0:
+                                 try:
+                                     # 强制点击，因为可能在动画中
+                                     # 设置较短超时，避免卡住
+                                     await visual_option.click(timeout=2000, force=True)
+                                     log += "  - 提示: 已同步点击视觉选项 (UI Component)\n"
+                                 except Exception as e_v:
+                                     log += f"  - 警告: 点击视觉选项失败: {e_v}\n"
+                             else:
+                                 log += "  - 警告: 未找到匹配文本的视觉选项，表单状态可能未更新\n"
+                                 
+                                 # 最后的救命稻草：如果找不到选项，可能是下拉框没打开？
+                                 # 再次尝试点击下拉框触发器？不，太复杂了。
+                                 # 尝试通过键盘操作：Down Arrow + Enter?
+                                 # 暂时不实现，风险较高
+                except Exception as e_visual:
+                    logger.warning(f"点击视觉选项失败: {e_visual}")
+
+                log += f"  - 定位器: {locator_strategy}={locator_value}\n"
+                log += f"  - 超时设置: {timeout_ms/1000}秒\n"
+                if force_action:
+                    log += f"  - 强制操作: 是\n"
+                log += f"  - 执行时间: {execution_time}秒"
+                # 步骤后采集
+                debug_data['after'] = await self._capture_debug_data(step, project_config, timing='after')
+                return True, log, None, debug_data
 
             elif action_type == 'assert':
                 # 根据断言类型执行不同的断言
@@ -794,7 +1086,26 @@ class PlaywrightTestEngine:
             log += f"  - 元素: '{element_name}'\n"
             log += f"  - 定位器: {locator_strategy}={locator_value}\n"
             log += f"  - 超时时间: {execution_time}秒\n"
-            log += f"  - 错误: {str(e)}"
+            log += f"  - 错误: {str(e)}\n"
+            
+            # 检查元素状态，提供更详细的诊断信息
+            try:
+                # 重新获取定位器（避免 stale element）
+                check_locator = locator
+                if await check_locator.count() > 0:
+                    is_visible = await check_locator.is_visible()
+                    is_enabled = await check_locator.is_enabled()
+                    log += f"  - 元素状态诊断:\n"
+                    log += f"    - 存在: 是\n"
+                    log += f"    - 可见: {'是' if is_visible else '否'}\n"
+                    log += f"    - 可用(Enabled): {'是' if is_enabled else '否 (可能是表单验证未通过)'}\n"
+                    
+                    if not is_enabled:
+                        log += "    -> 提示: 按钮处于禁用状态，通常是因为前序步骤（如输入框填写）未触发页面逻辑更新。\n"
+                else:
+                    log += f"  - 元素状态诊断: 元素在超时后未找到\n"
+            except Exception as diag_e:
+                log += f"  - 诊断失败: {diag_e}\n"
 
             # 捕获失败截图
             try:

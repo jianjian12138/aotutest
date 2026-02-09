@@ -1122,3 +1122,31 @@ export function getDebugFileContent(url) {
     params: { url }
   })
 }
+
+// ==================== 节点管理相关API ====================
+
+// 获取节点列表
+export function getExecutionNodes(params) {
+  return request({
+    url: '/ui-automation/execution-nodes/',
+    method: 'get',
+    params
+  })
+}
+
+// 注册节点
+export function registerExecutionNode(data) {
+  return request({
+    url: '/ui-automation/execution-nodes/register/',
+    method: 'post',
+    data
+  })
+}
+
+// 删除节点
+export function deleteExecutionNode(id) {
+  return request({
+    url: `/ui-automation/execution-nodes/${id}/`,
+    method: 'delete'
+  })
+}

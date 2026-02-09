@@ -3,9 +3,10 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 from .models import (
     ApiProject, ApiCollection, ApiRequest, Environment,
+    ApiTestCase, ApiTestCaseStep, ApiTestCaseExecution,
     RequestHistory, TestSuite, TestExecution, TestSuiteRequest,
     ScheduledTask, TaskExecutionLog, NotificationConfig, NotificationLog,
-    TaskNotificationSetting, OperationLog, ApiImportTask,
+    TaskNotificationSetting, OperationLog, ApiImportTask, TestSuiteTestCase
 )
 
 User = get_user_model()
@@ -252,6 +253,60 @@ class EnvironmentSerializer(serializers.ModelSerializer):
         return super().create(validated_data)
 
 
+class ApiTestCaseExecutionSerializer(serializers.ModelSerializer):
+    executed_by = UserSerializer(read_only=True)
+
+    class Meta:
+        model = ApiTestCaseExecution
+        fields = [
+            'id', 'test_case', 'status', 'total_steps', 'passed_steps', 
+            'failed_steps', 'results', 'execution_time', 'executed_by', 'created_at'
+        ]
+        read_only_fields = ['created_at']
+
+
+class ApiTestCaseStepSerializer(serializers.ModelSerializer):
+    api_request = ApiRequestSerializer(read_only=True)
+    api_request_id = serializers.PrimaryKeyRelatedField(
+        queryset=ApiRequest.objects.all(),
+        source='api_request',
+        write_only=True,
+        required=False,
+        allow_null=True
+    )
+
+    class Meta:
+        model = ApiTestCaseStep
+        fields = [
+            'id', 'test_case', 'step_number', 'name', 'description', 
+            'api_request', 'api_request_id',
+            'method', 'url', 'headers', 'params', 'body', 'auth',
+            'pre_request_script', 'post_request_script', 
+            'assertions', 'extract_rules', 'wait_time', 'enable',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['created_at', 'updated_at']
+
+
+class ApiTestCaseSerializer(serializers.ModelSerializer):
+    created_by = UserSerializer(read_only=True)
+    steps = ApiTestCaseStepSerializer(many=True, read_only=True)
+    steps_count = serializers.IntegerField(read_only=True)
+    
+    class Meta:
+        model = ApiTestCase
+        fields = [
+            'id', 'project', 'name', 'description', 
+            'status', 'priority', 'steps', 'steps_count',
+            'created_by', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['created_at', 'updated_at']
+
+    def create(self, validated_data):
+        validated_data['created_by'] = self.context['request'].user
+        return super().create(validated_data)
+
+
 class RequestHistorySerializer(serializers.ModelSerializer):
     request = ApiRequestSerializer(read_only=True)
     environment = EnvironmentSerializer(read_only=True)
@@ -268,21 +323,40 @@ class RequestHistorySerializer(serializers.ModelSerializer):
 
 class TestSuiteRequestSerializer(serializers.ModelSerializer):
     request = ApiRequestSerializer(read_only=True)
+    request_id = serializers.PrimaryKeyRelatedField(
+        queryset=ApiRequest.objects.all(),
+        source='request',
+        write_only=True
+    )
 
     class Meta:
         model = TestSuiteRequest
-        fields = ['id', 'request', 'order', 'assertions', 'enabled']
+        fields = ['id', 'test_suite', 'request', 'request_id', 'order', 'assertions', 'enabled']
+
+
+class TestSuiteTestCaseSerializer(serializers.ModelSerializer):
+    test_case = ApiTestCaseSerializer(read_only=True)
+    test_case_id = serializers.PrimaryKeyRelatedField(
+        queryset=ApiTestCase.objects.all(),
+        source='test_case',
+        write_only=True
+    )
+
+    class Meta:
+        model = TestSuiteTestCase
+        fields = ['id', 'test_suite', 'test_case', 'test_case_id', 'order', 'enabled']
 
 
 class TestSuiteSerializer(serializers.ModelSerializer):
     created_by = UserSerializer(read_only=True)
     suite_requests = TestSuiteRequestSerializer(source='testsuiterequest_set', many=True, read_only=True)
+    suite_test_cases = TestSuiteTestCaseSerializer(source='testsuitetestcase_set', many=True, read_only=True)
 
     class Meta:
         model = TestSuite
         fields = [
             'id', 'name', 'description', 'project', 'environment',
-            'suite_requests', 'created_by', 'created_at', 'updated_at'
+            'suite_requests', 'suite_test_cases', 'created_by', 'created_at', 'updated_at'
         ]
         read_only_fields = ['created_at', 'updated_at']
 
@@ -359,6 +433,19 @@ class ScheduledTaskSerializer(serializers.ModelSerializer):
         except:
             pass
         return "email"  # 默认值
+
+    def validate_cron_expression(self, value):
+        """验证 Cron 表达式是否有效"""
+        if not value:
+            return value
+        
+        from croniter import croniter
+        from django.utils import timezone
+        try:
+            croniter(value, timezone.now())
+        except Exception as e:
+            raise serializers.ValidationError(f"无效的 Cron 表达式: {str(e)}。请使用格式：'分 时 日 月 周'，例如 '44 11 * * *' 表示每天 11:44")
+        return value
 
     def validate(self, attrs):
         """验证定时任务配置"""
@@ -913,7 +1000,7 @@ class TaskNotificationSettingDetailSerializer(serializers.ModelSerializer):
 
 class OperationLogSerializer(serializers.ModelSerializer):
     """操作日志序列化器"""
-    user_name = serializers.CharField(source='user.username', read_only=True)
+    user_name = serializers.SerializerMethodField()
     operation_type_display = serializers.CharField(source='get_operation_type_display', read_only=True)
     resource_type_display = serializers.CharField(source='get_resource_type_display', read_only=True)
 
@@ -925,3 +1012,6 @@ class OperationLogSerializer(serializers.ModelSerializer):
             'resource_name', 'description', 'user', 'user_name', 'created_at'
         ]
         read_only_fields = ['created_at']
+
+    def get_user_name(self, obj):
+        return obj.user.username if obj.user else '系统'

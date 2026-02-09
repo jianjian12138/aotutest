@@ -91,6 +91,37 @@ class TestExecutor:
 
     def run(self):
         """执行测试套件"""
+        # 处理多浏览器并行执行
+        browsers = []
+        if isinstance(self.browser, list):
+            browsers = self.browser
+        elif isinstance(self.browser, str):
+            self.browser = self.browser.strip()
+            if self.browser.startswith('[') and self.browser.endswith(']'):
+                try:
+                    browsers = json.loads(self.browser)
+                except:
+                    browsers = [self.browser]
+            elif ',' in self.browser:
+                browsers = [b.strip() for b in self.browser.split(',')]
+            else:
+                browsers = [self.browser]
+        
+        # 如果包含多个浏览器，则分裂为多个执行器
+        if len(browsers) > 1:
+            print(f"检测到多浏览器配置: {browsers}，开始批量执行...")
+            for b in browsers:
+                print(f"=== 启动子任务: {b} ===")
+                executor = TestExecutor(
+                    test_suite=self.test_suite,
+                    engine=self.engine,
+                    browser=b,
+                    headless=self.headless,
+                    executed_by=self.executed_by
+                )
+                executor.run()
+            return
+
         try:
             # 设置环境变量，允许在后台线程中使用同步 ORM
             # 这对于 Playwright 执行是必需的
@@ -1878,13 +1909,14 @@ class TestExecutor:
 
             try:
                 # 清理浏览器状态
-                if i > 1:
-                    try:
-                        driver.delete_all_cookies()
-                        driver.execute_script("window.localStorage.clear();")
-                        driver.execute_script("window.sessionStorage.clear();")
-                    except:
-                        pass
+                # modify by Trae: 注释掉清理逻辑，支持 Test Suite 内的会话保持（Login Once）
+                # if i > 1:
+                #     try:
+                #         driver.delete_all_cookies()
+                #         driver.execute_script("window.localStorage.clear();")
+                #         driver.execute_script("window.sessionStorage.clear();")
+                #     except:
+                #         pass
                 
                 # 导航
                 if self.test_suite.project.base_url:

@@ -4,6 +4,11 @@
       <h1 class="page-title">任务详情 - {{ task.title }}</h1>
       <div class="header-actions">
         <button 
+          class="regenerate-btn" 
+          @click="handleRegenerate">
+          <span>🔄 重新生成</span>
+        </button>
+        <button 
           v-if="testCases.length > 0" 
           class="export-btn" 
           @click="exportToExcel"
@@ -75,7 +80,7 @@
               class="batch-adopt-btn" 
               :disabled="selectedCases.length === 0"
               @click="batchAdopt">
-              ✅ 一键采纳 ({{ selectedCases.length }})
+              💾 保存到用例库 ({{ selectedCases.length }})
             </button>
             <button 
               class="batch-discard-btn" 
@@ -121,8 +126,8 @@
               </div>
               <div class="body-cell">
                 <div class="action-buttons">
-                  <button class="view-btn" @click="viewCaseDetail(testCase, index)">📖 查看详情</button>
-                  <button class="adopt-btn" @click="adoptSingleCase(testCase, index)">✅ 采纳</button>
+                  <button class="view-btn" @click="viewCaseDetail(testCase, index)">📖 详情</button>
+                  <button class="adopt-btn" @click="adoptSingleCase(testCase, index)">💾 保存</button>
                   <button class="discard-btn" @click="discardSingleCase(testCase, index)">❌ 弃用</button>
                 </div>
               </div>
@@ -243,6 +248,33 @@
             </button>
             <button class="action-btn cancel-btn" @click="cancelEdit" :disabled="isSaving">取消</button>
           </template>
+        </div>
+      </div>
+    </div>
+    <!-- 重新生成对话框 -->
+    <div v-if="showRegenerateDialog" class="case-detail-modal" @click="showRegenerateDialog = false">
+      <div class="modal-content" @click.stop style="max-width: 600px;">
+        <div class="modal-header">
+          <h3>重新生成测试用例</h3>
+          <button class="close-btn" @click="showRegenerateDialog = false">×</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-item">
+            <label>调整需求描述:</label>
+            <el-input 
+              v-model="regenerateForm.requirement_text" 
+              type="textarea" 
+              :rows="10" 
+              placeholder="请根据当前结果调整需求描述..." 
+            />
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="action-btn save-btn" @click="submitRegenerate" :disabled="isRegenerating">
+            <span v-if="isRegenerating">🚀 生成中...</span>
+            <span v-else>🚀 开始生成</span>
+          </button>
+          <button class="action-btn cancel-btn" @click="showRegenerateDialog = false" :disabled="isRegenerating">取消</button>
         </div>
       </div>
     </div>
@@ -1020,6 +1052,22 @@ export default {
 .header-actions {
   display: flex;
   gap: 10px;
+}
+
+.regenerate-btn {
+  background: #e6a23c;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background 0.3s ease;
+  white-space: nowrap;
+}
+
+.regenerate-btn:hover {
+  background: #d48806;
 }
 
 .export-btn {

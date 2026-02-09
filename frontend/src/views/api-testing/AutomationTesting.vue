@@ -51,7 +51,7 @@
                     <div class="suite-info">
                       <div class="suite-name">{{ suite.name }}</div>
                       <div class="suite-meta">
-                        {{ suite.suite_requests?.length || 0 }} 个请求
+                        {{ suite.suite_test_cases?.length || 0 }} 个用例
                       </div>
                     </div>
                     <el-dropdown @command="handleSuiteAction" trigger="click">
@@ -104,46 +104,35 @@
                   </div>
                 </div>
 
-                <!-- 请求列表 -->
+                <!-- 测试用例列表 -->
                 <div class="requests-section">
                   <div class="section-header">
-                    <h5>测试请求</h5>
-                    <el-button size="small" @click="showAddRequest">
+                    <h5>测试用例</h5>
+                    <el-button size="small" @click="showAddTestCase">
                       <el-icon><Plus /></el-icon>
-                      添加请求
+                      添加用例
                     </el-button>
                   </div>
                   
-                  <el-table :data="selectedSuite.suite_requests" style="width: 100%">
+                  <el-table :data="selectedSuite.suite_test_cases" style="width: 100%">
                     <el-table-column type="index" width="50" />
-                    <el-table-column prop="request.name" label="请求名称" min-width="200" />
-                    <el-table-column prop="request.method" label="方法" width="80">
+                    <el-table-column prop="test_case.name" label="用例名称" min-width="200" />
+                    <el-table-column label="步骤数" width="100">
                       <template #default="scope">
-                        <el-tag :type="getMethodType(scope.row.request.method)" size="small">
-                          {{ scope.row.request.method }}
-                        </el-tag>
+                        {{ scope.row.test_case?.steps_count || 0 }} 步
                       </template>
                     </el-table-column>
-                    <el-table-column prop="request.url" label="URL" min-width="300" show-overflow-tooltip />
                     <el-table-column prop="enabled" label="启用" width="80">
                       <template #default="scope">
                         <el-switch 
                           v-model="scope.row.enabled" 
-                          @change="updateRequestEnabled(scope.row)"
+                          @change="updateTestCaseEnabled(scope.row)"
                         />
                       </template>
                     </el-table-column>
-                    <el-table-column label="断言" width="100">
+                    <el-table-column label="操作" width="100">
                       <template #default="scope">
-                        {{ scope.row.assertions?.length || 0 }} 个
-                      </template>
-                    </el-table-column>
-                    <el-table-column label="操作" width="150">
-                      <template #default="scope">
-                        <el-button link type="primary" @click="editAssertions(scope.row)" size="small">
-                          编辑断言
-                        </el-button>
-                        <el-button link type="danger" @click="removeRequest(scope.row)" size="small">
+                        <el-button link type="danger" @click="removeTestCase(scope.row)" size="small">
                           移除
                         </el-button>
                       </template>
@@ -169,13 +158,13 @@
                         </el-tag>
                       </template>
                     </el-table-column>
-                    <el-table-column prop="total_requests" label="总请求数" width="100" />
-                    <el-table-column prop="passed_requests" label="通过数" width="100">
+                    <el-table-column prop="total_requests" label="总步骤数" width="100" />
+                    <el-table-column prop="passed_requests" label="通过用例" width="100">
                       <template #default="scope">
                         <span style="color: #67c23a">{{ scope.row.passed_requests }}</span>
                       </template>
                     </el-table-column>
-                    <el-table-column prop="failed_requests" label="失败数" width="100">
+                    <el-table-column prop="failed_requests" label="失败用例" width="100">
                       <template #default="scope">
                         <span style="color: #f56c6c">{{ scope.row.failed_requests }}</span>
                       </template>
@@ -264,45 +253,44 @@
       </template>
     </el-dialog>
 
-    <!-- 添加请求对话框 -->
+    <!-- 添加测试用例对话框 -->
     <el-dialog
-      v-model="showAddRequestDialog"
-      title="添加请求到测试套件"
+      v-model="showAddTestCaseDialog"
+      title="添加测试用例到测试套件"
       width="800px"
     >
       <div class="add-request-content">
-        <div class="request-selector">
-          <el-tree
-            ref="requestTreeRef"
-            :data="requestTree"
-            :props="requestTreeProps"
-            show-checkbox
-            node-key="id"
-            :check-on-click-node="false"
-            @check="onRequestCheck"
-          >
-            <template #default="{ node, data }">
-              <div class="request-tree-node">
-                <el-icon v-if="data.type === 'collection'">
-                  <Folder />
-                </el-icon>
-                <el-icon v-else>
-                  <Document />
-                </el-icon>
-                <span>{{ data.name }}</span>
-                <span v-if="data.type === 'request'" class="method-tag" :class="data.method?.toLowerCase()">
-                  {{ data.method }}
-                </span>
-              </div>
-            </template>
-          </el-tree>
+        <div class="search-bar mb-3">
+          <el-input
+            v-model="testCaseSearchText"
+            placeholder="搜索测试用例名称"
+            prefix-icon="Search"
+            clearable
+            @input="filterTestCases"
+          />
         </div>
+        <el-table
+          ref="testCaseTableRef"
+          :data="filteredAvailableTestCases"
+          style="width: 100%"
+          max-height="400"
+          @selection-change="onTestCaseSelectionChange"
+        >
+          <el-table-column type="selection" width="55" />
+          <el-table-column prop="name" label="用例名称" />
+          <el-table-column prop="steps_count" label="步骤数" width="100" />
+          <el-table-column prop="created_at" label="创建时间" width="160">
+            <template #default="scope">
+              {{ formatDate(scope.row.created_at) }}
+            </template>
+          </el-table-column>
+        </el-table>
       </div>
       
       <template #footer>
-        <el-button @click="showAddRequestDialog = false">取消</el-button>
-        <el-button type="primary" @click="addSelectedRequests" :loading="addingRequests">
-          添加选中的请求
+        <el-button @click="showAddTestCaseDialog = false">取消</el-button>
+        <el-button type="primary" @click="addSelectedTestCases" :loading="addingTestCases" :disabled="!selectedTestCaseIds.length">
+          添加选中的用例 ({{ selectedTestCaseIds.length }})
         </el-button>
       </template>
     </el-dialog>
@@ -377,53 +365,82 @@
     <!-- 执行结果对话框 -->
     <el-dialog
       v-model="showExecutionDialog"
-      title="测试执行结果"
-      width="80%"
-      :top="'5vh'"
+      title="测试套件执行结果"
+      width="1000px"
     >
-      <div v-if="currentExecution" class="execution-detail">
-        <div class="execution-summary">
-          <el-row :gutter="20">
-            <el-col :span="6">
-              <el-statistic title="总请求数" :value="currentExecution.total_requests" />
-            </el-col>
-            <el-col :span="6">
-              <el-statistic title="通过数" :value="currentExecution.passed_requests" />
-            </el-col>
-            <el-col :span="6">
-              <el-statistic title="失败数" :value="currentExecution.failed_requests" />
-            </el-col>
-            <el-col :span="6">
-              <el-statistic title="通过率" :value="getPassRate(currentExecution)" suffix="%" />
-            </el-col>
-          </el-row>
+      <div v-if="currentExecution" class="execution-result-content">
+        <div class="result-summary mb-4">
+          <el-descriptions :column="3" border>
+            <el-descriptions-item label="状态">
+              <el-tag :type="getStatusType(currentExecution.status)">
+                {{ getStatusText(currentExecution.status) }}
+              </el-tag>
+            </el-descriptions-item>
+            <el-descriptions-item label="通过用例/总用例">
+              <span class="text-success">{{ currentExecution.passed_requests }}</span> / {{ currentExecution.passed_requests + currentExecution.failed_requests }}
+            </el-descriptions-item>
+            <el-descriptions-item label="通过率">{{ getPassRate(currentExecution) }}%</el-descriptions-item>
+            <el-descriptions-item label="总步骤数">{{ currentExecution.total_requests }}</el-descriptions-item>
+            <el-descriptions-item label="开始时间">{{ formatDate(currentExecution.start_time) }}</el-descriptions-item>
+            <el-descriptions-item label="总耗时">{{ getExecutionTime(currentExecution) }}</el-descriptions-item>
+          </el-descriptions>
         </div>
-        
-        <div class="execution-results">
-          <h4>详细结果</h4>
-          <el-table :data="formatExecutionResults(currentExecution.results)">
-            <el-table-column prop="name" label="请求名称" min-width="200" />
-            <el-table-column prop="method" label="方法" width="80">
+
+        <div class="result-details">
+          <h5>用例执行详情</h5>
+          <el-table :data="currentExecution.results" style="width: 100%" max-height="500" border>
+            <el-table-column type="expand">
+              <template #default="props">
+                <div class="case-steps-detail p-3">
+                  <h6>步骤详情</h6>
+                  <el-table :data="props.row.results" size="small" border>
+                    <el-table-column prop="step_number" label="步骤" width="60" />
+                    <el-table-column prop="name" label="步骤名称" />
+                    <el-table-column prop="method" label="方法" width="80">
+                      <template #default="scope">
+                        <el-tag :type="getMethodType(scope.row.method)" size="small">
+                          {{ scope.row.method }}
+                        </el-tag>
+                      </template>
+                    </el-table-column>
+                    <el-table-column prop="status_code" label="状态码" width="80" />
+                    <el-table-column prop="response_time" label="耗时" width="100">
+                      <template #default="scope">
+                        {{ scope.row.response_time?.toFixed(0) }}ms
+                      </template>
+                    </el-table-column>
+                    <el-table-column label="结果" width="80">
+                      <template #default="scope">
+                        <el-tag :type="scope.row.passed ? 'success' : 'danger'" size="small">
+                          {{ scope.row.passed ? '通过' : '失败' }}
+                        </el-tag>
+                      </template>
+                    </el-table-column>
+                    <el-table-column prop="error" label="错误信息" show-overflow-tooltip />
+                  </el-table>
+                </div>
+              </template>
+            </el-table-column>
+            <el-table-column prop="name" label="用例名称" min-width="200" />
+            <el-table-column label="状态" width="100">
               <template #default="scope">
-                <el-tag :type="getMethodType(scope.row.method)" size="small">
-                  {{ scope.row.method }}
+                <el-tag :type="scope.row.status === 'passed' ? 'success' : 'danger'" size="small">
+                  {{ scope.row.status === 'passed' ? '通过' : '失败' }}
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column prop="status" label="结果" width="100">
+            <el-table-column label="步骤统计" width="150">
               <template #default="scope">
-                <el-tag :type="scope.row.passed ? 'success' : 'danger'" size="small">
-                  {{ scope.row.passed ? '通过' : '失败' }}
-                </el-tag>
+                <span class="text-success">{{ scope.row.passed_count }}</span> / 
+                <span class="text-danger">{{ scope.row.failed_count }}</span> / 
+                {{ scope.row.total_count }}
               </template>
             </el-table-column>
-            <el-table-column prop="status_code" label="状态码" width="100" />
-            <el-table-column prop="response_time" label="响应时间" width="120">
+            <el-table-column prop="execution_time" label="耗时" width="120">
               <template #default="scope">
-                {{ scope.row.response_time?.toFixed(0) }}ms
+                {{ scope.row.execution_time?.toFixed(0) }}ms
               </template>
             </el-table-column>
-            <el-table-column prop="error" label="错误信息" min-width="200" show-overflow-tooltip />
           </el-table>
         </div>
       </div>
@@ -451,18 +468,21 @@ const testSuites = ref([])
 const selectedSuite = ref(null)
 const executions = ref([])
 const environments = ref([])
-const requestTree = ref([])
+const availableTestCases = ref([])
+const filteredAvailableTestCases = ref([])
+const testCaseSearchText = ref('')
+const selectedTestCaseIds = ref([])
 const running = ref(false)
 const executionsLoading = ref(false)
 const showCreateSuiteDialog = ref(false)
-const showAddRequestDialog = ref(false)
+const showAddTestCaseDialog = ref(false)
 const showExecutionDialog = ref(false)
 const editingSuite = ref(null)
 const submittingSuite = ref(false)
-const addingRequests = ref(false)
+const addingTestCases = ref(false)
 const currentExecution = ref(null)
 const suiteFormRef = ref()
-const requestTreeRef = ref()
+const testCaseTableRef = ref()
 
 const suiteForm = reactive({
   name: '',
@@ -526,7 +546,11 @@ const getExecutionTime = (execution) => {
   if (!execution.start_time || !execution.end_time) return '-'
   const start = dayjs(execution.start_time)
   const end = dayjs(execution.end_time)
-  return `${end.diff(start, 'second')}s`
+  const diffMs = end.diff(start, 'millisecond')
+  if (diffMs < 1000) {
+    return `${diffMs}ms`
+  }
+  return `${(diffMs / 1000).toFixed(2)}s`
 }
 
 const getAverageExecutionTime = (execution) => {
@@ -534,9 +558,9 @@ const getAverageExecutionTime = (execution) => {
     return '-'
   }
   
-  // 计算所有请求的平均响应时间
-  const totalResponseTime = execution.results.reduce((sum, result) => sum + (result.response_time || 0), 0)
-  const averageTime = totalResponseTime / execution.results.length
+  // 计算所有用例的总耗时
+  const totalTime = execution.results.reduce((sum, result) => sum + (result.execution_time || 0), 0)
+  const averageTime = totalTime / execution.results.length
   
   if (averageTime < 1000) {
     return `${Math.round(averageTime)}ms`
@@ -546,8 +570,9 @@ const getAverageExecutionTime = (execution) => {
 }
 
 const getPassRate = (execution) => {
-  if (execution.total_requests === 0) return 0
-  return ((execution.passed_requests / execution.total_requests) * 100).toFixed(1)
+  const totalCases = (execution.passed_requests || 0) + (execution.failed_requests || 0)
+  if (totalCases === 0) return 0
+  return ((execution.passed_requests / totalCases) * 100).toFixed(1)
 }
 
 const getEnvironmentName = (environmentId) => {
@@ -607,61 +632,33 @@ const loadEnvironments = async () => {
   }
 }
 
-const loadRequestTree = async () => {
+const loadAvailableTestCases = async () => {
   if (!selectedProject.value) return
   
   try {
-    // 加载集合
-    const collectionsRes = await api.get('/api-testing/collections/', {
+    const response = await api.get('/api-testing/testcases/', {
       params: { project: selectedProject.value }
     })
-    const collections = collectionsRes.data.results || collectionsRes.data
-    
-    // 加载请求
-    const requestsRes = await api.get('/api-testing/requests/')
-    const requests = requestsRes.data.results || requestsRes.data
-    
-    // 构建树形结构
-    requestTree.value = buildRequestTree(collections, requests)
+    availableTestCases.value = response.data.results || response.data
+    filterTestCases()
   } catch (error) {
-    ElMessage.error('加载请求树失败')
+    ElMessage.error('加载测试用例失败')
   }
 }
 
-const buildRequestTree = (collections, requests) => {
-  const map = {}
-  const roots = []
-  
-  // 创建集合节点
-  collections.forEach(collection => {
-    map[collection.id] = {
-      ...collection,
-      type: 'collection',
-      children: []
-    }
-  })
-  
-  // 构建集合层级关系
-  collections.forEach(collection => {
-    if (collection.parent && map[collection.parent]) {
-      map[collection.parent].children.push(map[collection.id])
-    } else {
-      roots.push(map[collection.id])
-    }
-  })
-  
-  // 添加请求到对应集合
-  requests.forEach(request => {
-    if (map[request.collection]) {
-      map[request.collection].children.push({
-        ...request,
-        type: 'request',
-        id: `request_${request.id}`
-      })
-    }
-  })
-  
-  return roots
+const filterTestCases = () => {
+  if (!testCaseSearchText.value) {
+    filteredAvailableTestCases.value = availableTestCases.value
+  } else {
+    const query = testCaseSearchText.value.toLowerCase()
+    filteredAvailableTestCases.value = availableTestCases.value.filter(tc => 
+      tc.name.toLowerCase().includes(query)
+    )
+  }
+}
+
+const onTestCaseSelectionChange = (selection) => {
+  selectedTestCaseIds.value = selection.map(tc => tc.id)
 }
 
 const loadExecutions = async () => {
@@ -699,7 +696,7 @@ const onProjectChange = async () => {
   await Promise.all([
     loadTestSuites(),
     loadEnvironments(),
-    loadRequestTree()
+    loadAvailableTestCases()
   ])
 }
 
@@ -828,123 +825,79 @@ const resetSuiteForm = () => {
   suiteFormRef.value?.resetFields()
 }
 
-const showAddRequest = async () => {
-  await loadRequestTree()
-  showAddRequestDialog.value = true
+const showAddTestCase = async () => {
+  testCaseSearchText.value = ''
+  selectedTestCaseIds.value = []
+  await loadAvailableTestCases()
+  showAddTestCaseDialog.value = true
   
-  // 等待对话框显示完成后再设置勾选状态
+  // 可以在此处设置表格的初始选中状态
   nextTick(() => {
-    setTimeout(() => {
-      if (requestTreeRef.value && selectedSuite.value) {
-        // 获取当前已关联的请求ID
-        const existingRequestIds = selectedSuite.value.suite_requests?.map(sr => 
-          `request_${sr.request.id}`
-        ) || []
-        
-        // 设置已关联接口为已勾选状态
-        requestTreeRef.value.setCheckedKeys(existingRequestIds, false)
-        console.log('设置已关联接口ID:', existingRequestIds)
-      }
-    }, 200)
+    if (testCaseTableRef.value && selectedSuite.value) {
+      const existingIds = selectedSuite.value.suite_test_cases?.map(stc => stc.test_case.id) || []
+      availableTestCases.value.forEach(tc => {
+        if (existingIds.includes(tc.id)) {
+          testCaseTableRef.value.toggleRowSelection(tc, true)
+        }
+      })
+    }
   })
 }
 
-const onRequestCheck = () => {
-  // 请求选择变化处理
-}
-
-const addSelectedRequests = async () => {
-  const checkedNodes = requestTreeRef.value.getCheckedNodes()
-  const requestIds = checkedNodes
-    .filter(node => node.type === 'request')
-    .map(node => node.id.replace('request_', ''))
-  
-  if (requestIds.length === 0) {
-    ElMessage.warning('请选择至少一个请求')
+const addSelectedTestCases = async () => {
+  if (selectedTestCaseIds.value.length === 0) {
+    ElMessage.warning('请选择至少一个测试用例')
     return
   }
   
-  addingRequests.value = true
+  addingTestCases.value = true
   try {
-    // 这里需要调用添加请求到套件的API
-    await api.post(`/api-testing/test-suites/${selectedSuite.value.id}/add-requests/`, {
-      request_ids: requestIds
+    await api.post(`/api-testing/test-suites/${selectedSuite.value.id}/add-test-cases/`, {
+      test_case_ids: selectedTestCaseIds.value
     })
-    
     ElMessage.success('添加成功')
-    showAddRequestDialog.value = false
-    // 重新加载当前测试套件详情
-    await reloadCurrentSuite()
+    showAddTestCaseDialog.value = false
+    
+    // 重新加载套件详情以获取更新后的用例列表
+    const response = await api.get(`/api-testing/test-suites/${selectedSuite.value.id}/`)
+    selectedSuite.value = response.data
+    
+    // 同时更新左侧列表中的数据（主要是用例数量）
+    await loadTestSuites()
   } catch (error) {
     ElMessage.error('添加失败')
   } finally {
-    addingRequests.value = false
+    addingTestCases.value = false
   }
 }
 
-const updateRequestEnabled = async (suiteRequest) => {
+const updateTestCaseEnabled = async (suiteTestCase) => {
   try {
-    await api.put(`/api-testing/test-suite-requests/${suiteRequest.id}/`, {
-      enabled: suiteRequest.enabled
+    await api.patch(`/api-testing/test-suite-testcases/${suiteTestCase.id}/`, {
+      enabled: suiteTestCase.enabled
     })
+    ElMessage.success('更新成功')
   } catch (error) {
     ElMessage.error('更新失败')
-    suiteRequest.enabled = !suiteRequest.enabled
+    suiteTestCase.enabled = !suiteTestCase.enabled
   }
 }
 
-const editAssertions = (suiteRequest) => {
-  currentRequest.value = suiteRequest
-  // Deep copy assertions to avoid direct modification
-  currentAssertions.value = JSON.parse(JSON.stringify(suiteRequest.assertions || []))
-  showAssertionsDialog.value = true
-}
-
-const addAssertion = () => {
-  currentAssertions.value.push({
-    source: 'status_code',
-    property: '',
-    operator: 'equals',
-    target: ''
-  })
-}
-
-const removeAssertion = (index) => {
-  currentAssertions.value.splice(index, 1)
-}
-
-const saveAssertions = async () => {
-  if (!currentRequest.value) return
-  
-  savingAssertions.value = true
+const removeTestCase = async (suiteTestCase) => {
   try {
-    await api.put(`/api-testing/test-suite-requests/${currentRequest.value.id}/`, {
-      assertions: currentAssertions.value
-    })
+    await ElMessageBox.confirm(
+      `确定要将用例 "${suiteTestCase.test_case.name}" 从套件中移除吗？`,
+      '确认移除',
+      { type: 'warning' }
+    )
     
-    ElMessage.success('断言保存成功')
-    showAssertionsDialog.value = false
-    // Update local data
-    currentRequest.value.assertions = currentAssertions.value
-  } catch (error) {
-    ElMessage.error('保存断言失败')
-  } finally {
-    savingAssertions.value = false
-  }
-}
-
-const removeRequest = async (suiteRequest) => {
-  try {
-    await ElMessageBox.confirm('确定要移除这个请求吗？', '确认移除', {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-      type: 'warning'
-    })
-    
-    await api.delete(`/api-testing/test-suite-requests/${suiteRequest.id}/`)
+    await api.delete(`/api-testing/test-suite-testcases/${suiteTestCase.id}/`)
     ElMessage.success('移除成功')
-    // 重新加载当前测试套件详情
-    await reloadCurrentSuite()
+    
+    // 刷新数据
+    const response = await api.get(`/api-testing/test-suites/${selectedSuite.value.id}/`)
+    selectedSuite.value = response.data
+    await loadTestSuites()
   } catch (error) {
     if (error !== 'cancel') {
       ElMessage.error('移除失败')
@@ -989,6 +942,22 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.text-success { color: #67c23a; }
+.text-danger { color: #f56c6c; }
+.mb-3 { margin-bottom: 1rem; }
+.mb-4 { margin-bottom: 1.5rem; }
+.p-3 { padding: 1rem; }
+
+.execution-result-content {
+  .result-summary {
+    margin-bottom: 20px;
+  }
+  .case-steps-detail {
+    background-color: #f8f9fa;
+    h6 { margin-bottom: 10px; color: #606266; }
+  }
+}
+
 /* 页面特定样式 */
 .page-container {
   padding: 0;

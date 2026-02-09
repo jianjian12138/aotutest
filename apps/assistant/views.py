@@ -5,6 +5,8 @@ from django.shortcuts import render
 from django.db.models import Q
 import requests
 from .models import AssistantSession, AssistantMessage, ChatMessage, DifyConfig, AIWorkflowConfig, KnowledgeDocument, KnowledgeEntity, KnowledgeRelationship
+from apps.requirement_analysis.models import AIModelConfig, AIModelService
+from asgiref.sync import async_to_sync
 from .serializers import (
     AssistantSessionSerializer, 
     AssistantSessionCreateSerializer,
@@ -15,6 +17,7 @@ from .serializers import (
     KnowledgeRelationshipSerializer
 )
 from .services import KnowledgeGraphService
+from .intelligent_executor import IntelligentExecutor
 
 
 class AssistantSessionViewSet(viewsets.ModelViewSet):
@@ -61,7 +64,10 @@ class ChatViewSet(viewsets.ViewSet):
         """发送消息到AI API (支持Dify, Coze等)"""
         session_id = request.data.get('session_id')
         message = request.data.get('message')
-        workflow_config_id = request.data.get('workflow_config_id')
+        # 兼容多种 ID 传参方式
+        workflow_config_id = request.data.get('workflow_config_id') or \
+                            request.data.get('model_config_id') or \
+                            request.data.get('model_id')
         use_knowledge_graph = request.data.get('use_knowledge_graph', False)
         
         if not session_id or not message:
@@ -84,25 +90,33 @@ class ChatViewSet(viewsets.ViewSet):
         
         # 确定使用的配置
         workflow_config = None
+        model_config = None
         dify_config = None
         
         if workflow_config_id:
+            # 1. 尝试从 AIWorkflowConfig 获取
             try:
                 workflow_config = AIWorkflowConfig.objects.get(id=workflow_config_id)
-            except AIWorkflowConfig.DoesNotExist:
-                pass
+            except (AIWorkflowConfig.DoesNotExist, ValueError):
+                # 2. 尝试从 AIModelConfig 获取
+                try:
+                    model_config = AIModelConfig.objects.get(id=workflow_config_id)
+                except (AIModelConfig.DoesNotExist, ValueError):
+                    pass
         
-        # 如果没有指定ID或找不到，尝试获取激活的Workflow配置
-        if not workflow_config:
+        # 如果没有指定ID或找不到，尝试获取激活的配置
+        if not workflow_config and not model_config:
             workflow_config = AIWorkflowConfig.objects.filter(is_active=True).first()
+            if not workflow_config:
+                model_config = AIModelConfig.objects.filter(is_active=True).first()
             
-        # 如果没有Workflow配置，尝试获取旧版Dify配置
-        if not workflow_config:
+        # 如果没有配置，尝试获取旧版Dify配置
+        if not workflow_config and not model_config:
             dify_config = DifyConfig.get_active_config()
             
-        if not workflow_config and not dify_config:
+        if not workflow_config and not model_config and not dify_config:
              return Response(
-                {'error': '未配置AI工作流引擎，请先在知识图谱-AI评测师中配置'},
+                {'error': '未配置AI模型或工作流引擎，请先在配置中心或AI助手设置中配置'},
                 status=status.HTTP_400_BAD_REQUEST
             )
             
@@ -121,7 +135,7 @@ class ChatViewSet(viewsets.ViewSet):
         if context:
             final_message = f"{message}\n{context}"
         
-        # 保存用户消息 (保存原始消息，不含context)
+        # 保存用户消息
         user_message = ChatMessage.objects.create(
             session=session,
             role='user',
@@ -129,10 +143,51 @@ class ChatViewSet(viewsets.ViewSet):
             conversation_id=session.conversation_id
         )
         
+        # 尝试使用智能执行器 (MCP, Skills, Workflow)
+        try:
+            executor_context = {
+                "session_id": session_id,
+                "test_mode": request.data.get('test_mode', 'api'),
+                "project_id": request.data.get('project_id'),
+                "device_id": request.data.get('device_id')
+            }
+            intelligent_result = IntelligentExecutor.execute(message, request.user, executor_context)
+        except Exception as e:
+            logger.error(f"IntelligentExecutor execution failed: {e}")
+            intelligent_result = {"error": str(e)}
+        
+        # 处理指令型技能 (不中断流程，而是合并指令)
+        skill_instructions = ""
+        if intelligent_result.get('type') == 'instructional':
+            skill_name = intelligent_result.get('skill_name')
+            skill_instructions = intelligent_result.get('instructions')
+            logger.info(f"Using instructional skill: {skill_name}")
+            # 我们将指令合并到 context 中
+            context = f"{context}\n\n【技能指令 - {skill_name}】:\n{skill_instructions}"
+            # 清除 intelligent_result 以便继续后续 AI 调用
+            intelligent_result = {"error": "continue_to_ai"}
+
+        if "error" not in intelligent_result:
+            # 如果成功通过技能或MCP处理，直接返回结果
+            answer = f"【智能执行结果】:\n{json.dumps(intelligent_result, ensure_ascii=False, indent=2)}"
+            assistant_message = ChatMessage.objects.create(
+                session=session,
+                role='assistant',
+                content=answer,
+                conversation_id=session.conversation_id
+            )
+            return Response({
+                'user_message': ChatMessageSerializer(user_message).data,
+                'assistant_message': ChatMessageSerializer(assistant_message).data,
+                'intelligent': True
+            })
+
         try:
             # 根据配置类型调用不同的处理逻辑
             if workflow_config:
                 return self._handle_workflow_request(request, session, workflow_config, final_message, user_message)
+            elif model_config:
+                return self._handle_model_config_request(request, session, model_config, final_message, user_message)
             else:
                 return self._handle_dify_request(request, session, dify_config, final_message, user_message)
                 
@@ -143,6 +198,37 @@ class ChatViewSet(viewsets.ViewSet):
         except requests.exceptions.RequestException as e:
             return Response({
                 'error': f'API请求失败: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    def _handle_model_config_request(self, request, session, config, message, user_message):
+        """处理直接调用 AI 模型配置 (OpenAI 兼容)"""
+        messages = [
+            {"role": "user", "content": message}
+        ]
+        
+        try:
+            # 使用 async_to_sync 调用异步的 AIModelService
+            response_data = async_to_sync(AIModelService.call_openai_compatible_api)(config, messages)
+            
+            answer = response_data['choices'][0]['message']['content']
+            
+            # 保存助手回复
+            assistant_message = ChatMessage.objects.create(
+                session=session,
+                role='assistant',
+                content=answer,
+                conversation_id=session.conversation_id
+            )
+            
+            return Response({
+                'user_message': ChatMessageSerializer(user_message).data,
+                'assistant_message': ChatMessageSerializer(assistant_message).data,
+                'conversation_id': session.conversation_id
+            })
+            
+        except Exception as e:
+            return Response({
+                'error': f'AI模型调用失败: {str(e)}'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def _handle_dify_request(self, request, session, config, message, user_message):
@@ -178,6 +264,18 @@ class ChatViewSet(viewsets.ViewSet):
         provider = config.provider
         api_url = config.api_url.rstrip('/')
         
+        # 如果 provider 是 skills，说明这只是一个指令增强，不应该直接调用 api_url
+        if provider == 'skills':
+            # 查找一个真正可用的 AI 模型来执行
+            fallback_model = AIModelConfig.objects.filter(is_active=True).first()
+            if fallback_model:
+                # 使用技能指令增强消息
+                instructions = config.additional_config.get('instructions', '')
+                enhanced_message = f"【系统指令】: {instructions}\n\n【用户需求】: {message}"
+                return self._handle_model_config_request(request, session, fallback_model, enhanced_message, user_message)
+            else:
+                return Response({'error': '技能模式需要配置至少一个活跃的 AI 模型作为执行引擎'}, status=status.HTTP_400_BAD_REQUEST)
+
         if provider == 'dify':
             # Dify Workflow/Chat 逻辑
             headers = {

@@ -103,6 +103,7 @@ class PerformanceTestSuite(models.Model):
     updated_at = models.DateTimeField(auto_now=True, verbose_name='更新时间')
     is_active = models.BooleanField(default=True, verbose_name='是否激活')
     locust_settings = models.JSONField(default=dict, blank=True, verbose_name='Locust配置')
+    worker_count = models.IntegerField(default=0, verbose_name='Worker数量(0为单机模式)')
 
     class Meta:
         verbose_name = '性能测试套件'
@@ -156,6 +157,7 @@ class PerformanceTestExecution(models.Model):
     duration = models.IntegerField(default=60, verbose_name='持续时间(秒)')
     results = models.JSONField(default=dict, blank=True, verbose_name='执行结果')
     locust_logs = models.TextField(blank=True, null=True, verbose_name='Locust日志')
+    report_html = models.TextField(blank=True, null=True, verbose_name='HTML报告')
 
     class Meta:
         verbose_name = '性能测试执行记录'

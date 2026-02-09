@@ -19,13 +19,12 @@ class ScheduledTaskViewSet(viewsets.ModelViewSet):
     def run_once(self, request, pk=None):
         """立即执行一次任务"""
         task = self.get_object()
-        # TODO: Implement actual task execution logic (Async task via Celery usually)
-        # For now just log it
         
-        # In a real implementation, you would trigger a celery task here.
-        # e.g. execute_scheduled_task.delay(task.id)
+        # 异步调用 Celery 任务
+        from .tasks import execute_scheduled_task
+        execute_scheduled_task.delay(task.id)
         
-        return Response({'status': 'Task execution started'}, status=status.HTTP_200_OK)
+        return Response({'status': 'Task execution started', 'task_id': task.id}, status=status.HTTP_200_OK)
 
 class NotificationConfigViewSet(viewsets.ModelViewSet):
     queryset = NotificationConfig.objects.all()

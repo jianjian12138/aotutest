@@ -1,7 +1,7 @@
 from rest_framework import viewsets, status
 from rest_framework.decorators import action, api_view
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
 from django.http import HttpResponse
@@ -24,7 +24,7 @@ from .models import (
     TestCase, TestCaseStep, TestCaseExecution, OperationRecord,
     TestCase, TestCaseStep, TestCaseExecution, OperationRecord,
     UiScheduledTask, UiNotificationConfig, UiNotificationLog, UiTaskNotificationSetting,
-    AICase, AIExecutionRecord, UiDevice
+    AICase, AIExecutionRecord, UiDevice, ExecutionNode
 )
 from .serializers import (
     UiProjectSerializer, UiProjectCreateSerializer, UiProjectUpdateSerializer,
@@ -42,9 +42,10 @@ from .serializers import (
     TestCaseSerializer, TestCaseStepSerializer, TestCaseExecutionSerializer, TestCaseRunSerializer,
     OperationRecordSerializer,
     UiScheduledTaskSerializer, UiNotificationConfigSerializer, UiNotificationLogSerializer, UiTaskNotificationSettingSerializer,
-    AICaseSerializer, AIExecutionRecordSerializer, UiDeviceSerializer
+    AICaseSerializer, AIExecutionRecordSerializer, UiDeviceSerializer, ExecutionNodeSerializer
 )
 from .operation_logger import log_operation
+from .services.case_generator import CaseGenerator
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
@@ -377,6 +378,33 @@ class ElementGroupViewSet(viewsets.ModelViewSet):
         project_id = request.query_params.get('project')
         if not project_id:
             return Response({'error': '需要指定项目ID'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # === 自动同步逻辑开始 ===
+        try:
+            # 1. 基于 PageObject 同步
+            page_objects = PageObject.objects.filter(project_id=project_id)
+            for po in page_objects:
+                group, _ = ElementGroup.objects.get_or_create(
+                    project_id=project_id,
+                    name=po.name,
+                    defaults={'description': po.description or f"Auto-generated for {po.name}"}
+                )
+                Element.objects.filter(project_id=project_id, page=po.name, group__isnull=True).update(group=group)
+
+            # 2. 基于 Element.page 同步 (针对没有 PageObject 但有 page 字段的元素)
+            # 获取所有非空 page 值的去重列表
+            pages = Element.objects.filter(project_id=project_id, page__isnull=False).exclude(page='').values_list('page', flat=True).distinct()
+            for page_name in pages:
+                group, _ = ElementGroup.objects.get_or_create(
+                    project_id=project_id,
+                    name=page_name,
+                    defaults={'description': f"Auto-generated group for {page_name}"}
+                )
+                Element.objects.filter(project_id=project_id, page=page_name, group__isnull=True).update(group=group)
+                
+        except Exception as e:
+            logger.warning(f"自动同步分组失败: {e}")
+        # === 自动同步逻辑结束 ===
 
         groups = self.get_queryset().filter(project_id=project_id, parent_group__isnull=True)
         serializer = ElementGroupSerializer(groups, many=True)
@@ -961,6 +989,265 @@ class TestCaseViewSet(viewsets.ModelViewSet):
         ).distinct()
         return TestCase.objects.filter(project__in=accessible_projects).select_related('project', 'created_by')
 
+    @action(detail=False, methods=['post'])
+    def upload_record(self, request):
+        """上传录制生成的代码"""
+        code = request.data.get('code')
+        project_id = request.data.get('project_id')
+        name = request.data.get('name', '录制用例')
+        
+        if not code or not project_id:
+            return Response({'error': 'Code and Project ID required'}, status=400)
+            
+        try:
+            # 1. 解析代码
+            steps = CaseGenerator.parse_playwright_code(code)
+            
+            # 2. 创建用例
+            project = UiProject.objects.get(id=project_id)
+            test_case = TestCase.objects.create(
+                name=name,
+                project=project,
+                created_by=request.user,
+                status='draft',
+                description='由 Playwright 录制生成'
+            )
+            
+            # 3. 保存步骤
+            for step in steps:
+                TestCaseStep.objects.create(
+                    test_case=test_case,
+                    step_number=step['step_order'],
+                    action_type=step['action_type'],
+                    description=step['description'],
+                    action_type_id=None, # 确保字段名正确
+                    input_value=step.get('input_value', ''),
+                    assert_type=step.get('assert_type', ''),
+                    assert_value=step.get('assert_value', ''),
+                    wait_time=1000
+                )
+                
+            return Response({
+                'status': 'success',
+                'case_id': test_case.id,
+                'steps_count': len(steps)
+            })
+            
+        except Exception as e:
+            logger.error(f"Failed to process recorded code: {e}")
+            return Response({'error': str(e)}, status=500)
+
+    def _process_steps(self, instance, steps_data):
+        """处理步骤数据，包括自动创建页面对象和元素"""
+        if not steps_data:
+            return
+
+        # 1. 尝试从步骤中推断页面信息
+        page_name = "Common_Page"
+        page_object = None
+        
+        for step in steps_data:
+            desc = step.get('description', '')
+            if 'Navigate to URL:' in desc:
+                try:
+                    url = desc.split('Navigate to URL:')[-1].strip()
+                    # 简单的URL解析提取页面名
+                    from urllib.parse import urlparse
+                    parsed = urlparse(url)
+                    path = parsed.path
+                    fragment = parsed.fragment
+                    
+                    # 优先使用 fragment (针对 SPA 应用 #/auth/login)
+                    if fragment:
+                        # 移除开头的 /
+                        clean_fragment = fragment.lstrip('/')
+                        if clean_fragment:
+                            page_name = clean_fragment.replace('/', '_').capitalize()
+                    elif path and path != '/':
+                        page_name = path.lstrip('/').replace('/', '_').capitalize()
+                        
+                    # 限制长度
+                    if len(page_name) > 50:
+                        page_name = page_name[:50]
+                except:
+                    pass
+                break
+        
+        # 2. 获取或创建 PageObject
+        try:
+            from .models import PageObject, ElementGroup
+            
+            # 创建页面对象
+            page_object, _ = PageObject.objects.get_or_create(
+                project=instance.project,
+                name=page_name,
+                defaults={
+                    'class_name': f"{page_name.replace('_', '')}Page",
+                    'description': f"Auto-generated page object for {page_name}",
+                    'created_by': self.request.user
+                }
+            )
+            
+            # 创建元素分组（用于元素管理页面显示）
+            element_group, _ = ElementGroup.objects.get_or_create(
+                project=instance.project,
+                name=page_name,
+                defaults={
+                    'description': f"Auto-generated group for {page_name}"
+                }
+            )
+        except Exception as e:
+            logger.warning(f"自动创建页面对象/分组失败: {e}")
+            element_group = None
+
+        # 创建新步骤
+        created_count = 0
+        for i, step_data in enumerate(steps_data):
+            # 确保步骤数据结构正确
+            if hasattr(step_data, 'dict'):
+                step_data = step_data.dict()
+            else:
+                step_data = dict(step_data)
+                
+            step_data['test_case'] = instance.id  # 使用测试用例ID
+            step_data['step_number'] = i + 1  # 确保步骤序号正确
+
+            # 自动关联/创建元素 (新增逻辑)
+            temp_locator = step_data.get('temp_locator')
+            if temp_locator and not step_data.get('element') and not step_data.get('element_id'):
+                try:
+                    from .models import Element, LocatorStrategy, PageObjectElement
+                    
+                    # 确定定位策略
+                    strategy_name = step_data.get('temp_strategy', 'css')
+                    # 处理 Playwright 的混合定位符，简化为 css
+                    if strategy_name not in ['css', 'xpath', 'name', 'id']:
+                        strategy_name = 'css'
+
+                    try:
+                        strategy = LocatorStrategy.objects.get(name=strategy_name)
+                    except LocatorStrategy.DoesNotExist:
+                        # 尝试不区分大小写查找
+                        strategy = LocatorStrategy.objects.filter(name__iexact=strategy_name).first()
+                        if not strategy:
+                            # 默认使用 CSS
+                            strategy = LocatorStrategy.objects.filter(name='css').first()
+
+                    if strategy:
+                        # 查找现有元素
+                        element = Element.objects.filter(
+                            project=instance.project,
+                            locator_value=temp_locator,
+                            locator_strategy=strategy
+                        ).first()
+
+                        if not element:
+                            # 创建新元素
+                            import time
+                            # 生成一个基础名称
+                            base_name = "Auto_Element"
+                            desc = step_data.get('description', '')
+                            if 'Click element:' in desc:
+                                # 尝试从描述提取更有意义的后缀
+                                suffix = desc.split(':')[-1].strip().replace('"', '').replace("'", "")
+                                # 清理非法字符
+                                import re
+                                suffix = re.sub(r'[^\w\-_]', '_', suffix)
+                                if suffix:
+                                    base_name = f"Auto_{suffix[:30]}"
+                            elif 'Fill element' in desc:
+                                # 尝试提取 Fill 的目标
+                                parts = desc.split(' with ')
+                                if len(parts) > 0:
+                                    suffix = parts[0].replace('Fill element', '').strip()
+                                    suffix = re.sub(r'[^\w\-_]', '_', suffix)
+                                    if suffix:
+                                        base_name = f"Auto_{suffix[:30]}"
+                            
+                            # 确保名称唯一性
+                            element_name = f"{base_name}_{int(time.time())}_{i}"
+
+                            element = Element.objects.create(
+                                project=instance.project,
+                                name=element_name,
+                                element_type='BUTTON' if step_data.get('action_type') == 'click' else 'INPUT',
+                                locator_strategy=strategy,
+                                locator_value=temp_locator,
+                                created_by=self.request.user,
+                                description="Automatically generated from script conversion",
+                                force_action=step_data.get('force_action', False), # 应用前端传递的强制操作标记
+                                page=page_name,  # 设置所属页面名称
+                                group=element_group # 设置所属分组（用于前端显示）
+                            )
+                        
+                        # 确保元素关联到页面对象（无论是新建的还是已存在的）
+                        if page_object and element:
+                            try:
+                                # 如果元素已存在但没有分组，尝试更新分组
+                                if not element.group and element_group:
+                                    element.group = element_group
+                                    element.page = page_name
+                                    element.save(update_fields=['group', 'page'])
+
+                                # 生成方法名
+                                method_name = element.name.lower().replace('auto_', '')
+                                # 确保唯一性
+                                if not PageObjectElement.objects.filter(page_object=page_object, element=element).exists():
+                                    if PageObjectElement.objects.filter(page_object=page_object, method_name=method_name).exists():
+                                        method_name = f"{method_name}_{int(time.time())}"
+                                        
+                                    PageObjectElement.objects.create(
+                                        page_object=page_object,
+                                        element=element,
+                                        method_name=method_name,
+                                        is_property=True
+                                    )
+                            except Exception as e_po:
+                                logger.warning(f"关联页面对象失败: {e_po}")
+                        
+                        step_data['element'] = element.id
+                except Exception as e:
+                    logger.warning(f"自动创建元素失败: {str(e)}")
+                    # 失败不阻断流程
+
+            # 处理元素ID
+            if 'element_id' in step_data:
+                step_data['element'] = step_data.pop('element_id')
+
+            # 移除只读字段
+            step_data.pop('id', None)
+            step_data.pop('element_name', None)
+            step_data.pop('element_locator', None)
+            step_data.pop('created_at', None)
+            step_data.pop('expanded', None)  # 前端UI状态字段
+
+            # 使用模型直接创建，避免序列化器的复杂性
+            try:
+                # 检查是否存在重复步骤（虽然理论上不会，但以防万一）
+                TestCaseStep.objects.filter(test_case=instance, step_number=step_data.get('step_number', i + 1)).delete()
+                
+                TestCaseStep.objects.create(
+                    test_case=instance,
+                    step_number=step_data.get('step_number', i + 1),
+                    action_type=step_data.get('action_type', 'click'),
+                    element_id=step_data.get('element') if step_data.get('element') else None,
+                    input_value=step_data.get('input_value', ''),
+                    wait_time=step_data.get('wait_time', 1000),
+                    assert_type=step_data.get('assert_type', ''),
+                    assert_value=step_data.get('assert_value', ''),
+                    description=step_data.get('description', ''),
+                    enable_debug_capture=step_data.get('enable_debug_capture', False)
+                )
+                created_count += 1
+            except Exception as e:
+                logger.error(f"创建步骤 {i+1} 失败: {str(e)}")
+                logger.error(f"步骤数据: {step_data}")
+                # 避免使用 serializers，因为未导入
+                from rest_framework.exceptions import ValidationError
+                raise ValidationError(f"步骤 {i+1} 创建失败: {str(e)}")
+
+        logger.info(f"成功创建了 {created_count} 个新步骤")
+
     def perform_create(self, serializer):
         from django.db import transaction
         
@@ -978,54 +1265,12 @@ class TestCaseViewSet(viewsets.ModelViewSet):
                 logger.info(f"创建测试用例 {instance.id} 的步骤数据: {len(steps_data) if steps_data else 0} 个步骤")
 
                 if steps_data:
-                    # 创建新步骤
-                    created_count = 0
-                    for i, step_data in enumerate(steps_data):
-                        # 确保步骤数据结构正确
-                        if hasattr(step_data, 'dict'):
-                            step_data = step_data.dict()
-                        else:
-                            step_data = dict(step_data)
-                            
-                        step_data['test_case'] = instance.id  # 使用测试用例ID
-                        step_data['step_number'] = i + 1  # 确保步骤序号正确
-
-                        # 处理元素ID
-                        if 'element_id' in step_data:
-                            step_data['element'] = step_data.pop('element_id')
-
-                        # 移除只读字段
-                        step_data.pop('id', None)
-                        step_data.pop('element_name', None)
-                        step_data.pop('element_locator', None)
-                        step_data.pop('created_at', None)
-                        step_data.pop('expanded', None)  # 前端UI状态字段
-
-                        # 使用模型直接创建，避免序列化器的复杂性
-                        try:
-                            TestCaseStep.objects.create(
-                                test_case=instance,
-                                step_number=step_data.get('step_number', i + 1),
-                                action_type=step_data.get('action_type', 'click'),
-                                element_id=step_data.get('element') if step_data.get('element') else None,
-                                input_value=step_data.get('input_value', ''),
-                                wait_time=step_data.get('wait_time', 1000),
-                                assert_type=step_data.get('assert_type', ''),
-                                assert_value=step_data.get('assert_value', ''),
-                                description=step_data.get('description', ''),
-                                enable_debug_capture=step_data.get('enable_debug_capture', False)
-                            )
-                            created_count += 1
-                        except Exception as e:
-                            logger.error(f"创建步骤 {i+1} 失败: {str(e)}")
-                            logger.error(f"步骤数据: {step_data}")
-                            raise serializers.ValidationError(f"步骤 {i+1} 创建失败: {str(e)}")
-
-                    logger.info(f"成功创建了 {created_count} 个新步骤")
+                    self._process_steps(instance, steps_data)
                     
         except Exception as e:
             logger.error(f"创建测试用例失败: {str(e)}")
-            raise serializers.ValidationError(f"创建失败: {str(e)}")
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError(f"创建失败: {str(e)}")
 
     @action(detail=True, methods=['post'])
     def copy_case(self, request, pk=None):
@@ -1100,54 +1345,12 @@ class TestCaseViewSet(viewsets.ModelViewSet):
                     instance.steps.all().delete()
                     logger.info(f"删除了 {existing_steps_count} 个现有步骤")
 
-                    # 创建新步骤
-                    created_count = 0
-                    for i, step_data in enumerate(steps_data):
-                        # 确保步骤数据结构正确
-                        if hasattr(step_data, 'dict'):
-                            step_data = step_data.dict()
-                        else:
-                            step_data = dict(step_data)
-                            
-                        step_data['test_case'] = instance.id  # 使用测试用例ID
-                        step_data['step_number'] = i + 1  # 确保步骤序号正确
-
-                        # 处理元素ID
-                        if 'element_id' in step_data:
-                            step_data['element'] = step_data.pop('element_id')
-
-                        # 移除只读字段
-                        step_data.pop('id', None)
-                        step_data.pop('element_name', None)
-                        step_data.pop('element_locator', None)
-                        step_data.pop('created_at', None)
-                        step_data.pop('expanded', None)  # 前端UI状态字段
-
-                        # 使用模型直接创建，避免序列化器的复杂性
-                        try:
-                            TestCaseStep.objects.create(
-                                test_case=instance,
-                                step_number=step_data.get('step_number', i + 1),
-                                action_type=step_data.get('action_type', 'click'),
-                                element_id=step_data.get('element') if step_data.get('element') else None,
-                                input_value=step_data.get('input_value', ''),
-                                wait_time=step_data.get('wait_time', 1000),
-                                assert_type=step_data.get('assert_type', ''),
-                                assert_value=step_data.get('assert_value', ''),
-                                description=step_data.get('description', ''),
-                                enable_debug_capture=step_data.get('enable_debug_capture', False)
-                            )
-                            created_count += 1
-                        except Exception as e:
-                            logger.error(f"创建步骤 {i+1} 失败: {str(e)}")
-                            logger.error(f"步骤数据: {step_data}")
-                            raise serializers.ValidationError(f"步骤 {i+1} 创建失败: {str(e)}")
-
-                    logger.info(f"成功创建了 {created_count} 个新步骤")
+                    self._process_steps(instance, steps_data)
 
         except Exception as e:
             logger.error(f"更新测试用例失败: {str(e)}")
-            raise serializers.ValidationError(f"更新失败: {str(e)}")
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError(f"更新失败: {str(e)}")
 
     def _generate_step_log(self, step, step_result='success'):
         """根据测试步骤生成执行日志"""
@@ -2253,6 +2456,9 @@ class OperationRecordViewSet(viewsets.ReadOnlyModelViewSet):
         queryset = OperationRecord.objects.all().order_by('-created_at')
 
         # 支持通过查询参数限制返回数量
+        # 注意：如果启用了分页，这里切片可能会导致问题
+        # 但由于我们只需要最新的N条记录，切片是可以的
+        # 只要后续不再进行过滤或排序操作
         limit = self.request.query_params.get('limit', None)
         if limit:
             try:
@@ -2691,7 +2897,7 @@ class UiScheduledTaskViewSet(viewsets.ModelViewSet):
                             task.save()
 
                             # 发送成功通知
-                            self._send_task_notification(task, success=True)
+                            # self._send_task_notification(task, success=True)
                         else:
                             task.failed_runs += 1
                             task.last_result = {
@@ -2704,8 +2910,7 @@ class UiScheduledTaskViewSet(viewsets.ModelViewSet):
                             task.save()
 
                             # 发送失败通知
-                            self._send_task_notification(task, success=False)
-
+                            # self._send_task_notification(task, success=False)
                     except Exception as e:
                         logger.error(f"执行定时任务测试用例时发生异常: {str(e)}")
                         task.failed_runs += 1
@@ -2714,7 +2919,7 @@ class UiScheduledTaskViewSet(viewsets.ModelViewSet):
                         task.save()
 
                         # 发送失败通知
-                        self._send_task_notification(task, success=False)
+                        # self._send_task_notification(task, success=False)
 
                 # 启动后台线程执行测试
                 thread = threading.Thread(target=run_test_cases)
@@ -3160,8 +3365,165 @@ class AICaseViewSet(viewsets.ModelViewSet):
         return AICase.objects.filter(project__in=accessible_projects)
 
     def perform_create(self, serializer):
+        save_as_script = self.request.data.get('save_as_script', False)
         instance = serializer.save(created_by=self.request.user)
         log_operation('create', 'ai_case', instance.id, instance.name, self.request.user)
+
+        if save_as_script:
+            # 启动异步线程处理脚本生成，避免阻塞 HTTP 请求
+            import threading
+            def generate_script_task():
+                logger.info(f"Starting async script generation for AI Case: {instance.name}, Mode: {instance.execution_mode}")
+                try:
+                    if instance.execution_mode == 'vision_web':
+                         # Vision Web 模式暂时不需要生成脚本，因为它是实时执行的
+                         # 但我们可以生成一个“启动器”脚本或者记录
+                         logger.info("Vision Web Mode: No script generation needed yet, agent runs dynamically.")
+                         pass
+
+                    elif instance.execution_mode in ['web', 'mobile']:
+                        from .ai_agent import generate_script_content_sync
+                        from .models import TestScript
+                        
+                        logger.info("Generating script content...")
+                        script_content = generate_script_content_sync(
+                            instance.task_description, 
+                            mode=instance.execution_mode
+                        )
+                        logger.info(f"Script content generated (len={len(script_content) if script_content else 0})")
+                        
+                        if script_content and not script_content.startswith("# Failed"):
+                            script = TestScript.objects.create(
+                                project=instance.project,
+                                name=f"Generated Script: {instance.name}",
+                                description=f"Generated from AI Case: {instance.name}",
+                                script_type='CODE',
+                                content=script_content,
+                                language='python',
+                                framework='playwright' # Default to playwright
+                            )
+                            logger.info(f"TestScript created successfully: {script.id}")
+                        else:
+                             logger.error(f"Script generation returned invalid content: {script_content}")
+                        
+                    elif instance.execution_mode == 'api': 
+                         from apps.api_testing.ai_agent import generate_api_case_data_sync
+                         from apps.api_testing.models import ApiTestCase, ApiTestCaseStep, ApiProject
+                         
+                         logger.info("Generating API case data...")
+                         api_case_data = generate_api_case_data_sync(instance.task_description)
+                         
+                         if api_case_data:
+                             # Try to find an ApiProject with the same name, or create one
+                             ui_project_name = instance.project.name
+                             api_project, created = ApiProject.objects.get_or_create(
+                                 name=ui_project_name,
+                                 defaults={
+                                     'description': f"Auto-created from UI Project: {instance.project.description}",
+                                     'project_type': 'HTTP',
+                                     'status': 'IN_PROGRESS',
+                                     'owner': instance.created_by
+                                 }
+                             )
+                             
+                             if created:
+                                 logger.info(f"Created new ApiProject: {api_project.name}")
+                                 
+                             api_test_case = ApiTestCase.objects.create(
+                                project=api_project,
+                                name=f"Generated API Case: {instance.name}",
+                                description=f"Generated from AI Case: {instance.name}\nPrompt: {instance.task_description}",
+                                status='draft',
+                                created_by=instance.created_by
+                             )
+                             
+                             for i, step_data in enumerate(api_case_data):
+                                ApiTestCaseStep.objects.create(
+                                    test_case=api_test_case,
+                                    step_number=i+1,
+                                    name=step_data.get('name', f'Step {i+1}'),
+                                    description=step_data.get('description', ''),
+                                    method=step_data.get('method', 'GET').upper(),
+                                    url=step_data.get('url', ''),
+                                    headers=step_data.get('headers', {}),
+                                    params=step_data.get('params', {}),
+                                    body=step_data.get('body', {}),
+                                    assertions=step_data.get('assertions', []),
+                                    extract_rules=step_data.get('extract', [])
+                                )
+                             logger.info(f"ApiTestCase created successfully: {api_test_case.id}")
+                         else:
+                             logger.warning("No API case data generated.") 
+    
+                except Exception as e:
+                    import logging
+                    logger = logging.getLogger('django')
+                    logger.error(f"Failed to generate script/case from AI Case: {e}")
+
+            thread = threading.Thread(target=generate_script_task)
+            thread.daemon = True
+            thread.start()
+
+    @action(detail=False, methods=['post'], url_path='create_api_case')
+    def create_api_case(self, request):
+        """Special endpoint to create API AI Case and optionally generate structured test case"""
+        project_id = request.data.get('project_id')
+        name = request.data.get('name')
+        task_description = request.data.get('task_description')
+        save_as_case = request.data.get('save_as_case', False)
+        
+        # Validate project (Should be ApiProject)
+        from apps.api_testing.models import ApiProject, ApiTestCase, ApiTestCaseStep
+        try:
+            project = ApiProject.objects.get(id=project_id)
+        except ApiProject.DoesNotExist:
+             return Response({'error': 'API Project not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        # Create AICase (Note: AICase model is in ui_automation, might need a separate one for API or reuse)
+        # Reuse AICase but link to UiProject? No, AICase.project is ForeignKey to UiProject.
+        # We need to handle this.
+        # Solution: Create a specific API AI Case model OR just create the ApiTestCase directly if requested.
+        
+        # If the goal is just to save the "AI Case" (the prompt) for API:
+        # We might need to relax the ForeignKey or create a new model.
+        # For now, let's assume we just create the structured ApiTestCase directly if save_as_case is True.
+        
+        if save_as_case:
+            from apps.api_testing.ai_agent import generate_api_case_data_sync
+            
+            case_data_list = generate_api_case_data_sync(task_description)
+            
+            if not case_data_list:
+                 return Response({'error': 'Failed to generate API test case steps'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+            # Create ApiTestCase
+            api_test_case = ApiTestCase.objects.create(
+                project=project,
+                name=name,
+                description=task_description,
+                status='ready',
+                created_by=request.user
+            )
+            
+            # Create Steps
+            for i, step_data in enumerate(case_data_list):
+                ApiTestCaseStep.objects.create(
+                    test_case=api_test_case,
+                    step_number=i+1,
+                    name=step_data.get('name', f'Step {i+1}'),
+                    description=step_data.get('description', ''),
+                    method=step_data.get('method', 'GET').upper(),
+                    url=step_data.get('url', ''),
+                    headers=step_data.get('headers', {}),
+                    params=step_data.get('params', {}),
+                    body=step_data.get('body', {}),
+                    assertions=step_data.get('assertions', []),
+                    extract_rules=step_data.get('extract', [])
+                )
+                
+            return Response({'message': 'API Test Case created successfully', 'id': api_test_case.id})
+        
+        return Response({'message': 'No action taken (save_as_case=False)'})
 
     def perform_update(self, serializer):
         instance = serializer.save()
@@ -3243,6 +3605,39 @@ class AICaseViewSet(viewsets.ModelViewSet):
                     asyncio.set_event_loop(loop)
                     try:
                         loop.run_until_complete(run_mobile_async())
+                    finally:
+                        loop.close()
+
+                elif ai_case.execution_mode == 'vision_web':
+                    # Vision Web 执行逻辑
+                    from .ai_vision_web import VisionWebAgent
+                    from playwright.async_api import async_playwright
+                    import asyncio
+
+                    async def run_vision_web_async():
+                        async with async_playwright() as p:
+                            browser = await p.chromium.launch(headless=False)
+                            context = await browser.new_context(viewport={'width': 1280, 'height': 720})
+                            page = await context.new_page()
+                            
+                            agent = VisionWebAgent(page, case_name=ai_case.name)
+                            agent.execution_record = execution_record
+                            
+                            async def web_callback(data):
+                                if data.get('type') == 'log':
+                                    content = data.get('content', '')
+                                    execution_record.logs += content + "\n"
+                                    await sync_to_async(execution_record.save)(update_fields=['logs'])
+                            
+                            await agent.run_task(ai_case.task_description, callback=web_callback, should_stop=should_stop_async)
+                            
+                            await context.close()
+                            await browser.close()
+
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    try:
+                        loop.run_until_complete(run_vision_web_async())
                     finally:
                         loop.close()
 
@@ -3392,11 +3787,41 @@ class AIExecutionRecordViewSet(viewsets.ModelViewSet):
         device_id = request.data.get('device_id') # 移动端设备ID
         model_config_id = request.data.get('model_config_id') # AI模型配置ID
         browser_type = request.data.get('browser_type', 'chrome') # 浏览器类型
+        reference_image = request.FILES.get('reference_image')
         
         logger.info(f"Run Adhoc Task: execution_mode={execution_mode}, device_id={device_id}, model_config_id={model_config_id}, browser_type={browser_type}, task={task_description[:50]}...")
 
         if not project_id or not task_description:
             return Response({'error': '缺少必要参数'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Handle reference image upload
+        if reference_image:
+            try:
+                import os
+                import time
+                from django.conf import settings
+                from django.core.files.storage import default_storage
+                from django.core.files.base import ContentFile
+                
+                # Ensure directory exists
+                temp_dir = os.path.join(settings.MEDIA_ROOT, 'temp', 'reference_images')
+                os.makedirs(temp_dir, exist_ok=True)
+                
+                # Save file
+                filename = f"ref_{request.user.id}_{int(time.time())}_{reference_image.name}"
+                # Use default_storage to handle saving (works for local and S3)
+                file_path = default_storage.save(f'temp/reference_images/{filename}', ContentFile(reference_image.read()))
+                
+                # Get full URL
+                media_url = getattr(settings, 'MEDIA_URL', '/media/')
+                full_url = f"{media_url}{file_path}"
+                
+                # Append to task description as a system note
+                task_description += f"\n\n[System Note] User uploaded a reference image: {full_url}"
+                
+            except Exception as e:
+                logger.error(f"Failed to save reference image: {e}")
+                # Continue execution even if image save fails, just log it
 
         try:
             project = UiProject.objects.get(id=project_id)
@@ -3473,6 +3898,50 @@ class AIExecutionRecordViewSet(viewsets.ModelViewSet):
                     finally:
                         loop.close()
                         
+                elif execution_mode == 'api':
+                    # API 模式执行逻辑
+                    from apps.api_testing.ai_agent import run_api_task_sync
+                    
+                    async def on_analysis_complete(planned_tasks):
+                        execution_record.planned_tasks = planned_tasks
+                        execution_record.logs += "任务分析完成，开始执行...\n"
+                        await sync_to_async(execution_record.save)()
+                        
+                    async def on_step_update(step_info):
+                        try:
+                            # 处理日志
+                            if step_info.get('type') == 'log':
+                                content = step_info.get('content')
+                                if content:
+                                    execution_record.logs += content
+                                    await sync_to_async(execution_record.save)(update_fields=['logs'])
+                                return
+
+                            # 处理任务状态
+                            task_id = step_info.get('task_id')
+                            status = step_info.get('status')
+                            
+                            if task_id and status:
+                                updated = False
+                                if execution_record.planned_tasks:
+                                    for task in execution_record.planned_tasks:
+                                        if str(task['id']) == str(task_id):
+                                            task['status'] = status
+                                            updated = True
+                                            break
+                                if updated:
+                                    await sync_to_async(execution_record.save)(update_fields=['planned_tasks'])
+                        except Exception as e:
+                            logger.error(f"更新步骤状态失败: {e}", exc_info=True)
+
+                    run_api_task_sync(
+                        task_description,
+                        analysis_callback=on_analysis_complete,
+                        step_callback=on_step_update,
+                        should_stop=should_stop_async,
+                        model_config_id=model_config_id
+                    )
+
                 else:
                     # 原有Web/Text执行逻辑
                     from .ai_agent import run_full_process_sync
@@ -3786,6 +4255,182 @@ class AIExecutionRecordViewSet(viewsets.ModelViewSet):
                 'error': str(e)
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+    @action(detail=False, methods=['post'], url_path='inspect_page')
+    def inspect_page(self, request):
+        """Smart Inspector: Analyze page (URL or Image or ADB Device) and extract elements"""
+        url = request.data.get('url')
+        image = request.FILES.get('image')
+        device_id = request.data.get('device_id')
+
+        if not url and not image and not device_id:
+            return Response({'error': 'URL, Image file or Device ID is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        from .ai_vision_web import VisionWebAgent
+        from playwright.async_api import async_playwright
+        import asyncio
+        from .utils.device_manager import DeviceManager
+        
+        # Prepare Config Synchronously (to avoid ORM in async thread)
+        from apps.requirement_analysis.models import AIModelConfig
+        import os
+        config_obj = AIModelConfig.objects.filter(role='writer', is_active=True).first()
+        api_key = config_obj.api_key if config_obj else os.getenv("OPENAI_API_KEY", "")
+        base_url = config_obj.base_url if config_obj else os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
+        model_name = config_obj.model_name if config_obj else "gpt-4o"
+        
+        # Scenario 1: ADB Device Inspection
+        if device_id:
+            try:
+                # Capture screenshot from device
+                screenshot_bytes = DeviceManager.get_screenshot_bytes(device_id)
+                if not screenshot_bytes:
+                     return Response({'error': 'Failed to capture device screenshot'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                
+                # Pass captured variables as default args to closure to ensure availability
+                def run_device_inspection_sync(api_key=api_key, base_url=base_url, model_name=model_name, screenshot_bytes=screenshot_bytes):
+                    import asyncio
+                    import threading
+                    from queue import Queue
+                    
+                    result_queue = Queue()
+                    
+                    def worker():
+                        loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(loop)
+                        
+                        async def _async_task():
+                            agent = VisionWebAgent(page=None, case_name=f"Smart Inspection (Device {device_id})", api_key=api_key, base_url=base_url, model_name=model_name)
+                            return await agent.inspect_image(screenshot_bytes)
+                        
+                        try:
+                            res = loop.run_until_complete(_async_task())
+                            result_queue.put(res)
+                        except Exception as e:
+                            result_queue.put(e)
+                        finally:
+                            loop.close()
+
+                    t = threading.Thread(target=worker)
+                    t.start()
+                    t.join()
+                    
+                    res = result_queue.get()
+                    if isinstance(res, Exception):
+                        raise res
+                    return res
+
+                result = run_device_inspection_sync()
+                return Response(result)
+            except Exception as e:
+                logger.error(f"Device inspection failed: {e}")
+                return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        # Scenario 2: Image Inspection
+        if image:
+            try:
+                # Read image content
+                image_bytes = image.read()
+                
+                # Pass captured variables as default args to closure to ensure availability
+                def run_image_inspection_sync(api_key=api_key, base_url=base_url, model_name=model_name, image_bytes=image_bytes):
+                    import asyncio
+                    import threading
+                    from queue import Queue
+                    
+                    result_queue = Queue()
+                    
+                    def worker():
+                        loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(loop)
+                        
+                        async def _async_task():
+                            agent = VisionWebAgent(page=None, case_name="Smart Inspection (Image)", api_key=api_key, base_url=base_url, model_name=model_name)
+                            return await agent.inspect_image(image_bytes)
+                        
+                        try:
+                            res = loop.run_until_complete(_async_task())
+                            result_queue.put(res)
+                        except Exception as e:
+                            result_queue.put(e)
+                        finally:
+                            loop.close()
+
+                    t = threading.Thread(target=worker)
+                    t.start()
+                    t.join()
+                    
+                    res = result_queue.get()
+                    if isinstance(res, Exception):
+                        raise res
+                    return res
+
+                result = run_image_inspection_sync()
+                return Response(result)
+            except Exception as e:
+                logger.error(f"Image inspection failed: {e}")
+                return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        # Scenario 3: URL Inspection (Existing logic)
+        
+        def run_inspection_sync(api_key=api_key, base_url=base_url, model_name=model_name, url=url):
+            """
+            Synchronous wrapper that runs Playwright in a fresh thread with its own event loop.
+            This completely avoids Django's async/sync context issues.
+            """
+            import asyncio
+            import threading
+            from queue import Queue
+            
+            result_queue = Queue()
+            
+            def worker():
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                
+                async def _async_task():
+                    async with async_playwright() as p:
+                        # Launch headless browser
+                        try:
+                            browser = await p.chromium.launch(headless=True, channel="chrome")
+                        except Exception:
+                            try:
+                                browser = await p.chromium.launch(headless=True)
+                            except Exception as e:
+                                logger.warning(f"Chromium launch failed: {e}, trying msedge")
+                                browser = await p.chromium.launch(headless=True, channel="msedge")
+                            
+                        context = await browser.new_context(viewport={'width': 1280, 'height': 720})
+                        page = await context.new_page()
+                        
+                        # Pass explicit credentials to avoid ORM calls in this thread
+                        agent = VisionWebAgent(page, case_name="Smart Inspection", api_key=api_key, base_url=base_url, model_name=model_name)
+                        return await agent.inspect_page(url)
+                
+                try:
+                    res = loop.run_until_complete(_async_task())
+                    result_queue.put(res)
+                except Exception as e:
+                    result_queue.put(e)
+                finally:
+                    loop.close()
+
+            t = threading.Thread(target=worker)
+            t.start()
+            t.join()
+            
+            res = result_queue.get()
+            if isinstance(res, Exception):
+                raise res
+            return res
+
+        try:
+            # Execute in isolation
+            result = run_inspection_sync()
+            return Response(result)
+        except Exception as e:
+            logger.error(f"Inspection failed: {e}")
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 class UiDashboardViewSet(viewsets.ViewSet):
     """UI自动化仪表盘视图集"""
@@ -3794,39 +4439,45 @@ class UiDashboardViewSet(viewsets.ViewSet):
     @action(detail=False, methods=['get'])
     def stats(self, request):
         """获取仪表盘统计数据"""
-        user = request.user
-        
-        # 获取用户可访问的项目ID列表
-        accessible_projects = UiProject.objects.filter(
-            models.Q(owner=user) | models.Q(members=user)
-        ).distinct()
-        project_ids = accessible_projects.values_list('id', flat=True)
+        try:
+            user = request.user
+            
+            # 获取用户可访问的项目ID列表
+            accessible_projects = UiProject.objects.filter(
+                models.Q(owner=user) | models.Q(members=user)
+            ).distinct()
+            project_ids = accessible_projects.values_list('id', flat=True)
 
-        # 统计数据
-        project_count = accessible_projects.count()
-        
-        # 测试用例数量
-        test_case_count = TestCase.objects.filter(project_id__in=project_ids).count()
-        
-        # 测试套件数量（包含用例总数）
-        suite_count = TestSuite.objects.filter(project_id__in=project_ids).count()
-        
-        from .models import TestSuiteTestCase
-        suite_test_case_count = TestSuiteTestCase.objects.filter(
-            test_suite__project_id__in=project_ids
-        ).count()
+            # 统计数据
+            project_count = accessible_projects.count()
+            
+            # 测试用例数量
+            test_case_count = TestCase.objects.filter(project_id__in=project_ids).count()
+            
+            # 测试套件数量
+            suite_count = TestSuite.objects.filter(project_id__in=project_ids).count()
+            
+            # 测试执行数量（传统+新版）
+            execution_count = TestExecution.objects.filter(project_id__in=project_ids).count()
+            test_case_execution_count = TestCaseExecution.objects.filter(project_id__in=project_ids).count()
+            total_execution_count = execution_count + test_case_execution_count
 
-        # 测试执行数量（传统+新版）
-        execution_count = TestExecution.objects.filter(project_id__in=project_ids).count()
-        test_case_execution_count = TestCaseExecution.objects.filter(project_id__in=project_ids).count()
-        total_execution_count = execution_count + test_case_execution_count
-
-        return Response({
-            'project_count': project_count,
-            'test_case_count': test_case_count,
-            'suite_count': suite_test_case_count,
-            'execution_count': total_execution_count
-        })
+            return Response({
+                'project_count': project_count,
+                'test_case_count': test_case_count,
+                'suite_count': suite_count,
+                'execution_count': total_execution_count
+            })
+        except Exception as e:
+            import traceback
+            print(f"Error in UiDashboardViewSet.stats: {str(e)}")
+            traceback.print_exc()
+            return Response({
+                'project_count': 0,
+                'test_case_count': 0,
+                'suite_count': 0,
+                'execution_count': 0
+            }, status=200)
 
 
 class UiDeviceViewSet(viewsets.ModelViewSet):
@@ -3966,5 +4617,58 @@ class UiDeviceViewSet(viewsets.ModelViewSet):
             return HttpResponse(image_data, content_type="image/png")
         else:
             return Response({'error': 'Failed to capture screenshot'}, status=500)
+
+
+class ExecutionNodeViewSet(viewsets.ModelViewSet):
+    """执行节点视图集"""
+    queryset = ExecutionNode.objects.all()
+    serializer_class = ExecutionNodeSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_permissions(self):
+        if self.action in ['register', 'recorder_command']:
+            return [AllowAny()]
+        return super().get_permissions()
+    
+    @action(detail=False, methods=['post'])
+    def register(self, request):
+        """节点注册/心跳"""
+        name = request.data.get('name')
+        token = request.data.get('token')
+        ip_address = request.data.get('ip_address')
+        node_type = request.data.get('node_type', 'execution')
+        capabilities = request.data.get('capabilities', {})
+        
+        if not token:
+            return Response({'error': 'Token required'}, status=400)
+            
+        node, created = ExecutionNode.objects.update_or_create(
+            token=token,
+            defaults={
+                'name': name or f'Node-{token[:6]}',
+                'ip_address': ip_address,
+                'status': 'online',
+                'node_type': node_type,
+                'last_heartbeat': timezone.now(),
+                'capabilities': capabilities
+            }
+        )
+        
+        return Response({
+            'status': 'registered',
+            'node_id': node.id,
+            'name': node.name
+        })
+    
+    @action(detail=False, methods=['get'])
+    def recorder_command(self, request):
+        """获取录制指令"""
+        token = request.query_params.get('token')
+        if not token:
+            return Response({'error': 'Token required'}, status=400)
+            
+        # 简单实现：查询是否有待执行的录制任务
+        # 实际场景可以用Redis队列
+        return Response({'command': None})  # 暂无指令
 
 

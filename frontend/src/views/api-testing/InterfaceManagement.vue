@@ -1,17 +1,10 @@
 <template>
-  <div class="page-container">
-    <div class="page-header">
-      <h3 class="page-title">接口管理</h3>
-    </div>
-    
-    <div class="main-content">
-      <div class="card-container">
-        <div class="content" style="height: 100%; display: flex; flex-direction: column;">
-          <div class="interface-layout">
-            <!-- 左侧集合树 -->
-            <div class="sidebar">
+  <div class="interface-manage-page">
+    <div class="interface-layout">
+      <!-- 左侧集合树 -->
+      <div class="sidebar">
               <div class="sidebar-header">
-                <el-select v-model="selectedProject" placeholder="选择项目" @change="onProjectChange" class="filter-select">
+                <el-select v-model="selectedProject" placeholder="选择项目" @change="onProjectChange" class="project-select">
                   <el-option
                     v-for="project in projects"
                     :key="project.id"
@@ -19,24 +12,44 @@
                     :value="project.id"
                   />
                 </el-select>
-                <div class="header-actions">
-                  <el-button type="primary" size="small" @click="showCreateCollectionDialog = true" title="创建集合">
-                    <el-icon><Folder /></el-icon>
-                  </el-button>
-                  <el-button type="success" size="small" @click="createEmptyRequest" title="添加接口">
-                    <el-icon><Plus /></el-icon>
-                  </el-button>
-                  <el-button type="warning" size="small" @click="showImportDialog = true" title="导入接口">
-                    <el-icon><Upload /></el-icon>
-                  </el-button>
+              </div>
+              
+              <div class="sidebar-toolbar">
+                <el-input 
+                  v-model="searchText" 
+                  placeholder="搜索接口..." 
+                  :prefix-icon="Search" 
+                  clearable 
+                  size="small" 
+                  class="search-input"
+                />
+                <div class="toolbar-actions">
+                  <el-dropdown trigger="click">
+                    <el-button size="small" circle>
+                      <el-icon><Plus /></el-icon>
+                    </el-button>
+                    <template #dropdown>
+                      <el-dropdown-menu>
+                        <el-dropdown-item @click="createEmptyRequest">
+                          <el-icon><DocumentAdd /></el-icon>新建接口
+                        </el-dropdown-item>
+                        <el-dropdown-item @click="showCreateCollectionDialog = true">
+                          <el-icon><FolderAdd /></el-icon>新建分组
+                        </el-dropdown-item>
+                        <el-dropdown-item divided @click="showImportDialog = true">
+                          <el-icon><Download /></el-icon>导入接口
+                        </el-dropdown-item>
+                      </el-dropdown-menu>
+                    </template>
+                  </el-dropdown>
                 </div>
               </div>
           
-              <div class="collection-tree">
+              <div class="collection-tree-container">
                 <el-tree
                   ref="treeRef"
-                  :data="collections"
-                  :props="treeProps"
+                  :data="filteredTreeData"
+                  :props="defaultProps"
                   node-key="id"
                   :expand-on-click-node="false"
                   :default-expanded-keys="expandedKeys"
@@ -44,9 +57,10 @@
                   @node-contextmenu="onNodeRightClick"
                   @node-expand="onNodeExpand"
                   @node-collapse="onNodeCollapse"
+                  class="custom-tree"
                 >
                   <template #default="{ node, data }">
-                    <div class="tree-node">
+                    <div class="tree-node" :class="{ 'is-active': selectedRequest?.id === data.id }">
                       <!-- 上传中节点 -->
                       <template v-if="data.type === 'uploading'">
                         <el-icon v-if="data.status === 'uploading'" class="uploading-icon">
@@ -55,59 +69,21 @@
                         <el-icon v-else-if="data.status === 'processing'" class="processing-icon">
                           <Loading />
                         </el-icon>
-                        <el-icon v-else-if="data.status === 'failed'" class="failed-icon">
-                          <Close />
-                        </el-icon>
-                        <span :class="`node-label uploading-node status-${data.status}`">{{ node.label }}</span>
-                        
-                        <!-- 操作按钮 -->
-                        <el-button
-                          v-if="data.status === 'uploading' || data.status === 'processing'"
-                          type="danger"
-                          size="small"
-                          @click.stop="stopUploadingNode(data)"
-                          title="停止上传"
-                        >
-                          <el-icon><Close /></el-icon>
-                        </el-button>
-                        <el-button
-                          v-else-if="data.status === 'failed'"
-                          type="danger"
-                          size="small"
-                          @click.stop="removeUploadingNode(data)"
-                          title="删除上传节点"
-                        >
-                          <el-icon><Delete /></el-icon>
-                        </el-button>
+                        <span class="node-label uploading-node">{{ node.label }}</span>
                       </template>
                       
-                      <!-- 普通节点 -->
+                      <!-- 分组节点 -->
+                      <template v-else-if="data.type === 'collection' || data.children">
+                        <el-icon class="folder-icon"><Folder /></el-icon>
+                        <span class="node-label">{{ node.label }}</span>
+                      </template>
+                      
+                      <!-- 接口节点 -->
                       <template v-else>
-                        <el-icon v-if="data.type === 'collection'">
-                          <Folder />
-                        </el-icon>
-                        <el-icon v-else>
-                          <Document />
-                        </el-icon>
-                        
-                        <!-- 集合名称编辑 -->
-                        <div v-if="data.type === 'collection' && editingNodeId === data.id" class="node-edit">
-                          <el-input
-                            v-model="editingNodeName"
-                            size="small"
-                            @blur="saveCollectionName"
-                            @keyup.enter="saveCollectionName"
-                            @keyup.esc="cancelEdit"
-                            ref="editInputRef"
-                          />
-                        </div>
-                        
-                        <!-- 普通显示模式 -->
-                        <span v-else class="node-label">{{ node.label }}</span>
-                        
-                        <span v-if="data.type === 'request' && data.request_type !== 'WEBSOCKET'" class="method-tag" :class="data.method?.toLowerCase()">
+                        <span class="method-indicator" :class="data.method?.toLowerCase()">
                           {{ data.method }}
                         </span>
+                        <span class="node-label" :title="node.label">{{ node.label }}</span>
                       </template>
                     </div>
                   </template>
@@ -125,647 +101,275 @@
               
               <div v-else class="request-detail">
                 <!-- 请求基本信息 -->
-                <div class="request-header">
-                  <div class="request-line">
-                    <!-- 请求类型选择器 -->
-                    <el-select 
-                      v-model="selectedRequest.request_type" 
-                      style="width: 120px; margin-right: 10px;"
-                      @change="onRequestTypeChange"
-                    >
-                      <el-option label="HTTP" value="HTTP" />
-                      <el-option label="WebSocket" value="WEBSOCKET" />
-                    </el-select>
-                    
-                    <!-- HTTP接口显示方法选择器 -->
-                    <el-select 
-                      v-if="selectedRequest.request_type !== 'WEBSOCKET'" 
-                      v-model="selectedRequest.method" 
-                      style="width: 100px;"
-                    >
-                      <el-option v-for="method in availableMethods" :key="method" :label="method" :value="method" />
-                    </el-select>
-                    
-                    <el-input
-                      v-model="selectedRequest.url"
-                      placeholder="输入请求URL"
-                      class="url-input"
-                      :class="{ 'websocket-url': selectedRequest.request_type === 'WEBSOCKET' }"
-                    >
-                      <template #prepend>
-                        <el-select v-model="selectedEnvironment" placeholder="环境" style="width: 120px;">
-                          <el-option label="无环境" :value="null" />
-                          <el-option
-                            v-for="env in environments"
-                            :key="env.id"
-                            :label="env.name"
-                            :value="env.id"
-                          />
-                        </el-select>
-                      </template>
-                    </el-input>
-
-                    <!-- 执行引擎选择 -->
-                    <el-select 
-                      v-if="selectedRequest.request_type !== 'WEBSOCKET'"
-                      v-model="executionEngine" 
-                      placeholder="引擎" 
-                      style="width: 110px; margin-left: 5px; margin-right: 5px;"
-                    >
-                      <el-option label="Requests" value="requests" />
-                      <el-option label="HttpRunner" value="httprunner" />
-                    </el-select>
-                    
-                    <!-- WebSocket连接按钮 -->
-                    <el-button 
-                      v-if="selectedRequest.request_type === 'WEBSOCKET'"
-                      :type="websocketConnectionStatus === 'disconnected' ? 'primary' : 'info'"
-                      :loading="websocketConnectionStatus === 'connecting'"
-                      @click="toggleWebSocketConnection"
-                    >
-                      <span v-if="websocketConnectionStatus === 'disconnected'">连接</span>
-                      <span v-else-if="websocketConnectionStatus === 'connecting'">连接中</span>
-                      <span v-else>关闭连接</span>
-                    </el-button>
-                    
-                    <!-- HTTP发送按钮 -->
-                    <el-button 
-                      v-else
-                      type="primary" 
-                      @click="sendRequest" 
-                      :loading="sending"
-                    >
-                      发送
-                    </el-button>
+                <div class="request-header-area">
+                  <div class="header-top">
+                    <div class="title-container">
+                      <el-input 
+                        v-model="selectedRequest.name" 
+                        placeholder="接口名称" 
+                        class="interface-title-input"
+                      />
+                    </div>
+                    <div class="header-actions">
+                      <el-select v-model="selectedEnvironment" placeholder="选择环境" size="small" class="env-selector">
+                        <el-option label="无环境" :value="null" />
+                        <el-option v-for="env in environments" :key="env.id" :label="env.name" :value="env.id" />
+                      </el-select>
+                      <el-button-group class="action-btns">
+                        <el-button type="primary" @click="saveRequest" :loading="saving">
+                          <el-icon><CircleCheck /></el-icon>保存
+                        </el-button>
+                        <el-dropdown trigger="click">
+                          <el-button type="primary" class="more-btn">
+                            <el-icon><ArrowDown /></el-icon>
+                          </el-button>
+                          <template #dropdown>
+                            <el-dropdown-menu>
+                              <el-dropdown-item @click="copyCurl">复制 cURL</el-dropdown-item>
+                              <el-dropdown-item @click="deleteNode">删除接口</el-dropdown-item>
+                            </el-dropdown-menu>
+                          </template>
+                        </el-dropdown>
+                      </el-button-group>
+                    </div>
                   </div>
-                  
-                  <div class="request-name">
-                    <el-input
-                      v-model="selectedRequest.name"
-                      placeholder="请求名称"
-                      size="small"
-                      style="width: 300px;"
-                    />
-                    <el-button size="small" @click="saveRequest" :loading="saving" ref="saveButtonRef">
-                      保存
+
+                  <div class="url-bar">
+                    <div class="method-url-group">
+                      <el-select 
+                        v-model="selectedRequest.method" 
+                        class="method-selector-compact"
+                        :class="selectedRequest.method.toLowerCase()"
+                      >
+                        <el-option v-for="method in availableMethods" :key="method" :label="method" :value="method" />
+                      </el-select>
+                      <el-input 
+                        v-model="selectedRequest.url" 
+                        placeholder="输入请求URL，支持 {{variable}} 语法" 
+                        class="url-input-compact" 
+                      />
+                    </div>
+                    <el-button type="primary" @click="sendRequest" :loading="sending" class="send-button-large">
+                      <span>发送</span>
+                      <el-icon class="el-icon--right"><Promotion /></el-icon>
                     </el-button>
                   </div>
                 </div>
 
-                <!-- 请求配置 -->
-                <el-tabs v-model="activeTab" class="request-tabs">
-                  <el-tab-pane label="Params" name="params">
-                    <KeyValueEditor
-                      v-model="selectedRequest.params"
-                      placeholder-key="参数名"
-                      placeholder-value="参数值"
-                    />
-                  </el-tab-pane>
-                  
-                  <el-tab-pane label="Headers" name="headers">
-                    <KeyValueEditor
-                      ref="headersEditorRef"
-                      v-model="selectedRequest.headers"
-                      placeholder-key="Header名"
-                      placeholder-value="Header值"
-                      @update:modelValue="onHeadersUpdate"
-                    />
-                  </el-tab-pane>
-                  
-                  <el-tab-pane label="Body" name="body" v-if="hasBody">
-                    <div class="body-container">
-                      <el-radio-group v-model="bodyType" @change="onBodyTypeChange">
-                        <el-radio value="none">none</el-radio>
-                        <el-radio value="form-data">form-data</el-radio>
-                        <el-radio value="x-www-form-urlencoded">x-www-form-urlencoded</el-radio>
-                        <el-radio value="raw">raw</el-radio>
-                        <el-radio value="binary">binary</el-radio>
-                      </el-radio-group>
-                      
-                      <div v-if="bodyType === 'form-data'" class="body-content">
-                        <KeyValueEditor
-                          v-model="formData"
-                          placeholder-key="键"
-                          placeholder-value="值"
-                          :show-file="true"
-                        />
-                      </div>
-                      
-                      <div v-else-if="bodyType === 'x-www-form-urlencoded'" class="body-content">
-                        <KeyValueEditor
-                          v-model="formUrlEncoded"
-                          placeholder-key="键"
-                          placeholder-value="值"
-                        />
-                      </div>
-                      
-                      <div v-else-if="bodyType === 'raw'" class="body-content">
-                        <div class="raw-options">
-                          <el-select v-model="rawType" style="width: 150px;">
-                            <el-option label="Text" value="text" />
-                            <el-option label="JSON" value="json" />
-                            <el-option label="HTML" value="html" />
-                            <el-option label="XML" value="xml" />
-                          </el-select>
-                        </div>
-                        <el-input
-                          v-model="rawBody"
-                          type="textarea"
-                          :rows="10"
-                          placeholder="请输入请求体内容"
-                          class="raw-body"
-                        />
+                <!-- 模式切换 -->
+                <el-tabs v-model="modeTab" class="mode-tabs">
+                  <el-tab-pane label="文档 / 设计" name="design">
+                    <div class="design-container">
+                      <div class="design-section">
+                        <div class="section-title">请求参数</div>
+                        <el-tabs v-model="activeTab" class="design-tabs">
+                          <el-tab-pane label="Query 参数" name="params">
+                            <div class="tab-pane-content">
+                              <KeyValueEditor v-model="selectedRequest.params" />
+                            </div>
+                          </el-tab-pane>
+                          <el-tab-pane label="Headers" name="headers">
+                            <div class="tab-pane-content">
+                              <KeyValueEditor ref="headersEditorRef" v-model="selectedRequest.headers" />
+                            </div>
+                          </el-tab-pane>
+                          <el-tab-pane label="Body" name="body" v-if="hasBody">
+                            <div class="tab-pane-content">
+                              <el-radio-group v-model="bodyType" size="small" style="margin-bottom: 15px;">
+                                <el-radio value="none">none</el-radio>
+                                <el-radio value="json">json</el-radio>
+                                <el-radio value="form-data">form-data</el-radio>
+                              </el-radio-group>
+                              
+                              <div v-if="bodyType === 'json'" class="body-editor-container">
+                                <el-input
+                                  v-model="rawBody"
+                                  type="textarea"
+                                  :rows="12"
+                                  placeholder='{"key": "value"}'
+                                  class="code-input"
+                                />
+                              </div>
+                              <div v-else-if="bodyType === 'form-data'">
+                                <KeyValueEditor v-model="formData" :show-file="true" />
+                              </div>
+                            </div>
+                          </el-tab-pane>
+                          <el-tab-pane label="断言规则" name="assertions">
+                            <div class="tab-pane-content">
+                              <div class="action-bar">
+                                <el-button type="primary" size="small" @click="addAssertion">
+                                  <el-icon><Plus /></el-icon>添加断言
+                                </el-button>
+                              </div>
+                              <div class="rules-list">
+                                <div v-for="(assertion, index) in selectedRequest.assertions" :key="index" class="rule-card">
+                                  <div class="rule-header">
+                                    <el-input v-model="assertion.name" placeholder="断言名称" size="small" class="rule-name-input" />
+                                    <el-button type="danger" size="small" link @click="removeAssertion(index)">
+                                      <el-icon><Delete /></el-icon>
+                                    </el-button>
+                                  </div>
+                                  <div class="rule-body">
+                                    <el-select v-model="assertion.type" placeholder="断言类型" size="small" style="width: 140px">
+                                      <el-option label="状态码" value="status_code" />
+                                      <el-option label="响应时间" value="response_time" />
+                                      <el-option label="JSON路径" value="json_path" />
+                                      <el-option label="包含文本" value="contains" />
+                                    </el-select>
+                                    <el-input v-if="assertion.type === 'json_path'" v-model="assertion.json_path" placeholder="JSONPath 表达式" size="small" style="flex: 1" />
+                                    <el-input v-model="assertion.expected" placeholder="期望值" size="small" style="width: 200px" />
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </el-tab-pane>
+                          <el-tab-pane label="提取变量" name="extract">
+                            <div class="tab-pane-content">
+                              <div class="action-bar">
+                                <el-button type="primary" size="small" @click="addExtractRule">
+                                  <el-icon><Plus /></el-icon>添加提取
+                                </el-button>
+                              </div>
+                              <div class="rules-list">
+                                <div v-for="(rule, index) in selectedRequest.extract_rules" :key="index" class="rule-card">
+                                  <div class="rule-header">
+                                    <el-input v-model="rule.variable_name" placeholder="变量名" size="small" class="rule-name-input" />
+                                    <el-button type="danger" size="small" link @click="removeExtractRule(index)">
+                                      <el-icon><Delete /></el-icon>
+                                    </el-button>
+                                  </div>
+                                  <div class="rule-body">
+                                    <el-select v-model="rule.type" placeholder="提取方式" size="small" style="width: 140px">
+                                      <el-option label="JSON路径" value="json_path" />
+                                      <el-option label="正则" value="regex" />
+                                    </el-select>
+                                    <el-input v-model="rule.json_path" placeholder="表达式" size="small" style="flex: 1" />
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </el-tab-pane>
+                        </el-tabs>
                       </div>
                     </div>
                   </el-tab-pane>
-                  
-                  <!-- HTTP接口专用标签页 -->
-                  <template v-if="!selectedRequest || selectedRequest.request_type !== 'WEBSOCKET'">
-                    <el-tab-pane label="Pre-request Script" name="pre-script">
-                      <el-input
-                        v-model="selectedRequest.pre_request_script"
-                        type="textarea"
-                        :rows="10"
-                        placeholder="// 请求前脚本，使用JavaScript语法"
-                      />
-                    </el-tab-pane>
-                    
-                    <el-tab-pane label="Tests" name="tests">
-                      <el-input
-                        v-model="selectedRequest.post_request_script"
-                        type="textarea"
-                        :rows="10"
-                        placeholder="// 请求后脚本和测试，使用JavaScript语法"
-                      />
-                    </el-tab-pane>
-                    
-                    <el-tab-pane label="断言" name="assertions">
-                      <div class="assertions-editor">
-                        <div class="assertions-header">
-                          <el-button size="small" type="primary" @click="addAssertion">
-                            <el-icon><Plus /></el-icon>
-                            添加断言
-                          </el-button>
-                        </div>
-                        
-                        <div class="assertions-list">
-                          <div 
-                            v-for="(assertion, index) in selectedRequest.assertions" 
-                            :key="index" 
-                            class="assertion-item"
-                          >
-                            <div class="assertion-header">
-                              <el-input 
-                                v-model="assertion.name" 
-                                placeholder="断言名称" 
-                                size="small" 
-                                class="assertion-name"
+
+                  <el-tab-pane label="运行 / 调试" name="debug">
+                    <div class="debug-container">
+                      <div class="debug-request-pane">
+                        <div class="pane-header">请求配置</div>
+                        <el-tabs v-model="debugActiveTab" class="compact-tabs">
+                          <el-tab-pane label="Query 参数" name="params">
+                            <KeyValueEditor v-model="selectedRequest.params" size="small" />
+                          </el-tab-pane>
+                          <el-tab-pane label="Headers" name="headers">
+                            <KeyValueEditor v-model="selectedRequest.headers" size="small" />
+                          </el-tab-pane>
+                          <el-tab-pane label="Body" name="body" v-if="hasBody">
+                            <div class="debug-body-editor">
+                              <el-radio-group v-model="bodyType" size="small" class="body-type-selector">
+                                <el-radio value="none">none</el-radio>
+                                <el-radio value="json">json</el-radio>
+                                <el-radio value="form-data">form-data</el-radio>
+                              </el-radio-group>
+                              <el-input
+                                v-if="bodyType === 'json'"
+                                v-model="rawBody"
+                                type="textarea"
+                                :rows="8"
+                                placeholder='{"key": "value"}'
+                                class="monospaced-input"
                               />
-                              <el-button 
-                                size="small" 
-                                type="danger" 
-                                @click="removeAssertion(index)"
-                                circle
-                              >
-                                <el-icon><Delete /></el-icon>
-                              </el-button>
+                              <KeyValueEditor v-if="bodyType === 'form-data'" v-model="formData" :show-file="true" size="small" />
                             </div>
-                            
-                            <div class="assertion-config">
-                              <el-select 
-                                v-model="assertion.type" 
-                                placeholder="选择断言类型" 
-                                size="small"
-                                @change="onAssertionTypeChange(assertion)"
-                              >
-                                <el-option label="状态码" value="status_code" />
-                                <el-option label="响应时间" value="response_time" />
-                                <el-option label="包含文本" value="contains" />
-                                <el-option label="JSON路径" value="json_path" />
-                                <el-option label="响应头" value="header" />
-                                <el-option label="完全匹配" value="equals" />
-                                <el-option label="数据库校验(AI)" value="database" />
-                              </el-select>
-                              
-                              <div class="assertion-params" v-if="assertion.type">
-                                <!-- 状态码断言 -->
-                                <div v-if="assertion.type === 'status_code'">
-                                  <el-input-number 
-                                    v-model="assertion.expected" 
-                                    :min="100" 
-                                    :max="599" 
-                                    size="small"
-                                    placeholder="期望状态码"
-                                  />
-                                </div>
-                                
-                                <!-- 响应时间断言 -->
-                                <div v-else-if="assertion.type === 'response_time'">
-                                  <el-input-number 
-                                    v-model="assertion.expected" 
-                                    :min="1" 
-                                    size="small"
-                                    placeholder="最大响应时间(ms)"
-                                  />
-                                </div>
-                                
-                                <!-- 包含文本断言 -->
-                                <div v-else-if="assertion.type === 'contains'">
-                                  <el-input 
-                                    v-model="assertion.expected" 
-                                    placeholder="期望包含的文本" 
-                                    size="small"
-                                  />
-                                </div>
-                                
-                                <!-- JSON路径断言 -->
-                                <div v-else-if="assertion.type === 'json_path'">
-                                  <el-input 
-                                    v-model="assertion.json_path" 
-                                    placeholder="JSON路径表达式" 
-                                    size="small"
-                                    class="assertion-input"
-                                  />
-                                  <el-input 
-                                    v-model="assertion.expected" 
-                                    placeholder="期望值" 
-                                    size="small"
-                                    class="assertion-input"
-                                  />
-                                </div>
-                                
-                                <!-- 响应头断言 -->
-                                <div v-else-if="assertion.type === 'header'">
-                                  <el-input 
-                                    v-model="assertion.header_name" 
-                                    placeholder="响应头名称" 
-                                    size="small"
-                                    class="assertion-input"
-                                  />
-                                  <el-input 
-                                    v-model="assertion.expected_value" 
-                                    placeholder="期望值" 
-                                    size="small"
-                                    class="assertion-input"
-                                  />
-                                </div>
-                                
-                                <!-- 完全匹配断言 -->
-                                <div v-else-if="assertion.type === 'equals'">
-                                  <el-input 
-                                    v-model="assertion.expected" 
-                                    placeholder="期望完全匹配的文本" 
-                                    size="small"
-                                  />
-                                </div>
-
-                                <!-- 数据库断言(AI) -->
-                                <div v-else-if="assertion.type === 'database'">
-                                  <el-select 
-                                    v-model="assertion.db_config_id" 
-                                    placeholder="选择数据库配置" 
-                                    size="small" 
-                                    class="assertion-input"
-                                    style="width: 100%"
-                                  >
-                                    <el-option
-                                      v-for="config in vannaConfigs"
-                                      :key="config.id"
-                                      :label="config.name"
-                                      :value="config.id"
-                                    />
-                                  </el-select>
-
-                                  <!-- 查询方式选择 -->
-                                  <div style="margin-bottom: 5px;">
-                                    <el-radio-group v-model="assertion.query_mode" size="small">
-                                      <el-radio label="sql">SQL语句</el-radio>
-                                      <el-radio label="natural_language">自然语言(AI)</el-radio>
-                                    </el-radio-group>
-                                  </div>
-                                  
-                                  <!-- SQL输入模式 -->
-                                  <div v-if="assertion.query_mode !== 'natural_language'" style="margin-bottom: 5px;">
-                                    <el-input 
-                                      v-model="assertion.sql" 
-                                      type="textarea" 
-                                      :rows="3" 
-                                      placeholder="SELECT count(*) FROM table WHERE ..." 
-                                      size="small"
-                                    />
-                                  </div>
-
-                                  <!-- 自然语言模式 -->
-                                  <div v-else style="margin-bottom: 5px;">
-                                    <div style="display: flex; gap: 5px; margin-bottom: 5px;">
-                                      <el-input 
-                                        v-model="assertion.prompt" 
-                                        type="textarea" 
-                                        :rows="2" 
-                                        placeholder="请输入自然语言查询需求，例如：查询用户表中状态为active的用户数量" 
-                                        size="small"
-                                      />
-                                      <el-button 
-                                        type="primary" 
-                                        size="small" 
-                                        @click="handleGenerateSqlInline(assertion)"
-                                        :disabled="!assertion.db_config_id || !assertion.prompt"
-                                        :loading="assertion.generating"
-                                      >
-                                        生成
-                                      </el-button>
-                                    </div>
-                                    <div v-if="assertion.sql" style="background-color: #f5f7fa; padding: 5px; border-radius: 4px; font-size: 12px; margin-bottom: 5px;">
-                                      <div style="color: #909399; margin-bottom: 2px;">生成的SQL:</div>
-                                      <code style="word-break: break-all;">{{ assertion.sql }}</code>
-                                    </div>
-                                  </div>
-                                  
-                                  <el-input 
-                                    v-model="assertion.expected" 
-                                    placeholder="期望值" 
-                                    size="small"
-                                    class="assertion-input"
-                                  />
-                                  
-                                  <el-select 
-                                    v-model="assertion.operator" 
-                                    placeholder="断言关系" 
-                                    size="small"
-                                    style="width: 100%"
-                                  >
-                                    <el-option label="等于" value="equal" />
-                                    <el-option label="包含" value="contain" />
-                                    <el-option label="大于" value="gt" />
-                                    <el-option label="小于" value="lt" />
-                                  </el-select>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                          
-                          <div v-if="!selectedRequest.assertions || selectedRequest.assertions.length === 0" class="no-assertions">
-                            <p>暂无断言配置</p>
-                            <el-button size="small" type="primary" @click="addAssertion">
-                              <el-icon><Plus /></el-icon>
-                              添加第一个断言
-                            </el-button>
-                          </div>
-                        </div>
+                          </el-tab-pane>
+                        </el-tabs>
                       </div>
-                    </el-tab-pane>
-                    
-                    <!-- 变量提取规则标签页 -->
-                    <el-tab-pane label="提取变量" name="extract-variables">
-                      <div class="extract-variables-editor">
-                        <div class="extract-variables-header">
-                          <el-button size="small" type="primary" @click="addExtractRule">
-                            <el-icon><Plus /></el-icon>
-                            添加提取规则
-                          </el-button>
-                        </div>
-                        
-                        <div class="extract-rules-list">
-                          <div 
-                            v-for="(rule, index) in selectedRequest.extract_rules" 
-                            :key="index" 
-                            class="extract-rule-item"
-                          >
-                            <div class="extract-rule-header">
-                              <el-input 
-                                v-model="rule.variable_name" 
-                                placeholder="变量名称" 
-                                size="small" 
-                                class="extract-rule-name"
-                              />
-                              <el-button 
-                                size="small" 
-                                type="danger" 
-                                @click="removeExtractRule(index)"
-                                circle
-                              >
-                                <el-icon><Delete /></el-icon>
-                              </el-button>
-                            </div>
-                            
-                            <div class="extract-rule-config">
-                              <el-select 
-                                v-model="rule.type" 
-                                placeholder="选择提取类型" 
-                                size="small"
-                                @change="onExtractRuleTypeChange(rule)"
-                              >
-                                <el-option label="状态码" value="status_code" />
-                                <el-option label="JSON路径" value="json_path" />
-                                <el-option label="响应头" value="header" />
-                                <el-option label="正则表达式" value="regex" />
-                              </el-select>
-                              
-                              <div class="extract-rule-params" v-if="rule.type">
-                                <!-- JSON路径提取 -->
-                                <div v-if="rule.type === 'json_path'">
-                                  <el-input 
-                                    v-model="rule.json_path" 
-                                    placeholder="JSON路径表达式" 
-                                    size="small"
-                                    class="extract-rule-input"
-                                  />
-                                </div>
-                                
-                                <!-- 响应头提取 -->
-                                <div v-else-if="rule.type === 'header'">
-                                  <el-input 
-                                    v-model="rule.header_name" 
-                                    placeholder="响应头名称" 
-                                    size="small"
-                                    class="extract-rule-input"
-                                  />
-                                </div>
-                                
-                                <!-- 正则表达式提取 -->
-                                <div v-else-if="rule.type === 'regex'">
-                                  <el-input 
-                                    v-model="rule.pattern" 
-                                    placeholder="正则表达式" 
-                                    size="small"
-                                    class="extract-rule-input"
-                                  />
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                          
-                          <div v-if="!selectedRequest.extract_rules || selectedRequest.extract_rules.length === 0" class="no-extract-rules">
-                            <p>暂无变量提取规则配置</p>
-                            <el-button size="small" type="primary" @click="addExtractRule">
-                              <el-icon><Plus /></el-icon>
-                              添加第一个提取规则
-                            </el-button>
-                          </div>
-                        </div>
-                      </div>
-                    </el-tab-pane>
-                  </template>
-                  
-                  <!-- WebSocket接口专用标签页 -->
-                  <template v-else-if="selectedRequest && selectedRequest.request_type === 'WEBSOCKET'">
-                    <el-tab-pane label="Message" name="message">
-                      <div class="message-container">
-                        <div class="message-input-section">
-                          <el-select 
-                            v-model="websocketMessageType" 
-                            placeholder="选择消息类型" 
-                            style="width: 150px; margin-bottom: 15px;"
-                          >
-                            <el-option label="Text" value="text" />
-                            <el-option label="JSON" value="json" />
-                            <el-option label="Binary" value="binary" />
-                          </el-select>
-                          
-                          <div v-if="websocketMessageType === 'text' || websocketMessageType === 'json'">
-                            <el-input
-                              v-model="websocketMessageContent"
-                              type="textarea"
-                              :rows="6"
-                              placeholder="请输入要发送的WebSocket消息内容"
-                            />
-                          </div>
-                          
-                          <div v-else-if="websocketMessageType === 'binary'">
-                            <el-upload
-                              drag
-                              action="#"
-                              :auto-upload="false"
-                              :show-file-list="false"
-                              :on-change="handleWebSocketFileUpload"
-                            >
-                              <el-icon class="el-icon--upload"><upload-filled /></el-icon>
-                              <div class="el-upload__text">
-                                将二进制文件拖到此处，或<em>点击上传</em>
-                              </div>
-                            </el-upload>
-                            <div v-if="websocketBinaryFile" class="uploaded-file">
-                              <span>{{ websocketBinaryFile.name }}</span>
-                              <el-button size="small" type="danger" @click="clearWebSocketBinaryFile">清除</el-button>
-                            </div>
-                          </div>
-                          
-                          <div class="message-actions" style="margin-top: 15px;">
-                            <el-button type="primary" @click="sendWebSocketMessage">
-                              发送消息
-                            </el-button>
-                            <el-button @click="clearWebSocketMessage">
-                              清空消息
-                            </el-button>
-                          </div>
-                        </div>
-                        
-                        <!-- WebSocket消息历史记录 -->
-                        <div class="websocket-response-section" v-if="websocketMessages.length > 0">
-                          <h3>消息历史</h3>
-                          <div class="websocket-messages">
-                            <div 
-                              v-for="(msg, index) in websocketMessages.slice().reverse()" 
-                              :key="index" 
-                              class="websocket-message-item"
-                              :class="msg.type"
-                            >
-                              <div class="message-header">
-                                <span class="message-type" :class="msg.type">
-                                  {{ msg.type === 'sent' ? '↑ 发送' : 
-                                     msg.type === 'connected' ? '✅连接成功' : 
-                                     msg.type === 'info' ? 'ℹ️信息' : 
-                                     msg.type === 'error' ? '❌错误' : '↓ 接收' }}
-                                </span>
-                                <span class="message-time">{{ msg.timestamp }}</span>
-                              </div>
-                              <div class="message-content">
-                                <pre v-if="msg.type === 'received' && isJsonString(msg.content)">{{ formatJson(msg.content) }}</pre>
-                                <pre v-else>{{ msg.content }}</pre>
-                              </div>
-                            </div>
-                          </div>
-                          <div class="message-actions">
-                            <el-button size="small" @click="clearWebSocketMessages">清空历史</el-button>
-                          </div>
-                        </div>
-                      </div>
-                    </el-tab-pane>
-                  </template>
-                </el-tabs>
-
-                <!-- 响应区域 -->
-                <div v-if="response" class="response-section">
-                  <div class="response-header">
-                    <h3>响应</h3>
-                    <div class="response-info">
-                      <el-tag :type="getStatusType(response.status_code)">
-                        {{ response.status_code }}
-                      </el-tag>
-                      <span class="response-time">{{ response.response_time?.toFixed(0) }}ms</span>
-                    </div>
-                  </div>
-                  
-                  <el-tabs v-model="responseActiveTab">
-                    <el-tab-pane label="Body" name="body">
-                      <div class="response-body">
-                        <div class="response-actions">
-                          <el-button-group>
-                            <el-button size="small" @click="formatResponse">格式化</el-button>
-                            <el-button size="small" @click="copyResponse">复制</el-button>
-                          </el-button-group>
-                        </div>
-                        <pre class="response-content">{{ responseBody }}</pre>
-                      </div>
-                    </el-tab-pane>
-                    
-                    <el-tab-pane label="Headers" name="headers">
-                      <div class="response-headers">
-                        <div v-for="(value, key) in response.response_data?.headers" :key="key" class="header-row">
-                          <strong>{{ key }}:</strong> {{ value }}
-                        </div>
-                      </div>
-                    </el-tab-pane>
-                    
-                    <el-tab-pane label="断言结果" name="assertions" v-if="response.assertions_results && response.assertions_results.length > 0">
-                      <div class="assertions-results">
-                        <div 
-                          v-for="(result, index) in response.assertions_results" 
-                          :key="index" 
-                          class="assertion-result-item"
-                          :class="{ 'passed': result.passed, 'failed': !result.passed }"
-                        >
-                          <div class="assertion-result-header">
-                            <el-tag :type="result.passed ? 'success' : 'danger'" size="small">
-                              {{ result.passed ? '通过' : '失败' }}
+                      
+                      <div class="debug-response-pane">
+                        <div class="pane-header">
+                          <span>响应结果</span>
+                          <div v-if="response" class="response-meta-tags">
+                            <el-tag :type="getStatusType(response.status_code)" effect="dark" size="small">
+                              {{ response.status_code }} {{ response.status_text || 'OK' }}
                             </el-tag>
-                            <span class="assertion-name">{{ result.name }}</span>
-                          </div>
-                          <div class="assertion-result-details">
-                            <div class="result-row">
-                              <span class="label">期望:</span>
-                              <span class="value">{{ result.expected !== null && result.expected !== undefined ? result.expected : '未设置' }}</span>
-                            </div>
-                            <div class="result-row">
-                              <span class="label">实际:</span>
-                              <span class="value">{{ result.actual !== null && result.actual !== undefined ? result.actual : '未获取到' }}</span>
-                            </div>
-                            <div class="result-row" v-if="result.error">
-                              <span class="label">错误:</span>
-                              <span class="value error">{{ result.error }}</span>
-                            </div>
+                            <el-tag type="info" size="small">{{ response.response_time?.toFixed(0) }} ms</el-tag>
+                            <el-tag type="info" size="small">{{ formatSize(response.response_data?.size) }}</el-tag>
                           </div>
                         </div>
+
+                        <div v-if="response" class="response-content-area">
+                          <el-tabs v-model="responseActiveTab" class="compact-tabs">
+                            <el-tab-pane label="请求信息" name="request">
+                              <div class="response-viewer">
+                                <div class="request-info-section">
+                                  <div class="info-item">
+                                    <span class="info-label">请求地址:</span>
+                                    <el-tag size="small" type="info" class="info-value">{{ response.request_data?.url }}</el-tag>
+                                  </div>
+                                  <div class="info-item">
+                                    <span class="info-label">请求方法:</span>
+                                    <el-tag size="small" :type="getStatusType(200)" class="info-value">{{ response.request_data?.method }}</el-tag>
+                                  </div>
+                                </div>
+                                <div class="request-detail-section">
+                                  <div class="detail-title">请求头 (Headers)</div>
+                                  <pre class="code-block small">{{ JSON.stringify(response.request_data?.headers, null, 2) }}</pre>
+                                </div>
+                                <div class="request-detail-section" v-if="response.request_data?.body">
+                                  <div class="detail-title">请求体 (Body)</div>
+                                  <pre class="code-block small">{{ typeof response.request_data?.body === 'string' ? response.request_data?.body : JSON.stringify(response.request_data?.body, null, 2) }}</pre>
+                                </div>
+                              </div>
+                            </el-tab-pane>
+                            <el-tab-pane label="响应 Body" name="body">
+                              <div class="response-body-toolbar">
+                                <el-radio-group v-model="responseViewMode" size="small">
+                                  <el-radio-button label="pretty">Pretty</el-radio-button>
+                                  <el-radio-button label="raw">Raw</el-radio-button>
+                                  <el-radio-button label="preview">Preview</el-radio-button>
+                                </el-radio-group>
+                                <el-button size="small" link @click="copyResponse">
+                                  <el-icon><CopyDocument /></el-icon>复制
+                                </el-button>
+                              </div>
+                              <div class="response-viewer">
+                                <pre v-if="responseViewMode === 'pretty'" class="code-block">{{ responseBody }}</pre>
+                                <pre v-else-if="responseViewMode === 'raw'" class="code-block">{{ response.response_data?.body }}</pre>
+                                <div v-else-if="responseViewMode === 'preview'" class="preview-block" v-html="response.response_data?.body"></div>
+                              </div>
+                            </el-tab-pane>
+                            <el-tab-pane label="Headers" name="headers">
+                              <div class="response-headers-table">
+                                <div v-for="(value, key) in response.response_headers" :key="key" class="header-item">
+                                  <span class="header-key">{{ key }}:</span>
+                                  <span class="header-value">{{ value }}</span>
+                                </div>
+                              </div>
+                            </el-tab-pane>
+                            <el-tab-pane label="断言结果" name="assertions">
+                              <div class="assertion-results-list">
+                                <div v-if="!response.assertion_results?.length" class="empty-results">未配置断言</div>
+                                <div v-for="(res, idx) in response.assertion_results" :key="idx" 
+                                     class="assertion-result-row" :class="res.status">
+                                  <el-icon><CircleCheck v-if="res.status === 'passed'" /><CircleClose v-else /></el-icon>
+                                  <span class="assertion-desc">{{ res.message }}</span>
+                                </div>
+                              </div>
+                            </el-tab-pane>
+                          </el-tabs>
+                        </div>
+                        <div v-else class="response-empty">
+                          <el-empty description="点击“发送”按钮以获取响应数据" :image-size="100" />
+                        </div>
                       </div>
-                    </el-tab-pane>
-                  </el-tabs>
-                </div>
+                    </div>
+                  </el-tab-pane>
+                </el-tabs>
               </div>
             </div>
-          </div>
-        </div>
-      </div>
-    </div>
+          </div> <!-- Close interface-layout -->
 
     <!-- 创建集合对话框 -->
     <el-dialog v-model="showCreateCollectionDialog" title="创建集合" width="500px">
@@ -892,17 +496,17 @@
         <el-button type="primary" @click="handleGenerateSql" :loading="generatingSql">生成SQL</el-button>
       </template>
     </el-dialog>
-      </div>
+  </div>
 </template>
 
 <script setup>
 import { ref, reactive, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Folder, Document, UploadFilled, Close } from '@element-plus/icons-vue'
+import { Plus, Folder, Document, UploadFilled, Close, DocumentAdd, Download, Search, CircleCheck, ArrowDown, Promotion, CopyDocument, CircleClose, Loading, Delete, FolderAdd } from '@element-plus/icons-vue'
 import api from '@/utils/api'
 import { getVannaConfigs, generateSql } from '@/api/data-factory'
 import KeyValueEditor from './components/KeyValueEditor.vue'
-import '@/assets/css/unified-styles.scss'
+import '@/assets/css/global.scss'
 
 const treeRef = ref(null)
 const expandedKeys = ref([])
@@ -919,6 +523,16 @@ const sending = ref(false)
 const saving = ref(false)
 const activeTab = ref('params')
 const responseActiveTab = ref('body')
+const responseViewMode = ref('pretty')
+const debugActiveTab = ref('params')
+
+const formatSize = (bytes) => {
+  if (!bytes) return '0 B'
+  const k = 1024
+  const sizes = ['B', 'KB', 'MB', 'GB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+}
 const showCreateCollectionDialog = ref(false)
 const showEditCollectionDialog = ref(false)
 const showContextMenu = ref(false)
@@ -929,6 +543,38 @@ const headersEditorRef = ref(null)
 const editingNodeId = ref(null)
 const editingNodeName = ref('')
 const editInputRef = ref(null)
+
+// 模式切换
+const modeTab = ref('design')
+const searchText = ref('')
+
+// 过滤后的集合树
+const filteredTreeData = computed(() => {
+  if (!searchText.value) return collections.value
+  
+  const search = searchText.value.toLowerCase()
+  const filterNode = (nodes) => {
+    const result = []
+    for (const node of nodes) {
+      const matchName = node.name && node.name.toLowerCase().includes(search)
+      let filteredChildren = []
+      
+      if (node.children && node.children.length > 0) {
+        filteredChildren = filterNode(node.children)
+      }
+      
+      if (matchName || filteredChildren.length > 0) {
+        result.push({
+          ...node,
+          children: filteredChildren
+        })
+      }
+    }
+    return result
+  }
+  
+  return filterNode(collections.value)
+})
 
 // 数据库配置
 const vannaConfigs = ref([])
@@ -1068,7 +714,7 @@ const formData = ref({})
 const formUrlEncoded = ref({})
 const rawBody = ref('')
 
-const treeProps = {
+const defaultProps = {
   children: 'children',
   label: 'name'
 }
@@ -1179,7 +825,10 @@ const loadCollections = async (preserveExpandState = true) => {
   
   try {
     const res = await api.get('/api-testing/collections/', {
-      params: { project: selectedProject.value }
+      params: { 
+        project: selectedProject.value,
+        page_size: 1000 // 获取所有集合以构建完整树
+      }
     })
     const collectionsData = res.data.results || res.data
     console.log('Backend collections data:', collectionsData)
@@ -1235,21 +884,19 @@ const loadRequests = async () => {
   
   try {
     const res = await api.get('/api-testing/requests/', {
-      params: { project: selectedProject.value }
+      params: { 
+        project: selectedProject.value,
+        page_size: 1000 // 获取所有请求以构建完整树
+      }
     })
     const requests = res.data.results || res.data
     
     // 确保requests是数组
     const requestsArray = Array.isArray(requests) ? requests : []
     
-    // 清空所有集合的子请求
+    // 清空所有集合的子请求（递归清空）
     collections.value.forEach(collection => {
-      if (collection.children) {
-        // 只保留子集合，移除所有请求
-        collection.children = collection.children.filter(child => child.type === 'collection' || child.children)
-      } else {
-        collection.children = []
-      }
+      clearCollectionChildren(collection)
     })
     
     // 创建一个请求映射，按集合ID分组
@@ -1267,6 +914,8 @@ const loadRequests = async () => {
       const collectionId = collection.id
       const collectionRequests = requestsByCollection[collectionId] || []
       
+      console.log(`Adding ${collectionRequests.length} requests to collection: ${collection.name} (ID: ${collectionId})`)
+      
       // 将请求添加到集合的children中
       collectionRequests.forEach(request => {
         collection.children.push({
@@ -1277,18 +926,19 @@ const loadRequests = async () => {
       })
       
       // 递归处理子集合
-      collection.children.forEach(child => {
-        if (child.type === 'collection') {
-          addRequestsToCollection(child)
-        }
-      })
+      if (collection.children && collection.children.length > 0) {
+        collection.children.forEach(child => {
+          if (child.type === 'collection') {
+            addRequestsToCollection(child)
+          }
+        })
+      }
     }
     
     // 遍历所有集合，添加请求
     collections.value.forEach(collection => {
-      if (collection.type === 'collection') {
-        addRequestsToCollection(collection)
-      }
+      // 这里的集合可能是 root 集合，也可能是带 type 的 node
+      addRequestsToCollection(collection)
     })
     
   } catch (error) {
@@ -1340,16 +990,26 @@ const buildTree = (items) => {
   
   // 构建新的树结构
   items.forEach(item => {
-    map[item.id] = { ...item, type: 'collection', children: [] }
+    // 检查item是否已经是处理过的节点（有children数组）
+    if (!item.children) {
+      item.children = []
+    }
+    // 确保类型正确
+    if (!item.type) {
+      item.type = 'collection'
+    }
+    map[item.id] = item
   })
   
   items.forEach(item => {
-    if (item.parent) {
-      if (map[item.parent]) {
-        map[item.parent].children.push(map[item.id])
+    if (item.parent && map[item.parent]) {
+      // 避免重复添加
+      if (!map[item.parent].children.includes(item)) {
+        map[item.parent].children.push(item)
       }
     } else {
-      roots.push(map[item.id])
+      // 如果没有父级，或者父级不在当前列表中，则作为根节点
+      roots.push(item)
     }
   })
   
@@ -1379,10 +1039,6 @@ const onNodeClick = (data) => {
     const convertedHeaders = convertObjectToKeyValueArray(data.headers || {})
     console.log('onNodeClick - converted headers:', convertedHeaders)
     
-    // 初始化currentHeaders
-    currentHeaders.value = data.headers || {}
-    console.log('onNodeClick - initialized currentHeaders:', currentHeaders.value)
-    
     selectedRequest.value = {
       ...data,
       params: convertObjectToKeyValueArray(data.params || {}),
@@ -1397,14 +1053,15 @@ const onNodeClick = (data) => {
     
     // 解析body数据
     if (data.body) {
-      if (data.body.type === 'json' && data.body.data) {
-        bodyType.value = 'raw'
-        rawType.value = 'json'
-        rawBody.value = JSON.stringify(data.body.data, null, 2)
-      } else if (data.body.type === 'raw' && data.body.data) {
-        bodyType.value = 'raw'
-        rawType.value = 'text'
-        rawBody.value = data.body.data
+      if (data.body.type === 'json') {
+        bodyType.value = 'json'
+        rawBody.value = typeof data.body.data === 'string' ? data.body.data : JSON.stringify(data.body.data, null, 2)
+      } else if (data.body.type === 'raw') {
+        bodyType.value = 'json' // 兼容旧数据，统一转为json展示
+        rawBody.value = typeof data.body.data === 'string' ? data.body.data : JSON.stringify(data.body.data, null, 2)
+      } else if (data.body.type === 'form-data') {
+        bodyType.value = 'form-data'
+        formData.value = data.body.data || {}
       } else {
         bodyType.value = 'none'
         rawBody.value = ''
@@ -1548,10 +1205,6 @@ const editNode = () => {
     const convertedHeaders = convertObjectToKeyValueArray(data.headers || {})
     console.log('editNode - converted headers:', convertedHeaders)
     
-    // 初始化currentHeaders
-    currentHeaders.value = data.headers || {}
-    console.log('editNode - initialized currentHeaders:', currentHeaders.value)
-    
     selectedRequest.value = {
       ...data,
       params: convertObjectToKeyValueArray(data.params || {}),
@@ -1564,14 +1217,15 @@ const editNode = () => {
     
     // 解析body数据
     if (data.body) {
-      if (data.body.type === 'json' && data.body.data) {
-        bodyType.value = 'raw'
-        rawType.value = 'json'
-        rawBody.value = JSON.stringify(data.body.data, null, 2)
-      } else if (data.body.type === 'raw' && data.body.data) {
-        bodyType.value = 'raw'
-        rawType.value = 'text'
-        rawBody.value = data.body.data
+      if (data.body.type === 'json') {
+        bodyType.value = 'json'
+        rawBody.value = typeof data.body.data === 'string' ? data.body.data : JSON.stringify(data.body.data, null, 2)
+      } else if (data.body.type === 'raw') {
+        bodyType.value = 'json' // 兼容旧数据
+        rawBody.value = typeof data.body.data === 'string' ? data.body.data : JSON.stringify(data.body.data, null, 2)
+      } else if (data.body.type === 'form-data') {
+        bodyType.value = 'form-data'
+        formData.value = data.body.data || {}
       } else {
         bodyType.value = 'none'
         rawBody.value = ''
@@ -1590,13 +1244,17 @@ const editNode = () => {
 }
 
 const deleteNode = async () => {
-  if (!rightClickedNode.value) {
+  // 优先使用右键点击的节点，如果没有（说明是在详情页点击的按钮），则使用当前选中的节点
+  const targetNode = rightClickedNode.value || (selectedRequest.value ? { ...selectedRequest.value, type: 'request' } : null)
+  
+  if (!targetNode) {
     hideContextMenu()
     return
   }
 
-  const nodeType = rightClickedNode.value.type
-  const nodeName = rightClickedNode.value.name
+  const nodeType = targetNode.type
+  const nodeName = targetNode.name
+  const nodeId = targetNode.id
   
   // 显示确认对话框
   try {
@@ -1613,13 +1271,15 @@ const deleteNode = async () => {
 
     // 用户确认删除，执行删除操作
     if (nodeType === 'collection') {
-      await deleteCollection(rightClickedNode.value.id)
+      await deleteCollection(nodeId)
     } else if (nodeType === 'request') {
-      await deleteRequest(rightClickedNode.value.id)
+      await deleteRequest(nodeId)
     }
   } catch (error) {
-    // 用户取消删除或删除失败，不做任何处理
-    console.log('删除操作被取消或失败:', error)
+    if (error !== 'cancel') {
+      console.error('删除操作失败:', error)
+      ElMessage.error('删除失败')
+    }
   }
   
   hideContextMenu()
@@ -2098,24 +1758,22 @@ const sendRequest = async () => {
     // 准备请求体数据
     let bodyData = {}
     if (hasBody.value) {
-      if (bodyType.value === 'raw' && rawBody.value) {
-        if (rawType.value === 'json') {
-          try {
-            bodyData = {
-              type: 'json',
-              data: JSON.parse(rawBody.value)
-            }
-          } catch (e) {
-            bodyData = {
-              type: 'raw',
-              data: rawBody.value
-            }
+      if (bodyType.value === 'json' && rawBody.value) {
+        try {
+          bodyData = {
+            type: 'json',
+            data: JSON.parse(rawBody.value)
           }
-        } else {
+        } catch (e) {
           bodyData = {
             type: 'raw',
             data: rawBody.value
           }
+        }
+      } else if (bodyType.value === 'form-data') {
+        bodyData = {
+          type: 'form-data',
+          data: formData.value
         }
       }
     }
@@ -2142,12 +1800,8 @@ const sendRequest = async () => {
   }
 }
 
-// 存储最新的headers数据
-const currentHeaders = ref({})
-
 const onHeadersUpdate = (newHeaders) => {
   console.log('Headers updated:', newHeaders)
-  currentHeaders.value = newHeaders
   if (selectedRequest.value) {
     // 强制更新整个selectedRequest对象以触发响应式更新
     selectedRequest.value = {
@@ -2165,24 +1819,22 @@ const saveRequest = async () => {
   try {
     // 准备保存的数据
     let bodyData = {}
-    if (hasBody.value && bodyType.value === 'raw' && rawBody.value) {
-      if (rawType.value === 'json') {
-        try {
-          bodyData = {
-            type: 'json',
-            data: JSON.parse(rawBody.value)
-          }
-        } catch (e) {
-          bodyData = {
-            type: 'raw',
-            data: rawBody.value
-          }
+    if (hasBody.value && bodyType.value === 'json' && rawBody.value) {
+      try {
+        bodyData = {
+          type: 'json',
+          data: JSON.parse(rawBody.value)
         }
-      } else {
+      } catch (e) {
         bodyData = {
           type: 'raw',
           data: rawBody.value
         }
+      }
+    } else if (hasBody.value && bodyType.value === 'form-data') {
+      bodyData = {
+        type: 'form-data',
+        data: formData.value
       }
     }
     
@@ -2226,26 +1878,31 @@ const saveRequest = async () => {
     console.log('Headers being saved:', data.headers)
     
     if (selectedRequest.value.id) {
-      await api.put(`/api-testing/requests/${selectedRequest.value.id}/`, data)
+      const res = await api.put(`/api-testing/requests/${selectedRequest.value.id}/`, data)
+      const updatedRequest = res.data
       
-      // 更新树中的请求名称，避免重新加载
-      const updateRequestName = (collections, requestId, newName) => {
+      // 更新树中的请求完整数据，避免重新加载
+      const updateRequestInTree = (collections, requestId, newData) => {
         for (const collection of collections) {
           if (collection.children) {
-            const request = collection.children.find(child => child.type === 'request' && child.id === requestId)
-            if (request) {
-              request.name = newName
+            const index = collection.children.findIndex(child => child.type === 'request' && child.id === requestId)
+            if (index > -1) {
+              // 保留 type 属性，合并其他新数据
+              collection.children[index] = {
+                ...newData,
+                type: 'request'
+              }
               return true
             }
           }
-          if (collection.children && updateRequestName(collection.children, requestId, newName)) {
+          if (collection.children && updateRequestInTree(collection.children, requestId, newData)) {
             return true
           }
         }
         return false
       }
       
-      updateRequestName(collections.value, selectedRequest.value.id, selectedRequest.value.name)
+      updateRequestInTree(collections.value, selectedRequest.value.id, updatedRequest)
     } else {
       const res = await api.post('/api-testing/requests/', data)
       selectedRequest.value.id = res.data.id
@@ -2284,6 +1941,37 @@ const copyResponse = () => {
     navigator.clipboard.writeText(responseBody.value)
     ElMessage.success('已复制到剪贴板')
   }
+}
+
+const copyCurl = () => {
+  if (!selectedRequest.value) return
+  
+  const { method, url, headers, params, body } = selectedRequest.value
+  let curl = `curl --location --request ${method} '${url}'`
+  
+  // Add params if any
+  const queryParams = convertKeyValueArrayToObject(params)
+  if (Object.keys(queryParams).length > 0) {
+    const searchParams = new URLSearchParams(queryParams)
+    curl = curl.replace(url, `${url}?${searchParams.toString()}`)
+  }
+  
+  // Add headers
+  if (Array.isArray(headers)) {
+    headers.forEach(h => {
+      if (h.enabled && h.key) {
+        curl += ` \\\n--header '${h.key}: ${h.value}'`
+      }
+    })
+  }
+  
+  // Add body
+  if (hasBody.value && bodyType.value === 'raw' && rawBody.value) {
+    curl += ` \\\n--data-raw '${rawBody.value.replace(/'/g, "'\\''")}'`
+  }
+  
+  navigator.clipboard.writeText(curl)
+  ElMessage.success('cURL 已复制到剪贴板')
 }
 
 const handleGenerateSqlInline = async (assertion) => {
@@ -2525,62 +2213,13 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-/* 页面特定样式 */
-.page-container {
-  padding: 0;
+/* 页面整体布局 */
+.interface-manage-page {
+  height: 100vh;
   display: flex;
   flex-direction: column;
-  max-width: 100%; /* 新增：覆盖全局样式的 max-width: 1600px，确保铺满 */
-}
-
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 15px 20px;
-  border-bottom: 1px solid #e6e6e6;
   background: white;
-  flex-shrink: 0;
-}
-
-.page-title {
-  margin: 0;
-  font-size: 24px;
-  font-weight: 600;
-  color: #303133;
-  position: relative;
-  padding-left: 16px;
-}
-
-.page-title::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 4px;
-  height: 20px;
-  background: var(--primary-color, #409eff);
-  border-radius: 2px;
-}
-
-.main-content {
-  flex: 1;
   overflow: hidden;
-  padding: 0;
-  display: flex;
-}
-
-.card-container {
-  flex: 1;
-  width: 100%;
-  height: 100%;
-  background-color: #fff;
-  padding: 20px;
-  box-shadow: 0 1px 4px rgba(0, 21, 41, 0.08);
-  display: flex;
-  flex-direction: column;
-  overflow-y: auto;
 }
 
 .interface-layout {
@@ -2593,65 +2232,106 @@ onBeforeUnmount(() => {
 .sidebar {
   width: 300px;
   border-right: 1px solid #e4e7ed;
-  background: #f8f9fa;
-  overflow: hidden;
+  background: #fcfcfc;
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
 }
 
 .sidebar-header {
-  padding: 10px;
-  border-bottom: 1px solid #e4e7ed;
+  padding: 12px;
+  background: white;
+}
+
+.sidebar-toolbar {
+  padding: 8px 12px;
   display: flex;
-  gap: 10px;
+  gap: 8px;
   align-items: center;
+  background: white;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.search-input {
+  flex: 1;
+}
+
+.toolbar-actions {
   flex-shrink: 0;
 }
 
-.header-actions {
-  display: flex;
-  gap: 8px;
-}
-
-.collection-tree {
+.collection-tree-container {
   flex: 1;
   overflow: auto;
-  padding: 10px;
+  padding: 8px 0;
+}
+
+.custom-tree {
+  background: transparent;
+}
+
+.custom-tree :deep(.el-tree-node__content) {
+  height: 32px;
+  margin: 2px 8px;
+  border-radius: 4px;
+}
+
+.custom-tree :deep(.el-tree-node__content:hover) {
+  background-color: #f0f2f5;
+}
+
+.custom-tree :deep(.el-tree-node.is-current > .el-tree-node__content) {
+  background-color: #e6f7ff;
+  color: #1890ff;
 }
 
 .tree-node {
   display: flex;
   align-items: center;
-  gap: 5px;
-  flex: 1;
+  gap: 6px;
+  width: 100%;
+  overflow: hidden;
+  font-size: 13px;
 }
 
-.node-label {
-  flex: 1;
+.tree-node.is-active {
+  color: #1890ff;
+  font-weight: 500;
 }
 
-.node-edit {
-  flex: 1;
-}
-
-.node-edit .el-input {
+.folder-icon {
+  color: #ffca28;
   font-size: 14px;
 }
 
-.method-tag {
+.method-indicator {
   font-size: 10px;
-  padding: 1px 4px;
-  border-radius: 2px;
-  color: white;
   font-weight: bold;
+  min-width: 32px;
+  text-align: center;
+  padding: 0 4px;
+  border-radius: 2px;
+  text-transform: uppercase;
+  transform: scale(0.9);
 }
 
-.method-tag.get { background: #67c23a; }
-.method-tag.post { background: #409eff; }
-.method-tag.put { background: #e6a23c; }
-.method-tag.delete { background: #f56c6c; }
-.method-tag.patch { background: #909399; }
+.method-indicator.get { color: #61affe; background: rgba(97, 175, 254, 0.1); }
+.method-indicator.post { color: #49cc90; background: rgba(73, 204, 144, 0.1); }
+.method-indicator.put { color: #fca130; background: rgba(252, 161, 48, 0.1); }
+.method-indicator.delete { color: #f93e3e; background: rgba(249, 62, 62, 0.1); }
+.method-indicator.patch { color: #50e3c2; background: rgba(80, 227, 194, 0.1); }
+
+.node-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.uploading-node {
+  color: #909399;
+  font-style: italic;
+}
 
 .request-content {
   flex: 1;
@@ -2661,61 +2341,465 @@ onBeforeUnmount(() => {
   background: white;
 }
 
-.empty-state {
+.request-detail {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.request-header-area {
+  padding: 12px 20px;
+  background: white;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.title-container {
+  flex: 1;
+  margin-right: 20px;
+}
+
+.interface-title-input :deep(.el-input__wrapper) {
+  box-shadow: none;
+  padding: 0;
+}
+
+.interface-title-input :deep(.el-input__inner) {
+  font-size: 18px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.header-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.env-selector {
+  width: 140px;
+}
+
+.url-bar {
+  display: flex;
+  gap: 12px;
+}
+
+.method-url-group {
+  flex: 1;
+  display: flex;
+  border: 1px solid #dcdfe6;
+  border-radius: 4px;
+  overflow: hidden;
+  transition: border-color 0.2s;
+}
+
+.method-url-group:focus-within {
+  border-color: #409eff;
+}
+
+.method-selector-compact {
+  width: 100px;
+}
+
+.method-selector-compact :deep(.el-input__wrapper) {
+  box-shadow: none;
+  background: #f5f7fa;
+  border-radius: 0;
+}
+
+.method-selector-compact :deep(.el-input__inner) {
+  font-weight: bold;
+  text-align: center;
+}
+
+.method-selector-compact.get :deep(.el-input__inner) { color: #61affe; }
+.method-selector-compact.post :deep(.el-input__inner) { color: #49cc90; }
+.method-selector-compact.put :deep(.el-input__inner) { color: #fca130; }
+.method-selector-compact.delete :deep(.el-input__inner) { color: #f93e3e; }
+
+.url-input-compact :deep(.el-input__wrapper) {
+  box-shadow: none;
+}
+
+.send-button-large {
+  width: 100px;
+  height: 32px;
+  font-weight: bold;
+}
+
+.mode-tabs {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.mode-tabs :deep(.el-tabs__header) {
+  margin: 0;
+  padding: 0 20px;
+  background: white;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.mode-tabs :deep(.el-tabs__item) {
+  height: 40px;
+  line-height: 40px;
+  font-size: 14px;
+}
+
+.mode-tabs :deep(.el-tabs__nav-wrap::after) {
+  display: none;
+}
+
+.mode-tabs :deep(.el-tabs__active-bar) {
+  height: 3px;
+  border-radius: 3px;
+}
+
+.mode-tabs :deep(.el-tabs__content) {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.mode-tabs :deep(.el-tab-pane) {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* 设计模式样式 */
+.design-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 16px 24px;
+  background: white;
+}
+
+.design-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.section-title {
+  font-size: 14px;
+  font-weight: bold;
+  color: #303133;
+  margin-bottom: 16px;
+  padding-left: 8px;
+  border-left: 4px solid #409eff;
+}
+
+.design-tabs {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.design-tabs :deep(.el-tabs__header) {
+  margin-bottom: 0;
+}
+
+.design-tabs :deep(.el-tabs__content) {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 0;
+}
+
+.tab-pane-content {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.body-editor-container {
+  border: 1px solid #dcdfe6;
+  border-radius: 4px;
+}
+
+.action-bar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 12px;
+}
+
+.rules-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.rule-card {
+  border: 1px solid #ebeef5;
+  border-radius: 4px;
+  overflow: hidden;
+  transition: box-shadow 0.2s;
+}
+
+.rule-card:hover {
+  box-shadow: 0 2px 12px 0 rgba(0,0,0,0.05);
+}
+
+.rule-header {
+  padding: 8px 12px;
+  background: #fafafa;
+  border-bottom: 1px solid #ebeef5;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.rule-name-input {
+  width: 200px;
+}
+
+.rule-name-input :deep(.el-input__wrapper) {
+  box-shadow: none;
+  background: transparent;
+}
+
+.rule-body {
+  padding: 12px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+/* 调试面板样式 */
+.debug-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  background: #fcfcfc;
+}
+
+.debug-request-pane, .debug-response-pane {
+  display: flex;
+  flex-direction: column;
+  background: white;
+  margin: 8px;
+  border: 1px solid #f0f0f0;
+  border-radius: 4px;
+  box-shadow: none;
+  overflow: hidden;
+}
+
+.debug-request-pane {
+  flex: 0 0 auto;
+  max-height: 40%;
+}
+
+.debug-response-pane {
+  flex: 1;
+}
+
+.pane-header {
+  padding: 8px 16px;
+  background: #fafafa;
+  border-bottom: 1px solid #f0f0f0;
+  font-size: 12px;
+  font-weight: bold;
+  color: #606266;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.compact-tabs :deep(.el-tabs__header) {
+  margin: 0;
+  padding: 0 16px;
+  background: white;
+}
+
+.compact-tabs :deep(.el-tabs__content) {
+  padding: 12px 16px;
+  overflow-y: auto;
+}
+
+.debug-body-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.monospaced-input :deep(.el-textarea__inner) {
+  font-family: 'Fira Code', 'Courier New', monospace;
+  font-size: 12px;
+  background: #fafafa;
+}
+
+.response-meta-tags {
+  display: flex;
+  gap: 8px;
+}
+
+.response-content-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.response-body-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.response-viewer {
+  flex: 1;
+  background: #fcfcfc;
+  border-radius: 4px;
+  overflow: auto;
+  padding: 12px;
+  border: 1px solid #f0f0f0;
+}
+
+.code-block {
+  margin: 0;
+  font-family: 'Fira Code', monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #303133;
+}
+
+.response-headers-table {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.header-item {
+  display: flex;
+  font-size: 12px;
+  padding: 4px 8px;
+  background: #f5f7fa;
+  border-radius: 4px;
+}
+
+.header-key {
+  font-weight: bold;
+  color: #606266;
+  margin-right: 8px;
+  min-width: 120px;
+}
+
+.header-value {
+  color: #303133;
+  word-break: break-all;
+}
+
+.assertion-results-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.assertion-result-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+.assertion-result-row.passed {
+  background: #f0f9eb;
+  color: #67c23a;
+}
+
+.assertion-result-row.failed {
+  background: #fef0f0;
+  color: #f56c6c;
+}
+
+.response-viewer {
+  padding: 16px;
+  background: #f8f9fa;
+  border-radius: 4px;
+  min-height: 200px;
+}
+
+.request-info-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #e4e7ed;
+}
+
+.request-detail-section {
+  margin-bottom: 20px;
+}
+
+.detail-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #606266;
+  margin-bottom: 8px;
+}
+
+.info-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.info-label {
+  font-size: 13px;
+  color: #909399;
+  width: 70px;
+  flex-shrink: 0;
+}
+
+.info-value {
+  font-family: monospace;
+}
+
+.code-block.small {
+  font-size: 12px;
+  padding: 12px;
+  max-height: 300px;
+}
+
+.response-empty {
   flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-.request-detail {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  padding: 20px;
-  overflow: auto;
-}
-
-.request-header {
-  margin-bottom: 20px;
-  flex-shrink: 0;
-}
-
-.request-line {
-  display: flex;
-  gap: 10px;
-  margin-bottom: 10px;
-}
-
-.url-input {
-  flex: 1;
-}
-
-.request-name {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-}
-
-.request-tabs {
-  margin-bottom: 20px;
-  flex: 0 0 auto;
-}
-
-.body-container {
+.extract-list {
   padding: 10px 0;
 }
 
-.body-content {
-  margin-top: 15px;
-}
-
-.raw-options {
+.extract-item {
+  display: flex;
+  gap: 10px;
+  align-items: center;
   margin-bottom: 10px;
-}
-
-.raw-body {
-  font-family: 'Courier New', monospace;
+  background: #f9f9f9;
+  padding: 10px;
+  border-radius: 4px;
 }
 
 .response-section {
@@ -2760,10 +2844,10 @@ onBeforeUnmount(() => {
   border-radius: 4px;
   font-family: 'Courier New', monospace;
   font-size: 12px;
-  max-height: 400px;
   overflow: auto;
   white-space: pre-wrap;
   word-break: break-all;
+  flex: 1;
 }
 
 .response-headers {

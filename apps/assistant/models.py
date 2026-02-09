@@ -35,14 +35,21 @@ class AIWorkflowConfig(models.Model):
         ('skills', 'Skills'),
         ('mcp', 'MCP'),
     ]
+    
+    MCP_TYPE_CHOICES = [
+        ('remote', '远程 (HTTP/SSE)'),
+        ('local', '本地 (Command Line)'),
+    ]
 
     name = models.CharField(max_length=100, verbose_name='配置名称')
     provider = models.CharField(max_length=20, choices=PROVIDER_CHOICES, verbose_name='提供商')
-    api_url = models.URLField(max_length=500, verbose_name='API URL')
+    mcp_type = models.CharField(max_length=20, choices=MCP_TYPE_CHOICES, default='remote', verbose_name='MCP类型')
+    api_url = models.CharField(max_length=500, verbose_name='API URL/Command')
     api_key = models.CharField(max_length=500, verbose_name='API Key', blank=True, null=True)
     workflow_id = models.CharField(max_length=200, verbose_name='工作流ID', blank=True, null=True)
     additional_config = models.JSONField(default=dict, verbose_name='额外配置', blank=True)
     is_active = models.BooleanField(default=True, verbose_name='是否启用')
+    tools_count = models.IntegerField(default=0, verbose_name='工具数量')
     created_at = models.DateTimeField(default=timezone.now, verbose_name='创建时间')
     updated_at = models.DateTimeField(auto_now=True, verbose_name='更新时间')
 

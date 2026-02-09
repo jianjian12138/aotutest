@@ -6,7 +6,7 @@ from .models import (
     ElementGroup, PageObject, PageObjectElement, ScriptStep, ScriptElementUsage,
     TestCase, TestCaseStep, TestCaseExecution, OperationRecord,
     UiScheduledTask, UiNotificationConfig, UiNotificationLog, UiTaskNotificationSetting,
-    AICase, AIExecutionRecord, UiDevice
+    AICase, AIExecutionRecord, UiDevice, ExecutionNode
 )
 from django.contrib.auth import get_user_model
 
@@ -51,8 +51,8 @@ class ElementSerializer(serializers.ModelSerializer):
     project = UiProjectSerializer(read_only=True)
     locator_strategy = LocatorStrategySerializer(read_only=True)
     created_by = UserSerializer(read_only=True)
-    project_id = serializers.IntegerField(write_only=True)
-    group_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
+    project_id = serializers.IntegerField()
+    group_id = serializers.IntegerField(required=False, allow_null=True)
     locator_strategy_id = serializers.IntegerField()  # 显式定义，支持读写
 
     class Meta:
@@ -312,8 +312,8 @@ class ElementEnhancedSerializer(serializers.ModelSerializer):
     usage_scripts = serializers.SerializerMethodField()
 
     # Write-only fields for foreign keys
-    project_id = serializers.IntegerField(write_only=True)
-    group_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
+    project_id = serializers.IntegerField()
+    group_id = serializers.IntegerField(required=False, allow_null=True)
     locator_strategy_id = serializers.IntegerField()  # 允许读写,支持回显
     parent_element_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
 
@@ -984,5 +984,16 @@ class UiDeviceSerializer(serializers.ModelSerializer):
         model = UiDevice
         fields = '__all__'
         read_only_fields = ('created_at', 'last_online')
+
+
+class ExecutionNodeSerializer(serializers.ModelSerializer):
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    node_type_display = serializers.CharField(source='get_node_type_display', read_only=True)
+
+    class Meta:
+        model = ExecutionNode
+        fields = '__all__'
+        read_only_fields = ('created_at', 'updated_at', 'last_heartbeat')
+
 
 

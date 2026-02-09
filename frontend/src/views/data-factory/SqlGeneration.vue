@@ -26,10 +26,10 @@
         <div class="input-section">
           <el-row :gutter="20">
             <el-col :span="8">
-              <el-form-item label="Vanna 配置">
+              <el-form-item label="SQL生成配置">
                 <el-select
                   v-model="selectedConfig"
-                  placeholder="选择 Vanna 配置"
+                  placeholder="选择 AI SQL 配置"
                   style="width: 100%"
                   @change="handleConfigChange"
                 >

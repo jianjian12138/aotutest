@@ -144,65 +144,6 @@ const projects = ref([
 // 查询数据
 const queries = ref([])
 
-// 模拟保存查询数据
-const mockQueries = [
-  {
-    id: 1,
-    name: '最近7天销售额',
-    description: '查询最近7天的销售总额和订单数量',
-    project: { id: 1, name: '电商平台数据分析' },
-    natural_language: '查询最近7天的销售额和订单数量',
-    sql: 'SELECT DATE(order_date) as date, SUM(amount) as total_sales, COUNT(*) as order_count FROM orders WHERE order_date >= DATE_SUB(NOW(), INTERVAL 7 DAY) GROUP BY DATE(order_date) ORDER BY date DESC',
-    created_by: { username: 'admin' },
-    created_at: '2023-11-15T10:30:00Z',
-    updated_at: '2023-11-15T14:20:00Z'
-  },
-  {
-    id: 2,
-    name: '活跃用户分析',
-    description: '查询最近30天的活跃用户数量',
-    project: { id: 2, name: '用户行为分析' },
-    natural_language: '查询最近30天每天的活跃用户数量',
-    sql: 'SELECT DATE(login_time) as date, COUNT(DISTINCT user_id) as active_users FROM user_logins WHERE login_time >= DATE_SUB(NOW(), INTERVAL 30 DAY) GROUP BY DATE(login_time) ORDER BY date DESC',
-    created_by: { username: 'test' },
-    created_at: '2023-11-14T09:15:00Z',
-    updated_at: '2023-11-14T16:45:00Z'
-  },
-  {
-    id: 3,
-    name: '订单状态分布',
-    description: '查询不同订单状态的数量分布',
-    project: { id: 3, name: '订单数据仓库' },
-    natural_language: '查询当前所有订单的状态分布',
-    sql: 'SELECT status, COUNT(*) as count FROM orders GROUP BY status ORDER BY count DESC',
-    created_by: { username: 'admin' },
-    created_at: '2023-11-13T11:20:00Z',
-    updated_at: '2023-11-13T15:30:00Z'
-  },
-  {
-    id: 4,
-    name: '商品库存预警',
-    description: '查询库存数量低于10的商品',
-    project: { id: 4, name: '商品库存监控' },
-    natural_language: '查询库存数量低于10的商品列表',
-    sql: 'SELECT name, sku, stock_quantity FROM products WHERE stock_quantity < 10 ORDER BY stock_quantity ASC',
-    created_by: { username: 'user1' },
-    created_at: '2023-11-12T13:45:00Z',
-    updated_at: '2023-11-12T17:15:00Z'
-  },
-  {
-    id: 5,
-    name: '广告投放效果',
-    description: '查询各广告渠道的ROI',
-    project: { id: 5, name: '广告效果分析' },
-    natural_language: '查询每个广告渠道的投入产出比',
-    sql: 'SELECT channel, SUM(cost) as total_cost, SUM(revenue) as total_revenue, (SUM(revenue) / SUM(cost)) as roi FROM ad_campaigns GROUP BY channel ORDER BY roi DESC',
-    created_by: { username: 'user2' },
-    created_at: '2023-11-11T10:00:00Z',
-    updated_at: '2023-11-11T14:50:00Z'
-  }
-]
-
 // 过滤后的查询
 const filteredQueries = computed(() => {
   let result = [...queries.value]

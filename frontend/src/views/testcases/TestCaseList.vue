@@ -15,6 +15,10 @@
           <el-icon><Download /></el-icon>
           导出Excel
         </el-button>
+        <el-button type="warning" @click="handleImport">
+          <el-icon><Upload /></el-icon>
+          导入用例
+        </el-button>
         <el-button type="primary" @click="$router.push('/ai-generation/testcases/create')">
           <el-icon><Plus /></el-icon>
           新建用例
@@ -150,14 +154,68 @@
         />
       </div>
     </div>
+
+    <!-- 导入对话框 -->
+    <el-dialog v-model="importDialogVisible" title="导入测试用例" width="500px">
+      <el-form :model="importForm" label-width="100px">
+        <el-form-item label="目标项目" required>
+          <el-select v-model="importForm.projectId" placeholder="请选择项目" style="width: 100%">
+            <el-option
+              v-for="project in projects"
+              :key="project.id"
+              :label="project.name"
+              :value="project.id"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="文件类型" required>
+          <el-select v-model="importForm.fileType" placeholder="请选择类型" style="width: 100%">
+            <el-option label="Excel (.xlsx)" value="excel" />
+            <el-option label="CSV (.csv)" value="csv" />
+            <el-option label="JSON (.json)" value="json" />
+            <el-option label="YAML (.yaml)" value="yaml" />
+            <el-option label="Postman Collection (.json)" value="postman" />
+            <el-option label="JMeter Script (.jmx)" value="jmeter" />
+            <el-option label="ZIP包 (AI_TEST兼容)" value="zip" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="上传文件" required>
+          <el-upload
+            ref="uploadRef"
+            action="#"
+            :auto-upload="false"
+            :on-change="handleFileChange"
+            :limit="1"
+            style="width: 100%"
+          >
+            <template #trigger>
+              <el-button type="primary">选择文件</el-button>
+            </template>
+            <template #tip>
+              <div class="el-upload__tip">
+                支持 Excel, CSV, JSON, YAML 或 ZIP 格式
+              </div>
+            </template>
+          </el-upload>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="importDialogVisible = false">取消</el-button>
+          <el-button type="primary" @click="submitImport" :loading="isImporting">
+            导入
+          </el-button>
+        </span>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Search, Download, Delete } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox, ElUpload } from 'element-plus'
+import { Plus, Search, Download, Delete, Upload } from '@element-plus/icons-vue'
 import api from '@/utils/api'
 import dayjs from 'dayjs'
 import * as XLSX from 'xlsx'
@@ -175,6 +233,62 @@ const priorityFilter = ref('')
 const statusFilter = ref('')
 const selectedTestCases = ref([])
 const isDeleting = ref(false)
+
+// Import Dialog
+const importDialogVisible = ref(false)
+const isImporting = ref(false)
+const importForm = ref({
+  projectId: '',
+  fileType: 'excel',
+  file: null
+})
+const uploadRef = ref(null)
+
+const handleImport = () => {
+  importForm.value = {
+    projectId: projectFilter.value || (projects.value.length > 0 ? projects.value[0].id : ''),
+    fileType: 'excel',
+    file: null
+  }
+  importDialogVisible.value = true
+}
+
+const handleFileChange = (file) => {
+  importForm.value.file = file.raw
+}
+
+const submitImport = async () => {
+  if (!importForm.value.file) {
+    ElMessage.warning('请选择文件')
+    return
+  }
+  if (!importForm.value.projectId) {
+    ElMessage.warning('请选择项目')
+    return
+  }
+
+  isImporting.value = true
+  const formData = new FormData()
+  formData.append('file', importForm.value.file)
+  formData.append('project_id', importForm.value.projectId)
+  formData.append('file_type', importForm.value.fileType)
+
+  try {
+    const response = await api.post('/testcases/import/', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    })
+    ElMessage.success(response.data.message || '导入成功')
+    importDialogVisible.value = false
+    fetchTestCases()
+  } catch (error) {
+    console.error('Import failed:', error)
+    ElMessage.error(error.response?.data?.error || '导入失败')
+  } finally {
+    isImporting.value = false
+  }
+}
 
 const fetchTestCases = async () => {
   loading.value = true
