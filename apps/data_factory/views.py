@@ -29,7 +29,9 @@ from .models import (
     DataFactoryProject,
     SavedQuery,
     QueryHistory,
-    TableMetadata
+    TableMetadata,
+    DataSource,
+    DataPool
 )
 
 from .serializers import (
@@ -38,7 +40,9 @@ from .serializers import (
     DataFactoryProjectSerializer,
     SavedQuerySerializer,
     QueryHistorySerializer,
-    TableMetadataSerializer
+    TableMetadataSerializer,
+    DataSourceSerializer,
+    DataPoolSerializer
 )
 
 logger = logging.getLogger(__name__)
@@ -480,71 +484,128 @@ class TableMetadataViewSet(viewsets.ReadOnlyModelViewSet):
     def _scan_database_tables(self, config):
         """扫描数据库表结构并创建或更新TableMetadata记录"""
         try:
-            import pymysql
-            from pymysql.cursors import DictCursor
-            
             db_config = config.db_connection
-            
-            # 连接到MySQL数据库
-            connection = pymysql.connect(
-                host=db_config.get('host', 'localhost'),
-                port=int(db_config.get('port', 3306)),
-                database=db_config.get('database', ''),
-                user=db_config.get('username', ''),
-                password=db_config.get('password', ''),
-                cursorclass=DictCursor
-            )
-            
+            db_type = config.db_type.lower()
             tables = []
             
-            with connection.cursor() as cursor:
-                # 获取所有表名
-                cursor.execute("SHOW TABLES")
-                table_names = cursor.fetchall()
+            if db_type == 'mysql':
+                import pymysql
+                from pymysql.cursors import DictCursor
+                connection = pymysql.connect(
+                    host=db_config.get('host', 'localhost'),
+                    port=int(db_config.get('port', 3306)),
+                    database=db_config.get('database', ''),
+                    user=db_config.get('username', ''),
+                    password=db_config.get('password', ''),
+                    cursorclass=DictCursor
+                )
                 
-                for table in table_names:
-                    table_name = list(table.values())[0]
+                with connection.cursor() as cursor:
+                    cursor.execute("SHOW TABLES")
+                    table_names = cursor.fetchall()
                     
-                    # 获取表描述
-                    cursor.execute(f"SHOW CREATE TABLE `{table_name}`")
-                    create_table = cursor.fetchone()
-                    table_comment = ""
-                    if create_table:
-                        create_sql = create_table['Create Table']
-                        # 提取表注释
-                        if 'COMMENT=' in create_sql:
-                            import re
-                            comment_match = re.search(r'COMMENT=(?:"([^"]+)"|\'([^\']+)\')', create_sql)
-                            if comment_match:
-                                table_comment = comment_match.group(1) or comment_match.group(2) or ""
+                    for table in table_names:
+                        table_name = list(table.values())[0]
+                        cursor.execute(f"SHOW CREATE TABLE `{table_name}`")
+                        create_table = cursor.fetchone()
+                        table_comment = ""
+                        if create_table:
+                            create_sql = create_table['Create Table']
+                            if 'COMMENT=' in create_sql:
+                                import re
+                                comment_match = re.search(r'COMMENT=(?:"([^"]+)"|\'([^\']+)\')', create_sql)
+                                if comment_match:
+                                    table_comment = comment_match.group(1) or comment_match.group(2) or ""
+                        
+                        cursor.execute(f"DESCRIBE `{table_name}`")
+                        columns = cursor.fetchall()
+                        
+                        formatted_columns = []
+                        for col in columns:
+                            formatted_columns.append({
+                                'name': col.get('Field', col.get('field', '')),
+                                'type': col.get('Type', col.get('type', '')),
+                                'nullable': col.get('Null', col.get('null', '')) == 'YES',
+                                'default': col.get('Default', col.get('default')),
+                                'description': col.get('Comment', col.get('comment', ''))
+                            })
+                        
+                        table_meta, created = TableMetadata.objects.update_or_create(
+                            config=config,
+                            table_name=table_name,
+                            defaults={
+                                'schema_name': db_config.get('database', ''),
+                                'description': table_comment,
+                                'columns': formatted_columns,
+                                'updated_at': timezone.now()
+                            }
+                        )
+                        tables.append(table_meta)
+                        
+            elif db_type == 'postgresql':
+                import psycopg2
+                from psycopg2.extras import RealDictCursor
+                connection = psycopg2.connect(
+                    host=db_config.get('host', 'localhost'),
+                    port=int(db_config.get('port', 5432)),
+                    database=db_config.get('database', ''),
+                    user=db_config.get('username', ''),
+                    password=db_config.get('password', '')
+                )
+                
+                with connection.cursor(cursor_factory=RealDictCursor) as cursor:
+                    # 获取public下的所有表
+                    cursor.execute("""
+                        SELECT tablename 
+                        FROM pg_catalog.pg_tables 
+                        WHERE schemaname = 'public'
+                    """)
+                    table_names = cursor.fetchall()
                     
-                    # 获取表的列信息
-                    cursor.execute(f"DESCRIBE `{table_name}`")
-                    columns = cursor.fetchall()
-                    
-                    # 转换列信息格式
-                    formatted_columns = []
-                    for col in columns:
-                        formatted_columns.append({
-                            'name': col.get('Field', col.get('field', '')),
-                            'type': col.get('Type', col.get('type', '')),
-                            'nullable': col.get('Null', col.get('null', '')) == 'YES',
-                            'default': col.get('Default', col.get('default')),
-                            'description': col.get('Comment', col.get('comment', ''))
-                        })
-                    
-                    # 创建或更新TableMetadata记录
-                    table_meta, created = TableMetadata.objects.update_or_create(
-                        config=config,
-                        table_name=table_name,
-                        defaults={
-                            'schema_name': db_config.get('database', ''),
-                            'description': table_comment,
-                            'columns': formatted_columns,
-                            'updated_at': timezone.now()
-                        }
-                    )
-                    tables.append(table_meta)
+                    for table in table_names:
+                        table_name = table['tablename']
+                        
+                        # 获取表注释
+                        cursor.execute(f"SELECT obj_description('{table_name}'::regclass) as comment")
+                        table_comment_row = cursor.fetchone()
+                        table_comment = table_comment_row['comment'] if table_comment_row and table_comment_row['comment'] else ""
+                        
+                        # 获取列及其注释
+                        cursor.execute(f"""
+                            SELECT 
+                                c.column_name as field,
+                                c.data_type as type,
+                                c.is_nullable as nullable,
+                                c.column_default as default_val,
+                                pgd.description as comment
+                            FROM information_schema.columns c
+                            LEFT JOIN pg_catalog.pg_statio_all_tables st ON c.table_name = st.relname AND c.table_schema = st.schemaname
+                            LEFT JOIN pg_catalog.pg_description pgd ON pgd.objoid = st.relid AND pgd.objsubid = c.ordinal_position
+                            WHERE c.table_name = '{table_name}' AND c.table_schema = 'public'
+                        """)
+                        columns = cursor.fetchall()
+                        
+                        formatted_columns = []
+                        for col in columns:
+                            formatted_columns.append({
+                                'name': col['field'],
+                                'type': col['type'],
+                                'nullable': col['nullable'] == 'YES',
+                                'default': col['default_val'],
+                                'description': col['comment'] or ""
+                            })
+                        
+                        table_meta, created = TableMetadata.objects.update_or_create(
+                            config=config,
+                            table_name=table_name,
+                            defaults={
+                                'schema_name': 'public',
+                                'description': table_comment,
+                                'columns': formatted_columns,
+                                'updated_at': timezone.now()
+                            }
+                        )
+                        tables.append(table_meta)
             
             return tables
         except Exception as e:
@@ -553,7 +614,7 @@ class TableMetadataViewSet(viewsets.ReadOnlyModelViewSet):
             logger.error(f"错误堆栈: {traceback.format_exc()}")
             raise
         finally:
-            if 'connection' in locals() and connection.open:
+            if 'connection' in locals() and hasattr(connection, 'close'):
                 connection.close()
 
     @action(detail=True, methods=['post'])
@@ -663,3 +724,86 @@ class TestDataGeneratorViewSet(viewsets.ViewSet):
         """获取可用的数据类型"""
         service = TestDataGeneratorService()
         return Response({'providers': service.get_available_providers()})
+
+
+class DataSourceViewSet(viewsets.ModelViewSet):
+    """数据源管理视图集"""
+    queryset = DataSource.objects.all()
+    serializer_class = DataSourceSerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['project', 'type', 'is_active']
+    search_fields = ['name', 'host']
+    ordering_fields = ['created_at', 'name']
+    ordering = ['-created_at']
+    pagination_class = StandardPagination
+
+    def get_queryset(self):
+        user = self.request.user
+        return DataSource.objects.filter(
+            models.Q(project__owner=user) | 
+            models.Q(project__members=user) |
+            models.Q(project__isnull=True)
+        ).distinct()
+
+    def perform_create(self, serializer):
+        serializer.save(created_by=self.request.user)
+
+    @action(detail=True, methods=['post'])
+    def test_connection(self, request, pk=None):
+        """测试数据源连接"""
+        datasource = self.get_object()
+        try:
+            # TODO: Implemented real connection logic based on connection type
+            import time
+            time.sleep(1) # mock connection delay
+            return Response({'status': 'success', 'message': f'连接 {datasource.host} 成功 (模拟)'})
+        except Exception as e:
+            return Response({'status': 'error', 'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class DataPoolViewSet(viewsets.ModelViewSet):
+    """数据池管理视图集"""
+    queryset = DataPool.objects.all()
+    serializer_class = DataPoolSerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['project']
+    search_fields = ['name', 'description']
+    ordering_fields = ['created_at', 'name']
+    ordering = ['-created_at']
+    pagination_class = StandardPagination
+
+    def get_queryset(self):
+        user = self.request.user
+        return DataPool.objects.filter(
+            models.Q(project__owner=user) | 
+            models.Q(project__members=user) |
+            models.Q(project__isnull=True)
+        ).distinct()
+
+    def perform_create(self, serializer):
+        serializer.save(created_by=self.request.user)
+
+    @action(detail=True, methods=['post'])
+    def sync_data(self, request, pk=None):
+        """将前端生成的数据同步到数据池"""
+        data_pool = self.get_object()
+        new_data = request.data.get('data', [])
+        mode = request.data.get('mode', 'append')  # 'append' or 'overwrite'
+        
+        if not isinstance(new_data, list):
+            return Response({'error': 'Data must be a list of records'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        current_data = data_pool.data if isinstance(data_pool.data, list) else []
+        
+        if mode == 'append':
+            current_data.extend(new_data)
+        elif mode == 'overwrite':
+            current_data = new_data
+            
+        data_pool.data = current_data
+        data_pool.save(update_fields=['data', 'updated_at'])
+        
+        return Response({'message': f'Successfully synced {len(new_data)} records', 'total': len(current_data)})
+

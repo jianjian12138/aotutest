@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 
 class RequirementDocumentViewSet(viewsets.ModelViewSet):
     """需求文档视图集"""
-    queryset = RequirementDocument.objects.all()
+    queryset = RequirementDocument.objects.select_related('uploaded_by', 'project').order_by('-created_at')
     serializer_class = RequirementDocumentSerializer
     parser_classes = [MultiPartParser, FormParser]
     
@@ -1443,7 +1443,7 @@ class TestCaseGenerationTaskViewSet(viewsets.ModelViewSet):
             if test_cases:
                 try:
                     from apps.testcases.models import TestCase
-                    from apps.projects.models import Project
+                    from apps.core_platform.models import Project
                     from django.db import models
                     
                     # 优先使用任务关联的项目
@@ -1580,7 +1580,7 @@ class TestCaseGenerationTaskViewSet(viewsets.ModelViewSet):
             # 导入到testcases应用（使用与单条采纳相同的逻辑）
             try:
                 from apps.testcases.models import TestCase
-                from apps.projects.models import Project
+                from apps.core_platform.models import Project
                 from django.db import models
                 
                 # 优先使用任务关联的项目
@@ -1673,7 +1673,7 @@ class TestCaseGenerationTaskViewSet(viewsets.ModelViewSet):
             # 导入到testcases应用
             try:
                 from apps.testcases.models import TestCase
-                from apps.projects.models import Project
+                from apps.core_platform.models import Project
                 from django.db import models
                 
                 # 优先使用任务关联的项目

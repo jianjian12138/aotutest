@@ -1,12 +1,9 @@
 <template>
-  <div class="page-container">
-    <div class="page-header">
-      <h3 class="page-title">测试报告</h3>
-      <div class="header-actions">
-        <el-button type="primary" @click="refreshReports">刷新报告</el-button>
-        <el-button @click="openAllureReport">查看Allure报告说明</el-button>
-      </div>
-    </div>
+  <BasePage title="测试报告">
+    <template #actions><el-button type="primary" @click="refreshReports">刷新报告</el-button>
+        <el-button @click="openAllureReport">查看Allure报告说明</el-button></template>
+    
+
     
     <div class="main-content">
       <div class="card-container">
@@ -45,9 +42,8 @@
         </el-table>
       </div>
     </div>
-  </div>
+  </BasePage>
 </template>
-
 <script setup>
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
@@ -130,50 +126,15 @@ onMounted(() => {
 
 <style scoped>
 /* 页面特定样式 */
-.page-container {
-  padding: 0;
-  display: flex;
-  flex-direction: column;
 
-  max-width: 100%; /* 新增：覆盖全局样式的 max-width: 1600px，确保铺满 */
-}
 
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 15px 20px;
-  border-bottom: 1px solid #e6e6e6;
-  background: white;
-  flex-shrink: 0;
-}
 
-.page-title {
-  margin: 0;
-  font-size: 24px;
-  font-weight: 600;
-  color: #303133;
-  position: relative;
-  padding-left: 16px;
-}
 
-.page-title::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 4px;
-  height: 20px;
-  background: var(--primary-color, #409eff);
-  border-radius: 2px;
-}
 
-.header-actions {
-  display: flex;
-  align-items: center;
-  gap: 15px;
-}
+
+
+
+
 
 .main-content {
   flex: 1;

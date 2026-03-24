@@ -1,4 +1,5 @@
-from rest_framework import viewsets, permissions
+from rest_framework import viewsets, permissions, filters
+from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.db.models import Count, Q, Sum, F, Avg
@@ -8,15 +9,70 @@ from datetime import timedelta, datetime
 from django.http import HttpResponse
 from io import BytesIO
 import pandas as pd
+import json
+import re
 from .models import TestReport, ReportTemplate
 from apps.executions.models import TestPlan, TestRun, TestRunCase
 from apps.testcases.models import TestCase
-from apps.requirement_analysis.models import RequirementAnalysis, GeneratedTestCase, BusinessRequirement
+from apps.requirement_analysis.models import RequirementAnalysis, GeneratedTestCase, BusinessRequirement, AIModelConfig
+from .serializers import TestReportSerializer
 
 class TestReportViewSet(viewsets.ModelViewSet):
+    format_kwarg = None
+    
+    def dispatch(self, request, *args, **kwargs):
+        # 拦截 'format' 参数，防止 DRF 自动内容协商导致 404
+        if 'format' in request.GET:
+            query_params = request.GET.copy()
+            if 'file_format' not in query_params:
+                query_params['file_format'] = query_params['format']
+            # 彻底移除 'format'，避免 DRF 看到它
+            del query_params['format']
+            request.GET = query_params
+            
+        return super().dispatch(request, *args, **kwargs)
     """测试报告视图集"""
-    queryset = TestReport.objects.all()
-    permission_classes = [permissions.IsAuthenticated]
+    queryset = TestReport.objects.select_related(
+        'project', 
+        'api_test_execution', 
+        'api_test_suite_execution',
+        'execution',
+        'generated_by'
+    ).all()
+    serializer_class = TestReportSerializer
+    permission_classes = [permissions.AllowAny]
+    filter_backends = [DjangoFilterBackend, filters.OrderingFilter, filters.SearchFilter]
+    filterset_fields = ['project', 'report_type', 'api_test_execution']
+    search_fields = ['name']
+    ordering_fields = ['created_at']
+    ordering = ['-created_at']
+    
+    @action(detail=True, methods=['get'])
+    def fetch_report_file(self, request, pk=None):
+        """导出单个测试报告"""
+        report = self.get_object()
+        # 兼容旧参数 'format' 和新参数 'file_format'
+        format_type = (request.query_params.get('file_format') or 
+                       request.query_params.get('format') or 
+                       'excel').lower()
+        
+        # 使用序列化器获取完整数据
+        serializer = self.get_serializer(report)
+        data = serializer.data
+        
+        if format_type == 'excel':
+            return self._export_excel(report, data)
+        elif format_type == 'html':
+            return self._export_html(report, data)
+        elif format_type == 'pdf':
+            return self._export_pdf(report, data)
+        else:
+            return Response({'error': f'不支持的导出格式: {format_type}'}, status=400)
+
+    @action(detail=True, methods=['get'])
+    def export_file(self, request, pk=None):
+        """兼容旧版导出 URL"""
+        return self.fetch_report_file(request, pk)
     
     @action(detail=False, methods=['get'])
     def dashboard(self, request):
@@ -374,3 +430,261 @@ class TestReportViewSet(viewsets.ModelViewSet):
             return Response({
                 'error': f'导出报告失败: {str(e)}'
             }, status=500)
+
+    @action(detail=True, methods=['post'])
+    def analyze(self, request, pk=None):
+        """AI 智能分析报告"""
+        report = self.get_object()
+        model_config_id = request.data.get('model_config_id')
+        
+        # 1. 提取失败数据
+        failures = []
+        if report.report_type == 'api_execution':
+            content = report.content or {}
+            results = content.get('results', [])
+            for item in results:
+                # 检查是否是套件执行中的用例
+                if item.get('type') == 'test_case':
+                    case_name = item.get('name')
+                    case_results = item.get('results', [])
+                    for step in case_results:
+                        if not step.get('passed', True):
+                            failures.append({
+                                'case_name': case_name,
+                                'step_name': step.get('name'),
+                                'error': step.get('error'),
+                                'request': step.get('request_data'),
+                                'response': step.get('response_data')
+                            })
+                else:
+                    # 单个请求
+                    if not item.get('passed', True):
+                        failures.append({
+                            'name': item.get('name'),
+                            'error': item.get('error'),
+                            'request': item.get('request_data'),
+                            'response': item.get('response_data')
+                        })
+        elif report.report_type == 'execution' and report.execution:
+            # 标准执行报告
+            run_cases = report.execution.run_cases.filter(status='failed')
+            for rc in run_cases:
+                failures.append({
+                    'case_name': rc.testcase.title,
+                    'actual_result': rc.actual_result,
+                    'comments': rc.comments,
+                    'precondition': rc.testcase.precondition if hasattr(rc.testcase, 'precondition') else ''
+                })
+        
+        if not failures:
+             return Response({
+                'ai_analysis_result': "报告中未发现失败内容，无需 AI 分析。",
+                'ai_suggestions': "所有测试通过，请继续保持。",
+                'ai_analyzed_at': timezone.now(),
+                'model_used': 'N/A'
+            })
+
+        # 2. 获取 AI 模型配置
+        config = None
+        if model_config_id:
+            config = AIModelConfig.objects.filter(id=model_config_id).first()
+        if not config:
+            config = AIModelConfig.objects.filter(is_active=True).first()
+            
+        if not config:
+            return Response({'error': '未找到有效的 AI 模型配置，请在配置中心设置。'}, status=400)
+
+        # 3. 调用 AI 分析
+        try:
+            from langchain_openai import ChatOpenAI
+            from langchain_core.messages import SystemMessage, HumanMessage
+            
+            llm = ChatOpenAI(
+                model=config.model_name,
+                api_key=config.api_key,
+                base_url=config.base_url,
+                temperature=0.3
+            )
+            
+            prompt = f"""你是一个高级测试专家和调试专家。请分析以下接口测试失败数据，并给出专业的分析总结和修复建议。
+报告名称: {report.name}
+失败详情 (仅列出失败的部分):
+{json.dumps(failures[:10], ensure_ascii=False, indent=2)} (仅展示部分)
+
+请按以下 JSON 格式返回分析结果：
+{{
+  "analysis_result": "对失败原因的高层级总结...",
+  "suggestions": "具体的修复步骤和建议..."
+}}
+"""
+            
+            # 增加重试机制和断路保护 (最多3次)
+            max_retries = 3
+            last_error = None
+            
+            for attempt in range(max_retries):
+                try:
+                    response = llm.invoke([
+                        SystemMessage(content="你是一个专业的自动化测试分析专家。"),
+                        HumanMessage(content=prompt)
+                    ])
+                    last_error = None
+                    break # 成功则跳出重试循环
+                except Exception as invoke_err:
+                    last_error = invoke_err
+                    logger.warning(f"AI Analysis attempt {attempt + 1} failed: {str(invoke_err)}")
+                    import time
+                    time.sleep(1) # 短暂亦避让
+            
+            if last_error:
+                return Response({
+                    'error': f'AI 分析失败，已重试 {max_retries} 次仍然无响应。最后一次报错: {str(last_error)}'
+                }, status=503)
+            
+            content = response.content.strip()
+            # 清理可能的 markdown 格式
+            match = re.search(r'\{[\s\S]*\}', content)
+            if match:
+                content = match.group(0)
+            
+            try:
+                result_json = json.loads(content)
+                report.ai_analysis_result = result_json.get('analysis_result', content)
+                report.ai_suggestions = result_json.get('suggestions', '')
+            except:
+                report.ai_analysis_result = content
+                report.ai_suggestions = "AI 返回结果无法解析为 JSON，请直接阅读分析总结。"
+                
+            report.ai_analyzed_at = timezone.now()
+            report.save()
+            
+            return Response({
+                'ai_analysis_result': report.ai_analysis_result,
+                'ai_suggestions': report.ai_suggestions,
+                'ai_analyzed_at': report.ai_analyzed_at,
+                'model_used': config.name
+            })
+            
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"AI Analysis Error: {str(e)}")
+            return Response({'error': f'AI 分析抛出异常: {str(e)}'}, status=500)
+
+
+    def _export_excel(self, report, data):
+        """导出为 Excel"""
+        output = BytesIO()
+        writer = pd.ExcelWriter(output, engine='xlsxwriter')
+        
+        # 1. 摘要信息
+        summary_data = {
+            '字段': ['报告名称', '项目', '测试类型', '状态', '总用例数', '通过数', '失败数', '跳过数', '通过率', '总耗时', '创建时间'],
+            '值': [
+                data['name'],
+                data['project_name'],
+                data['test_type'],
+                data.get('status', '-'),
+                data['total_cases'],
+                data['total_cases'] - data['failed_cases'] - data['skipped_cases'],
+                data['failed_cases'],
+                data['skipped_cases'],
+                f"{data['pass_rate']}%",
+                f"{data['duration']}s",
+                data['created_at']
+            ]
+        }
+        pd.DataFrame(summary_data).to_excel(writer, sheet_name='概览', index=False)
+        
+        # 2. 测试详情
+        details = data.get('test_details', [])
+        if details:
+            details_df = pd.DataFrame(details)
+            # 重命名列以提高可读性
+            column_map = {
+                'name': '用例名称',
+                'status': '状态',
+                'duration': '耗时(s)',
+                'error_message': '错误信息',
+                'item_type': '类型'
+            }
+            details_df = details_df.rename(columns=column_map)
+            # 只保留存在的列
+            cols_to_keep = [c for c in column_map.values() if c in details_df.columns]
+            details_df[cols_to_keep].to_excel(writer, sheet_name='测试详情', index=False)
+            
+        writer.close()
+        output.seek(0)
+        
+        filename = f"Report_{report.id}_{datetime.now().strftime('%Y%m%d%H%M%S')}.xlsx"
+        response = HttpResponse(
+            output.getvalue(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = f'attachment; filename={filename}'
+        return response
+
+    def _export_html(self, report, data):
+        """导出为 HTML (Premium)"""
+        from .html_exporter import HtmlReportExporter
+        
+        try:
+            html_content = HtmlReportExporter.generate_html(report, data)
+            filename = f"Report_{report.id}_{datetime.now().strftime('%Y%m%d%H%M%S')}.html"
+            response = HttpResponse(html_content, content_type='text/html; charset=utf-8')
+            response['Content-Disposition'] = f'attachment; filename={filename}'
+            return response
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"HTML Export Error: {str(e)}", exc_info=True)
+            return Response({'error': f'HTML 导出失败: {str(e)}'}, status=500)
+
+    def _export_pdf(self, report, data):
+        """导出为 PDF"""
+        try:
+            from apps.ui_automation.pdf_generator import AIReportPDFGenerator
+            
+            # 适配数据格式以满足 AIReportPDFGenerator 的要求
+            # AIReportPDFGenerator 期望 overview, execution_details, statistics, timeline 等
+            
+            report_data = {
+                'overview': {
+                    'status': data.get('status', 'N/A'),
+                    'duration_formatted': f"{data['duration']}s",
+                    'completion_rate': data['pass_rate']
+                },
+                'execution_details': {
+                    'case_name': data['name'],
+                    'execution_mode': data['test_type']
+                },
+                'statistics': {
+                    'total': data['total_cases'],
+                    'completed': data['total_cases'] - data['failed_cases'] - data['skipped_cases'],
+                    'failed': data['failed_cases'],
+                    'skipped': data['skipped_cases']
+                },
+                'timeline': []
+            }
+            
+            # 将 test_details 映射到 timeline
+            for d in data.get('test_details', []):
+                report_data['timeline'].append({
+                    'id': d.get('name', 'Step'),
+                    'description': d.get('name', 'N/A'),
+                    'status_display': d.get('status', 'N/A')
+                })
+                
+            pdf_gen = AIReportPDFGenerator(report_data, 'summary')
+            pdf_buffer = pdf_gen.generate()
+            
+            filename = f"Report_{report.id}_{datetime.now().strftime('%Y%m%d%H%M%S')}.pdf"
+            response = HttpResponse(pdf_buffer.getvalue(), content_type='application/pdf')
+            response['Content-Disposition'] = f'attachment; filename={filename}'
+            return response
+            
+        except Exception as e:
+            logger = logging.getLogger(__name__)
+            logger.error(f"PDF Export Error: {str(e)}", exc_info=True)
+            # 如果 PDF 失败，降级到 HTML 或返回错误
+            return Response({'error': f'PDF 导出失败: {str(e)}'}, status=500)

@@ -1,10 +1,7 @@
 <template>
-  <div class="common-method-management">
-    <div class="header">
-      <h2>公共方法管理</h2>
-      <el-button type="primary" @click="handleCreate">新增方法</el-button>
-    </div>
-
+  <BasePage title="公共方法管理">
+    
+    
     <div class="filter-container">
       <el-input
         v-model="searchQuery"
@@ -112,13 +109,14 @@
         </span>
       </template>
     </el-dialog>
-  </div>
-</template>
+  
 
+  </BasePage>
+</template>
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search, Delete } from '@element-plus/icons-vue'
+import { Search, Delete, Plus } from '@element-plus/icons-vue'
 import request from '@/utils/request.js'
 
 const loading = ref(false)
@@ -300,12 +298,12 @@ onMounted(() => {
 .common-method-management {
   padding: 20px;
 }
-.header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-}
+/* 页面特定样式 */
+
+
+
+
+
 .filter-container {
   margin-bottom: 20px;
 }

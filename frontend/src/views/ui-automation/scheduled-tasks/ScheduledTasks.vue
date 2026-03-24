@@ -1,14 +1,11 @@
 <template>
-  <div class="test-case-manager">
-    <div class="page-header">
-      <h1 class="page-title">UI自动化定时任务</h1>
-      <div class="header-actions">
-        <el-button type="primary" @click="handleCreateClick">
-          <el-icon><Plus /></el-icon>
-          新建定时任务
-        </el-button>
-      </div>
-    </div>
+  <BasePage title="UI自动化定时任务">
+    <template #actions>
+      <el-button type="primary" @click="handleCreateClick">
+        <el-icon><Plus /></el-icon>
+        新建定时任务
+      </el-button>
+    </template>
     
     <div class="main-content">
       <div class="card-container">
@@ -51,7 +48,7 @@
               <el-tag :type="scope.row.task_type === 'TEST_SUITE' ? 'success' : 'primary'">
                 {{ scope.row.task_type === 'TEST_SUITE' ? '测试套件' : '测试用例' }}
               </el-tag>
-            </template>
+  
           </el-table-column>
           <el-table-column prop="notification_type_display" label="通知类型" width="130">
             <template #default="scope">
@@ -314,9 +311,9 @@
         </el-button>
       </template>
     </el-dialog>
-  </div>
+  
+  </BasePage>
 </template>
-
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -695,27 +692,11 @@ const deleteTask = async (task) => {
   flex-direction: column;
 }
 
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 15px 20px;
-  border-bottom: 1px solid #e6e6e6;
-  background: white;
-}
 
-.page-title {
-  margin: 0;
-  font-size: 24px;
-  font-weight: 600;
-  color: #303133;
-}
 
-.header-actions {
-  display: flex;
-  align-items: center;
-  gap: 15px;
-}
+
+
+
 
 .main-content {
   flex: 1;

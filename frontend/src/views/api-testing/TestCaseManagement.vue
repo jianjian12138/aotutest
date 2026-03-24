@@ -1,31 +1,58 @@
 <template>
-  <div class="page-container">
-    <div class="page-header">
-      <h3 class="page-title">用例管理</h3>
-      <div class="header-actions">
-        <el-button type="primary" @click="openTestCaseDialog()">
+  <BasePage title="用例管理">
+    <template #actions><el-select v-model="selectedProject" placeholder="选择项目" @change="onProjectChange" style="width: 200px; margin-right: 8px;">
+          <el-option
+            v-for="project in projects"
+            :key="project.id"
+            :label="project.name"
+            :value="project.id"
+          />
+        </el-select><el-button type="primary" @click="openTestCaseDialog()">
           <el-icon><Plus /></el-icon> 新增用例
         </el-button>
         <el-button @click="fetchTestCases">
           <el-icon><Refresh /></el-icon> 刷新
-        </el-button>
-      </div>
-    </div>
+        </el-button></template>
     
+
     <div class="main-content">
       <div class="card-container">
-        <div class="case-layout">
+        <div class="content" style="height: 100%; display: flex; flex-direction: column;">
+        <div class="content-layout">
+          <!-- 最左侧：模块树 -->
+          <div class="module-panel">
+            <div class="sidebar-header" style="padding: 15px; border-bottom: 1px solid #e4e7ed; background: white; display: flex; justify-content: space-between; align-items: center;">
+              <h3 style="margin: 0; font-size: 15px;">用例模块</h3>
+              <el-button type="primary" link size="small" @click="showCreateModuleDialog = true" title="创建模块">
+                <el-icon><FolderAdd /></el-icon>
+              </el-button>
+            </div>
+            <div class="module-tree-container">
+              <el-tree
+                ref="moduleTreeRef"
+                :data="moduleTreeData"
+                :props="moduleTreeProps"
+                node-key="id"
+                :expand-on-click-node="false"
+                :default-expanded-keys="expandedModuleKeys"
+                @node-click="onModuleNodeClick"
+                @node-contextmenu="onModuleNodeRightClick"
+                highlight-current
+              >
+                <template #default="{ node, data }">
+                  <div class="tree-node">
+                    <el-icon><Folder /></el-icon>
+                    <span class="node-label" style="font-size: 14px;">{{ node.label }}</span>
+                    <span v-if="data.case_count > 0" class="case-count-tag">{{ data.case_count }}</span>
+                  </div>
+                </template>
+              </el-tree>
+            </div>
+          </div>
+
           <!-- Left: Case List -->
           <div class="sidebar">
             <div class="sidebar-header">
-              <el-select v-model="selectedProject" placeholder="选择项目" @change="onProjectChange" class="filter-select">
-                <el-option
-                  v-for="project in projects"
-                  :key="project.id"
-                  :label="project.name"
-                  :value="project.id"
-                />
-              </el-select>
               <div class="sidebar-actions">
                 <el-input
                   v-model="searchText"
@@ -231,6 +258,7 @@
             </div>
           </div>
         </div>
+        </div>
       </div>
     </div>
 
@@ -243,6 +271,19 @@
       <el-form :model="testCaseForm" :rules="caseRules" ref="caseFormRef" label-width="80px">
         <el-form-item label="用例名称" prop="name">
           <el-input v-model="testCaseForm.name" placeholder="请输入用例名称" />
+        </el-form-item>
+        <el-form-item label="所属模块">
+          <el-tree-select
+            v-model="testCaseForm.module_id"
+            :data="moduleTreeData"
+            :props="moduleTreeProps"
+            node-key="id"
+            value-key="id"
+            placeholder="请选择所属模块(可选)"
+            check-strictly
+            clearable
+            style="width: 100%"
+          />
         </el-form-item>
         <el-form-item label="描述" prop="description">
           <el-input v-model="testCaseForm.description" type="textarea" :rows="3" placeholder="请输入用例描述" />
@@ -266,6 +307,42 @@
         <el-button type="primary" @click="saveTestCase" :loading="savingCase">确定</el-button>
       </template>
     </el-dialog>
+
+    <!-- 新建/编辑模块对话框 -->
+    <el-dialog v-model="showCreateModuleDialog" :title="editingModule ? '编辑模块' : '创建模块'" width="450px">
+      <el-form ref="moduleFormRef" :model="moduleForm" :rules="moduleRules" label-width="90px">
+        <el-form-item label="模块名称" prop="name">
+          <el-input v-model="moduleForm.name" placeholder="请输入模块名称" />
+        </el-form-item>
+        <el-form-item label="父级模块" prop="parent">
+          <el-tree-select
+            v-model="moduleForm.parent"
+            :data="moduleTreeData"
+            :props="moduleTreeProps"
+            node-key="id"
+            value-key="id"
+            placeholder="请选择父级模块(可选)"
+            check-strictly
+            clearable
+            style="width: 100%"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="showCreateModuleDialog = false">取消</el-button>
+          <el-button type="primary" @click="saveModuleForm">确定</el-button>
+        </span>
+      </template>
+    </el-dialog>
+
+    <!-- 右键菜单 -->
+    <ul v-show="showContextMenu" class="context-menu" :style="{ left: contextMenuX + 'px', top: contextMenuY + 'px' }">
+      <li @click="addTestCaseToModule">添加用例</li>
+      <li @click="addSubModule">添加子模块</li>
+      <li @click="editModuleNode">编辑</li>
+      <li @click="deleteModuleNode">删除</li>
+    </ul>
 
     <!-- Interface Selector Dialog -->
     <el-dialog v-model="showInterfaceSelector" title="从接口库选择" width="800px" top="10vh">
@@ -553,6 +630,19 @@
               </el-table-column>
             </el-table>
           </el-tab-pane>
+          <el-tab-pane label="变量提取">
+            <div v-if="currentStepResult.extracted_variables && Object.keys(currentStepResult.extracted_variables).length > 0">
+              <el-table :data="Object.entries(currentStepResult.extracted_variables).map(([k,v]) => ({name: k, value: v}))" size="small" border>
+                <el-table-column prop="name" label="变量名" width="200" />
+                <el-table-column prop="value" label="提取值">
+                  <template #default="{ row }">
+                    <span>{{ typeof row.value === 'object' ? JSON.stringify(row.value) : row.value }}</span>
+                  </template>
+                </el-table-column>
+              </el-table>
+            </div>
+            <el-empty v-else description="该步骤无变量提取" :image-size="60" />
+          </el-tab-pane>
         </el-tabs>
 
         <div v-if="currentStepResult.error" class="error-msg">
@@ -572,7 +662,7 @@
                 {{ latestResult.status === 'passed' ? '通过' : '失败' }}
               </el-tag>
             </el-descriptions-item>
-            <el-descriptions-item label="执行时间">{{ new Date(latestResult.created_at).toLocaleString() }}</el-descriptions-item>
+            <el-descriptions-item label="执行时间">{{ formatDateTime(latestResult.created_at) }}</el-descriptions-item>
             <el-descriptions-item label="总耗时">{{ latestResult.execution_time.toFixed(2) }} ms</el-descriptions-item>
             <el-descriptions-item label="通过步骤">{{ latestResult.passed_steps }}</el-descriptions-item>
             <el-descriptions-item label="失败步骤">{{ latestResult.failed_steps }}</el-descriptions-item>
@@ -635,6 +725,19 @@
                       </el-table-column>
                     </el-table>
                   </el-tab-pane>
+                  <el-tab-pane label="变量提取">
+                    <div v-if="res.extracted_variables && Object.keys(res.extracted_variables).length > 0">
+                      <el-table :data="Object.entries(res.extracted_variables).map(([k,v]) => ({name: k, value: v}))" size="small" border>
+                        <el-table-column prop="name" label="变量名" width="200" />
+                        <el-table-column prop="value" label="提取值">
+                          <template #default="{ row }">
+                            <span>{{ typeof row.value === 'object' ? JSON.stringify(row.value) : row.value }}</span>
+                          </template>
+                        </el-table-column>
+                      </el-table>
+                    </div>
+                    <el-empty v-else description="该步骤无变量提取" :image-size="60" />
+                  </el-tab-pane>
                 </el-tabs>
               </div>
             </el-collapse-item>
@@ -642,19 +745,42 @@
         </div>
       </div>
     </el-dialog>
-  </div>
-</template>
 
+  </BasePage>
+</template>
 <script setup>
 import { ref, computed, onMounted, reactive, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { 
   Search, Refresh, VideoPlay, Plus, Edit, Delete, 
-  Rank, Check, Connection, Timer, Clock, Close, Warning, ArrowRight 
+  Rank, Check, Connection, Timer, Clock, Close, Warning, ArrowRight, Folder, FolderAdd 
 } from '@element-plus/icons-vue'
 import draggable from 'vuedraggable'
 import api from '@/utils/api'
 import KeyValueEditor from './components/KeyValueEditor.vue'
+import {
+  getApiTestCaseModules, createApiTestCaseModule,
+  updateApiTestCaseModule, deleteApiTestCaseModule
+} from '@/api/api-testing'
+
+// Module Tree State
+const moduleTreeData = ref([])
+const expandedModuleKeys = ref([])
+const selectedModuleId = ref(null)
+const selectedModuleNode = ref(null)
+const moduleTreeProps = { children: 'children', label: 'name' }
+const moduleTreeRef = ref(null)
+
+const showCreateModuleDialog = ref(false)
+const editingModule = ref(null)
+const moduleFormRef = ref(null)
+const moduleForm = reactive({ name: '', parent: null })
+const moduleRules = { name: [{ required: true, message: '请输入模块名称', trigger: 'blur' }] }
+
+const showContextMenu = ref(false)
+const contextMenuX = ref(0)
+const contextMenuY = ref(0)
+const rightClickedModule = ref(null)
 
 // Data
 const projects = ref([])
@@ -681,7 +807,8 @@ const testCaseForm = reactive({
   name: '',
   description: '',
   priority: 'medium',
-  status: 'draft'
+  status: 'draft',
+  module_id: null
 })
 const caseRules = {
   name: [{ required: true, message: '请输入用例名称', trigger: 'blur' }]
@@ -756,9 +883,109 @@ const loadProjects = async () => {
   }
 }
 
+const loadModuleTree = async () => {
+  if (!selectedProject.value) {
+    moduleTreeData.value = []
+    return
+  }
+  try {
+    const res = await getApiTestCaseModules({ project: selectedProject.value })
+    moduleTreeData.value = res.data?.results || res.data || []
+  } catch(error) {
+    console.error('获取模块树失败:', error)
+  }
+}
+
+const onModuleNodeClick = (data) => {
+  selectedModuleId.value = data.id
+  selectedModuleNode.value = data
+  fetchTestCases()
+}
+
+const onModuleNodeRightClick = (event, data) => {
+  event.preventDefault()
+  showContextMenu.value = false
+  rightClickedModule.value = data
+  contextMenuX.value = event.clientX
+  contextMenuY.value = event.clientY
+  showContextMenu.value = true
+  
+  const hideMenu = () => {
+    showContextMenu.value = false
+    document.removeEventListener('click', hideMenu)
+  }
+  setTimeout(() => document.addEventListener('click', hideMenu), 100)
+}
+
+const addTestCaseToModule = () => {
+  if (rightClickedModule.value) {
+    testCaseForm.module_id = rightClickedModule.value.id
+  }
+  showCaseDialog.value = true
+  testCaseForm.name = ''
+  testCaseForm.description = ''
+  testCaseForm.status = 'draft'
+  testCaseForm.priority = 'medium'
+  testCaseForm.id = null
+}
+
+const addSubModule = () => {
+  editingModule.value = null
+  moduleForm.name = ''
+  moduleForm.parent = rightClickedModule.value ? rightClickedModule.value.id : null
+  showCreateModuleDialog.value = true
+}
+
+const editModuleNode = () => {
+  editingModule.value = rightClickedModule.value
+  moduleForm.name = rightClickedModule.value.name
+  moduleForm.parent = rightClickedModule.value.parent || null
+  showCreateModuleDialog.value = true
+}
+
+const deleteModuleNode = async () => {
+  if (!rightClickedModule.value) return
+  try {
+    await ElMessageBox.confirm(`确定删除模块 "${rightClickedModule.value.name}" 吗？该目录下的所有用例及子模块将解除关联或被删除。`, '提示', { type: 'warning' })
+    await deleteApiTestCaseModule(rightClickedModule.value.id)
+    ElMessage.success('删除成功')
+    if (selectedModuleId.value === rightClickedModule.value.id) {
+      selectedModuleId.value = null
+      fetchTestCases()
+    }
+    loadModuleTree()
+  } catch(e) {}
+}
+
+const saveModuleForm = async () => {
+  if (!moduleFormRef.value) return
+  const valid = await moduleFormRef.value.validate()
+  if (!valid) return
+  try {
+    const data = {
+      name: moduleForm.name,
+      parent: moduleForm.parent || null,
+      project: selectedProject.value
+    }
+    if (editingModule.value) {
+      await updateApiTestCaseModule(editingModule.value.id, data)
+      ElMessage.success('修改成功')
+    } else {
+      await createApiTestCaseModule(data)
+      ElMessage.success('创建成功')
+    }
+    showCreateModuleDialog.value = false
+    loadModuleTree()
+  } catch(e) {
+    ElMessage.error(editingModule.value ? '修改失败' : '创建失败')
+  }
+}
+
 const onProjectChange = () => {
   selectedCase.value = null
+  selectedModuleId.value = null
   steps.value = []
+  loadModuleTree()
   fetchTestCases()
   fetchInterfaces()
 }
@@ -768,9 +995,11 @@ const fetchTestCases = async () => {
   if (!selectedProject.value) return
   loading.value = true
   try {
-    const res = await api.get('/api-testing/testcases/', {
-      params: { project: selectedProject.value }
-    })
+    const params = { project: selectedProject.value }
+    if (selectedModuleId.value) {
+      params.module = selectedModuleId.value
+    }
+    const res = await api.get('/api-testing/testcases/', { params })
     testCases.value = res.data.results || res.data
   } catch (error) {
     ElMessage.error('加载用例失败')
@@ -786,7 +1015,8 @@ const openTestCaseDialog = (row = null) => {
       name: row.name,
       description: row.description,
       priority: row.priority,
-      status: row.status
+      status: row.status,
+      module_id: row.module ? row.module.id : (row.module_id || null)
     })
   } else {
     Object.assign(testCaseForm, {
@@ -794,7 +1024,8 @@ const openTestCaseDialog = (row = null) => {
       name: '',
       description: '',
       priority: 'medium',
-      status: 'draft'
+      status: 'draft',
+      module_id: selectedModuleId.value || null
     })
   }
   showCaseDialog.value = true
@@ -806,7 +1037,11 @@ const saveTestCase = async () => {
     if (!valid) return
     savingCase.value = true
     try {
-      const data = { ...testCaseForm, project: selectedProject.value }
+      const data = { 
+        ...testCaseForm, 
+        project: selectedProject.value,
+        module_id: testCaseForm.module_id || null 
+      }
       if (testCaseForm.id) {
         await api.put(`/api-testing/testcases/${testCaseForm.id}/`, data)
         ElMessage.success('更新成功')
@@ -917,6 +1152,23 @@ const formatJson = (json) => {
     }
   }
   return JSON.stringify(json, null, 2)
+}
+
+const formatDateTime = (dateStr) => {
+  if (!dateStr) return '-'
+  try {
+    const d = new Date(dateStr)
+    if (isNaN(d.getTime())) return dateStr
+    const year = d.getFullYear()
+    const month = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    const hours = String(d.getHours()).padStart(2, '0')
+    const minutes = String(d.getMinutes()).padStart(2, '0')
+    const seconds = String(d.getSeconds()).padStart(2, '0')
+    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
+  } catch (e) {
+    return dateStr
+  }
 }
 
 // Methods - Steps
@@ -1045,7 +1297,8 @@ const addStepsFromInterfaces = async () => {
     selectedInterfaces.value = []
     fetchSteps(selectedCase.value.id)
   } catch (error) {
-    ElMessage.error('添加步骤失败')
+    console.error('Add step failed:', error, error.response?.data);
+    ElMessage.error(error.response?.data?.error || '添加步骤失败')
   }
 }
 
@@ -1117,8 +1370,11 @@ const addStepExtract = () => {
 
 // Methods - Execution
 const fetchEnvironments = async () => {
+  if (!selectedProject.value) return
   try {
-    const res = await api.get('/api-testing/environments/')
+    const res = await api.get('/api-testing/environments/', {
+      params: { project: selectedProject.value }
+    })
     environments.value = res.data.results || res.data
   } catch (error) {
     ElMessage.error('加载环境列表失败')
@@ -1160,7 +1416,7 @@ const getPriorityType = (p) => {
 }
 const getPriorityLabel = (p) => {
   const map = { high: '高', medium: '中', low: '低' }
-  return map[p] || p
+  return map[p] || 'info'
 }
 const getMethodColor = (m) => {
   const map = { GET: 'success', POST: 'primary', PUT: 'warning', DELETE: 'danger', PATCH: 'info' }
@@ -1173,42 +1429,6 @@ onMounted(() => {
 </script>
 
 <style scoped lang="scss">
-.page-container {
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-}
-
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 15px 20px;
-  border-bottom: 1px solid #e6e6e6;
-  background: white;
-  flex-shrink: 0;
-}
-
-.page-title {
-  margin: 0;
-  font-size: 24px;
-  font-weight: 600;
-  color: #303133;
-  position: relative;
-  padding-left: 16px;
-  &::before {
-    content: "";
-    position: absolute;
-    left: 0;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 4px;
-    height: 20px;
-    background: #409eff;
-    border-radius: 2px;
-  }
-}
 
 .main-content {
   flex: 1;
@@ -1219,20 +1439,73 @@ onMounted(() => {
 .card-container {
   flex: 1;
   width: 100%;
-  height: 100%;
   background-color: #fff;
+  padding: 0;
+  box-shadow: 0 1px 4px rgba(0, 21, 41, 0.08);
   display: flex;
   flex-direction: column;
-}
-
-.case-layout {
-  display: flex;
-  flex: 1;
   overflow: hidden;
 }
 
+.content-layout {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  height: 100%;
+}
+
+.module-panel {
+  width: 250px;
+  border-right: 1px solid #e4e7ed;
+  background: white;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+.module-tree-container {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px;
+}
+.tree-node {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+.case-count-tag {
+  background: #f0f2f5;
+  color: #909399;
+  font-size: 12px;
+  padding: 0 6px;
+  border-radius: 10px;
+  margin-left: auto;
+}
+.context-menu {
+  position: fixed;
+  background: white;
+  border: 1px solid #e4e7ed;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
+  padding: 5px 0;
+  margin: 0;
+  list-style: none;
+  z-index: 3000;
+  min-width: 120px;
+}
+.context-menu li {
+  padding: 8px 15px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #606266;
+}
+.context-menu li:hover {
+  background-color: #f5f7fa;
+  color: #409eff;
+}
+
 .sidebar {
-  width: 320px;
+  width: 300px;
   border-right: 1px solid #e4e7ed;
   background: #f8f9fa;
   display: flex;

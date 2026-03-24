@@ -1,7 +1,9 @@
+from apps.notifications.models import NotificationConfig, NotificationLog
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from rest_framework.routers import DefaultRouter
+from apps.notifications.views import NotificationConfigViewSet, NotificationLogViewSet
 from .views import (
     UiProjectViewSet,
     LocatorStrategyViewSet,
@@ -19,12 +21,11 @@ from .views import (
     UiScheduledTaskViewSet,
     AIExecutionRecordViewSet,
     AICaseViewSet,
-    UiNotificationConfigViewSet,
-    UiNotificationLogViewSet,
     OperationRecordViewSet,
     UiDashboardViewSet,
     UiDeviceViewSet,
-    ExecutionNodeViewSet
+    ExecutionNodeViewSet,
+    UiTestCaseModuleViewSet
 )
 from .views_config import EnvironmentConfigViewSet, AIIntelligentModeConfigViewSet
 from .debug_views import DebugFileViewSet
@@ -45,14 +46,15 @@ router.register(r'test-suites', TestSuiteViewSet)
 router.register(r'test-executions', TestExecutionViewSet)
 router.register(r'screenshots', ScreenshotViewSet)
 router.register(r'test-cases', TestCaseViewSet)
+router.register(r'test-case-modules', UiTestCaseModuleViewSet)
 router.register(r'test-case-steps', TestCaseStepViewSet)
 router.register(r'test-case-executions', TestCaseExecutionViewSet)
 router.register(r'scheduled-tasks', UiScheduledTaskViewSet)
 router.register(r'ai-execution-records', AIExecutionRecordViewSet)
 router.register(r'ai-cases', AICaseViewSet, basename='ai-cases')
 router.register(r'ai-case-generation', AICaseViewSet, basename='ai-case-generation')
-router.register(r'notification-configs', UiNotificationConfigViewSet)
-router.register(r'notification-logs', UiNotificationLogViewSet)
+router.register(r'notification-configs', NotificationConfigViewSet, basename='ui-notification-configs')
+router.register(r'notification-logs', NotificationLogViewSet, basename='ui-notification-logs')
 router.register(r'operation-records', OperationRecordViewSet)
 
 

@@ -5,7 +5,6 @@ import { useUserStore } from '@/stores/user'
 import Login from '@/views/auth/Login.vue'
 import Register from '@/views/auth/Register.vue'
 import Layout from '@/layout/index.vue'
-import ProjectList from '@/views/projects/ProjectList.vue'
 
 const routes = [
   {
@@ -17,6 +16,18 @@ const routes = [
     name: 'Home',
     component: () => import('@/views/Home.vue'),
     meta: { requiresAuth: true }
+  },
+  {
+    path: '/agent-workspace',
+    component: Layout,
+    meta: { requiresAuth: true },
+    children: [
+      {
+        path: '',
+        name: 'AgentWorkspace',
+        component: () => import('@/views/agent/AgentWorkspace.vue')
+      }
+    ]
   },
   {
     path: '/login',
@@ -55,16 +66,7 @@ const routes = [
         name: 'RequirementAnalysis',
         component: () => import('@/views/requirement-analysis/RequirementAnalysisView.vue')
       },
-      {
-        path: 'projects',
-        name: 'Projects',
-        component: ProjectList
-      },
-      {
-        path: 'projects/:id',
-        name: 'ProjectDetail',
-        component: () => import('@/views/projects/ProjectDetail.vue')
-      },
+
       {
         path: 'testcases',
         name: 'TestCases',
@@ -130,11 +132,7 @@ const routes = [
         name: 'ExecutionDetail',
         component: () => import('@/views/executions/ExecutionDetailView.vue')
       },
-      {
-        path: 'reports',
-        name: 'AiTestReport',
-        component: () => import('@/views/reports/AiTestReport.vue')
-      },
+
 
       {
         path: 'prompt-config',
@@ -172,11 +170,7 @@ const routes = [
         name: 'ApiDashboard',
         component: () => import('@/views/api-testing/Dashboard.vue')
       },
-      {
-        path: 'projects',
-        name: 'ApiProjects',
-        component: () => import('@/views/api-testing/ProjectManagement.vue')
-      },
+
       {
         path: 'interfaces',
         name: 'ApiInterfaces',
@@ -207,16 +201,7 @@ const routes = [
         name: 'ApiReports',
         component: () => import('@/views/api-testing/ReportView.vue')
       },
-      {
-        path: 'scheduled-tasks',
-        name: 'ApiScheduledTasks',
-        component: () => import('@/views/api-testing/ScheduledTasks.vue')
-      },
-      {
-        path: 'notification-logs',
-        name: 'ApiNotificationLogs',
-        component: () => import('@/views/notification/NotificationLogs.vue')
-      }
+
     ]
   },
   {
@@ -233,11 +218,7 @@ const routes = [
         name: 'UiDashboard',
         component: () => import('@/views/ui-automation/dashboard/Dashboard.vue')
       },
-      {
-        path: 'projects',
-        name: 'UiProjects',
-        component: () => import('@/views/ui-automation/projects/ProjectList.vue')
-      },
+
       {
         path: 'elements-enhanced',
         name: 'UiElementsEnhanced',
@@ -264,6 +245,11 @@ const routes = [
         component: () => import('@/views/ui-automation/scripts/ScriptList.vue')
       },
       {
+        path: 'scripts/editor',
+        name: 'UiScriptEditor',
+        component: () => import('@/views/ui-automation/scripts/ScriptEditorEnhanced.vue')
+      },
+      {
         path: 'suites',
         name: 'UiSuites',
         component: () => import('@/views/ui-automation/suites/SuiteList.vue')
@@ -273,11 +259,7 @@ const routes = [
         name: 'UiExecutions',
         component: () => import('@/views/ui-automation/executions/ExecutionList.vue')
       },
-      {
-        path: 'reports',
-        name: 'UiReports',
-        component: () => import('@/views/ui-automation/reports/ReportList.vue')
-      },
+
       {
         path: 'devices',
         name: 'UiDevices',
@@ -288,21 +270,16 @@ const routes = [
         name: 'UiAgents',
         component: () => import('@/views/ui-automation/agent/AgentManagement.vue')
       },
-      {
-        path: 'debug-files',
-        name: 'UiDebugFiles',
-        component: () => import('@/views/ui-automation/debug/DebugFileManager.vue')
-      },
-      {
-        path: 'scheduled-tasks',
-        name: 'UiScheduledTasks',
-        component: () => import('@/views/ui-automation/scheduled-tasks/ScheduledTasks.vue')
-      },
-      {
-        path: 'notification-logs',
-        name: 'UiNotificationLogs',
-        component: () => import('@/views/ui-automation/notification/NotificationLogs.vue')
-      }
+          {
+            path: 'debug-files',
+            name: 'UiDebugFiles',
+            component: () => import('@/views/ui-automation/debug/DebugFileManager.vue')
+          },
+          {
+            path: 'reports',
+            name: 'UiReports',
+            component: () => import('@/views/ui-automation/reports/ReportList.vue')
+          }
     ]
   },
   {
@@ -310,7 +287,7 @@ const routes = [
     component: Layout,
     meta: { requiresAuth: true },
     children: [
-    {
+      {
         path: '',
         redirect: 'web-testing'
       },
@@ -344,6 +321,11 @@ const routes = [
         path: 'execution-records',
         name: 'AIExecutionRecords',
         component: () => import('@/views/ui-automation/ai/AIExecutionRecords.vue')
+      },
+      {
+        path: 'agent-browser',
+        name: 'AgentBrowser',
+        component: () => import('@/views/ui-automation/ai/AgentBrowser.vue')
       }
     ]
   },
@@ -375,26 +357,33 @@ const routes = [
             name: 'ConfigAIMode',
             component: () => import('@/views/configuration/AIIntelligentModeConfig.vue')
           },
+
           {
             path: 'cicd',
-            name: 'ConfigCicd',
-            component: () => import('@/views/configuration/CicdConfig.vue')
+            component: () => import('@/views/configuration/ConfigurationCenter.vue'), // Reuse the simple router-view wrapper
+            children: [
+              {
+                path: '',
+                redirect: 'pipelines'
+              },
+              {
+                path: 'pipelines',
+                name: 'PipelineList',
+                component: () => import('@/views/cicd/PipelineList.vue')
+              },
+              {
+                path: 'pipelines/:id',
+                name: 'PipelineDetail',
+                component: () => import('@/views/cicd/PipelineDetail.vue')
+              }
+            ]
           },
           {
             path: 'database',
             name: 'ConfigDatabase',
             component: () => import('@/views/configuration/DatabaseConfig.vue')
           },
-          {
-            path: 'scheduled-tasks',
-            name: 'ConfigScheduledTasks',
-            component: () => import('@/views/configuration/ScheduledTasks.vue')
-          },
-          {
-            path: 'notifications',
-            name: 'ConfigNotifications',
-            component: () => import('@/views/configuration/NotificationConfigs.vue')
-          },
+
           {
             path: 'dify',
             name: 'DifyConfig',
@@ -409,6 +398,16 @@ const routes = [
             path: 'skills',
             name: 'SkillsConfig',
             component: () => import('@/views/configuration/SkillsConfig.vue')
+          },
+          {
+            path: 'agent-profiles',
+            name: 'AgentProfileConfig',
+            component: () => import('@/views/configuration/AgentProfileConfig.vue')
+          },
+          {
+            path: 'agent-skills',
+            name: 'AgentSkillConfig',
+            component: () => import('@/views/configuration/AgentSkillConfig.vue')
           },
           {
             path: 'users',
@@ -429,15 +428,7 @@ const routes = [
       }
     ]
   },
-  {
-    path: '/cicd',
-    component: Layout,
-    meta: { requiresAuth: true },
-    children: [
-      { path: '', redirect: 'dashboard' },
-      { path: 'dashboard', name: 'CICDDashboard', component: () => import('@/views/cicd/CICDDashboard.vue') }
-    ]
-  },
+
   {
     path: '/data-factory',
     component: Layout,
@@ -446,17 +437,14 @@ const routes = [
       { path: '', redirect: 'dashboard' },
       { path: 'dashboard', name: 'DataFactoryDashboard', component: () => import('@/views/data-factory/Dashboard.vue') },
       { path: 'sql-generation', name: 'SqlGeneration', component: () => import('@/views/data-factory/SqlGeneration.vue') },
-      { path: 'projects', name: 'ProjectManagement', component: () => import('@/views/data-factory/ProjectManagement.vue') },
+
       { path: 'saved-queries', name: 'SavedQueries', component: () => import('@/views/data-factory/SavedQueries.vue') },
       { path: 'table-metadata', name: 'TableMetadata', component: () => import('@/views/data-factory/TableMetadata.vue') },
       { path: 'query-history', name: 'QueryHistory', component: () => import('@/views/data-factory/QueryHistory.vue') },
       { path: 'data-generator', name: 'TestDataGenerator', component: () => import('@/views/data-factory/TestDataGenerator.vue') }
     ]
   },
-  {
-    path: '/midscene',
-    redirect: '/natural-language-testing'
-  },
+
   {
     path: '/strix-security',
     component: Layout,
@@ -466,8 +454,44 @@ const routes = [
       { path: 'dashboard', name: 'StrixDashboard', component: () => import('@/views/security/Dashboard.vue') },
       { path: 'scan-tasks', name: 'StrixScanTasks', component: () => import('@/views/security/ScanTasks.vue') },
       { path: 'vulnerabilities', name: 'StrixVulnerabilities', component: () => import('@/views/security/Vulnerabilities.vue') },
-      { path: 'reports', name: 'StrixReports', component: () => import('@/views/security/Reports.vue') },
+
       { path: 'config', name: 'StrixConfig', component: () => import('@/views/security/Config.vue') }
+    ]
+  },
+  {
+    path: '/special-testing',
+    component: Layout,
+    meta: { requiresAuth: true },
+    children: [
+      {
+        path: '',
+        redirect: 'dashboard'
+      },
+      {
+        path: 'dashboard',
+        name: 'SpecialTestingDashboard',
+        component: () => import('@/views/special-testing/Dashboard.vue')
+      },
+      {
+        path: 'mqtt',
+        name: 'MqttTest',
+        component: () => import('@/views/special-testing/mqtt/MqttTest.vue')
+      },
+      {
+        path: 'monkey',
+        name: 'MonkeyTest',
+        component: () => import('@/views/special-testing/monkey/MonkeyTest.vue')
+      },
+      {
+        path: 'redis',
+        name: 'RedisTest',
+        component: () => import('@/views/special-testing/middleware/RedisTest.vue')
+      },
+      {
+        path: 'kafka',
+        name: 'KafkaTest',
+        component: () => import('@/views/special-testing/middleware/KafkaTest.vue')
+      }
     ]
   },
   {
@@ -477,14 +501,62 @@ const routes = [
     children: [
       { path: '', redirect: 'dashboard' },
       { path: 'dashboard', name: 'PerformanceDashboard', component: () => import('@/views/performance-test/Dashboard.vue') },
-      { path: 'projects', name: 'PerformanceProjects', component: () => import('@/views/performance-test/ProjectManagement.vue') },
+
       { path: 'collections', name: 'PerformanceCollections', component: () => import('@/views/performance-test/CollectionManagement.vue') },
       { path: 'requests', name: 'PerformanceRequests', component: () => import('@/views/performance-test/RequestManagement.vue') },
       { path: 'test-suites', name: 'PerformanceTestSuites', component: () => import('@/views/performance-test/TestSuiteManagement.vue') },
-    { path: 'executions', name: 'PerformanceExecutions', component: () => import('@/views/performance-test/ExecutionManagement.vue') },
-    { path: 'executions/:id/report', name: 'PerformanceExecutionReport', component: () => import('@/views/performance-test/ExecutionReport.vue') },
-    { path: 'scheduled-tasks', name: 'PerformanceScheduledTasks', component: () => import('@/views/performance-test/ScheduledTaskManagement.vue') }
-  ]
+      { path: 'executions', name: 'PerformanceExecutions', component: () => import('@/views/performance-test/ExecutionManagement.vue') },
+      { path: 'executions/:id/report', name: 'PerformanceExecutionReport', component: () => import('@/views/performance-test/ExecutionReport.vue') },
+
+    ]
+  },
+  {
+    path: '/unified',
+    component: Layout,
+    meta: { requiresAuth: true },
+    children: [
+      {
+        path: '',
+        redirect: 'projects'
+      },
+
+      {
+        path: 'projects',
+        name: 'UnifiedProjects',
+        component: () => import('@/views/unified/projects/ProjectList.vue')
+      },
+      {
+        path: 'projects/:id',
+        name: 'UnifiedProjectDetail',
+        component: () => import('@/views/unified/projects/ProjectDetail.vue')
+      },
+
+      {
+        path: 'scheduler',
+        name: 'UnifiedScheduler',
+        component: () => import('@/views/unified/scheduler/TaskList.vue')
+      },
+      {
+        path: 'scheduler/:id',
+        name: 'UnifiedTaskDetail',
+        component: () => import('@/views/unified/scheduler/TaskDetail.vue')
+      },
+      {
+        path: 'notifications',
+        name: 'UnifiedNotifications',
+        component: () => import('@/views/unified/notifications/ConfigList.vue')
+      },
+      {
+        path: 'reports',
+        name: 'UnifiedReports',
+        component: () => import('@/views/unified/reports/ReportList.vue')
+      },
+      {
+        path: 'reports/:id',
+        name: 'UnifiedReportDetail',
+        component: () => import('@/views/unified/reports/ReportDetail.vue')
+      }
+    ]
   },
   {
     path: '/knowledge-graph',

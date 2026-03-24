@@ -1,21 +1,16 @@
 <template>
-  <div class="page-container">
-    <div class="page-header">
-      <h3 class="page-title">数据库配置</h3>
-      <div class="header-actions">
-        <el-button type="primary" @click="handleCreateConfig">
-          <el-icon><Plus /></el-icon>
-          新建配置
-        </el-button>
-      </div>
-    </div>
+  <BasePage title="数据库配置">
+    <template #actions>
+      <el-button type="primary" @click="handleCreateConfig">
+        <el-icon><Plus /></el-icon>
+        新建配置
+      </el-button>
+    </template>
+    
+    <p class="description-text">Data Factory 数据库连接配置</p>
 
-    <div class="main-content">
-      <div class="card-container">
-        <p class="description-text">Data Factory 数据库连接配置</p>
-
-        <!-- 搜索和筛选 -->
-        <div class="search-filter">
+    <!-- 搜索和筛选 -->
+    <div class="search-filter">
           <el-input
             v-model="searchKeyword"
             placeholder="搜索配置名称或描述"
@@ -24,7 +19,7 @@
           >
             <template #prefix>
               <el-icon><Search /></el-icon>
-            </template>
+          </template>
           </el-input>
           
           <el-select
@@ -104,23 +99,20 @@
           </el-table-column>
         </el-table>
         
-        <!-- 分页 -->
-        <div class="pagination-container">
-          <el-pagination
-            v-model:current-page="currentPage"
-            v-model:page-size="pageSize"
-            :page-sizes="[10, 20, 50, 100]"
-            layout="total, sizes, prev, pager, next, jumper"
-            :total="filteredConfigs.length"
-            @size-change="handleSizeChange"
-            @current-change="handleCurrentChange"
-          />
-        </div>
-      </div>
+    <!-- 分页 -->
+    <div class="pagination-container">
+      <el-pagination
+        v-model:current-page="currentPage"
+        v-model:page-size="pageSize"
+        :page-sizes="[10, 20, 50, 100]"
+        layout="total, sizes, prev, pager, next, jumper"
+        :total="filteredConfigs.length"
+        @size-change="handleSizeChange"
+        @current-change="handleCurrentChange"
+      />
     </div>
-  </div>
 
-  <!-- 查看配置对话框 -->
+    <!-- 查看配置对话框 -->
   <el-dialog
     v-model="viewDialogVisible"
     title="查看配置详情"
@@ -215,8 +207,9 @@
       </span>
     </template>
   </el-dialog>
-</template>
 
+  </BasePage>
+</template>
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -472,67 +465,11 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.page-container {
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
-  padding: 0;
-  background-color: var(--el-bg-color-page);
-  max-width: 100%; /* 新增：覆盖全局样式的 max-width: 1600px，确保铺满 */
-}
-
-.page-header {
-  flex-shrink: 0;
-  padding: 16px 24px;
-  background: #fff;
-  border-bottom: 1px solid var(--el-border-color-light);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.page-title {
-  font-size: 24px;
-  font-weight: 600;
-  color: var(--el-text-color-primary);
-  display: flex;
-  align-items: center;
-  margin: 0;
-}
-
-.page-title::before {
-  content: '';
-  width: 4px;
-  height: 16px;
-  background-color: var(--el-color-primary);
-  margin-right: 8px;
-  border-radius: 2px;
-}
-
 .description-text {
   margin-top: 0;
   margin-bottom: 16px;
   font-size: 13px;
   color: var(--el-text-color-secondary);
-}
-
-.main-content {
-  flex: 1;
-  padding: 0;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
-
-.card-container {
-  flex: 1;
-  background: #fff;
-  border-radius: 4px;
-  display: flex;
-  flex-direction: column;
-  padding: 0;
-  overflow: hidden;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
 }
 
 .search-filter {

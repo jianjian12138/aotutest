@@ -180,3 +180,11 @@ export function getDashboardSummary() {
     method: 'get'
   })
 }
+
+export function inferSchemaFromTable(tableId) {
+  return request({
+    url: '/data-factory/data-generator/infer_from_table/',
+    method: 'post',
+    data: { table_id: tableId }
+  })
+}

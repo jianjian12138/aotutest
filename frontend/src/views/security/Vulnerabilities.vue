@@ -1,15 +1,5 @@
 <template>
-  <div class="vulnerabilities">
-    <el-card shadow="hover">
-      <template #header>
-        <div class="card-header page-header" style="margin-bottom: 0;">
-          <h2 class="page-title">漏洞管理</h2>
-          <el-button type="primary" @click="handleExport">
-            <el-icon><Download /></el-icon>
-            导出漏洞
-          </el-button>
-        </div>
-      </template>
+  <BasePage title="漏洞管理">
       
       <!-- 搜索和筛选 -->
       <div class="search-filter">
@@ -152,15 +142,14 @@
           @size-change="handleSizeChange"
           @current-change="handleCurrentChange"
         />
-      </div>
-    </el-card>
-  </div>
-</template>
+     </div>
 
+  </BasePage>
+</template>
 <script setup>
 import { ref, computed, onMounted, reactive } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage, ElNotification } from 'element-plus'
+import { ElMessage, ElNotification, ElMessageBox } from 'element-plus'
 import { Search, View, EditPen, Download } from '@element-plus/icons-vue'
 import { 
   getVulnerabilities, 
@@ -205,8 +194,8 @@ const fetchData = async () => {
     }
     
     const response = await getVulnerabilities(params)
-    vulnerabilities.value = response.results
-    pagination.total = response.count
+    vulnerabilities.value = response.data?.results || []
+    pagination.total = response.data?.count || 0
   } catch (error) {
     ElMessage.error('获取漏洞列表失败')
   } finally {

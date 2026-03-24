@@ -1,28 +1,6 @@
 <template>
-  <div class="page-container">
-    <div class="page-header">
-      <h1 class="page-title">AI 智能测试实验室</h1>
-      <div class="header-controls">
-        <el-radio-group v-model="activeTab" style="margin-right: 20px" v-if="false">
-            <el-radio-button label="app">App 智能测试</el-radio-button>
-            <el-radio-button label="web">Web 智能测试</el-radio-button>
-        </el-radio-group>
-
-        <el-select v-model="projectId" placeholder="选择项目" style="width: 200px" @change="onProjectChange">
-          <el-option v-for="project in projects" :key="project?.id" :label="project?.name" :value="project?.id" />
-        </el-select>
-        
-        <el-select v-model="selectedModelConfigId" placeholder="选择 AI 模型" style="width: 250px">
-          <el-option 
-            v-for="config in modelConfigs" 
-            :key="config?.id" 
-            :label="`${config?.name} (${config?.model_type})`" 
-            :value="config?.id" 
-          />
-        </el-select>
-      </div>
-    </div>
-
+  <BasePage title="AI 智能测试实验室">
+    
     <div class="card-container">
       <!-- App 移动端测试内容 -->
       <div v-if="activeTab === 'app'">
@@ -44,6 +22,20 @@
 
               <div class="section-title">任务输入</div>
               <el-form :model="appTaskForm" label-position="top">
+                <el-form-item label="AI 模型配置" required>
+                  <el-select v-model="selectedModelConfigId" placeholder="选择 AI 模型 (建议使用多模态模型)" style="width: 100%">
+                    <el-option
+                      v-for="config in modelConfigs"
+                      :key="config.id"
+                      :label="`${config.name} (${config.model_name})`"
+                      :value="config.id"
+                    >
+                      <span style="float: left">{{ config.name }}</span>
+                      <span style="float: right; color: #8492a6; font-size: 13px">{{ config.model_name }}</span>
+                    </el-option>
+                  </el-select>
+                </el-form-item>
+
                 <el-form-item label="任务描述" required>
                   <el-input
                     v-model="appTaskForm.description"
@@ -86,24 +78,35 @@
               </el-form>
               
               <el-alert
-                title="AutoGLM 模式提示"
-                type="info"
+                title="Mobile Agent 智能化模式"
+                type="success"
                 :closable="false"
                 style="margin-top: 20px;"
                 show-icon
               >
                 <template #default>
-                  <div>通过 ADB 控制安卓设备。请确保设备已连接且屏幕解锁。</div>
-                  <div>建议使用 AutoGLM 或类似多模态模型以获得最佳效果。</div>
+                  <div>已升级至 Mobile Agent v3.5 架构。支持：</div>
+                  <div style="margin-top: 5px;">• <b>多代理协作</b>：Planning (规划) + Execution (执行)</div>
+                  <div>• <b>GUI-Critic</b>：自动诊断并修正幻觉点击</div>
+                  <div>• <b>操作记忆</b>：高频路径自动学习与复用</div>
                 </template>
               </el-alert>
               
-              <div class="section-title" style="margin-top: 20px;">执行日志</div>
+              <div class="section-title" style="margin-top: 20px;">
+                执行状态
+                <el-tag v-if="currentPlan" type="warning" size="small" style="margin-left: 10px;">当前目标: {{ currentPlan }}</el-tag>
+              </div>
               <div class="log-container" ref="appLogContainer">
                 <div v-if="!logs && !running" class="empty-logs">
                   暂无执行日志
                 </div>
-                <pre v-else class="log-content">{{ logs }}</pre>
+                <div v-else class="rich-logs">
+                  <div v-for="(log, index) in parsedLogs" :key="index" :class="['log-line', log.type]">
+                    <span class="log-time">{{ log.time }}</span>
+                    <span class="log-tag" v-if="log.tag">{{ log.tag }}</span>
+                    <span class="log-text">{{ log.content }}</span>
+                  </div>
+                </div>
               </div>
             </el-col>
             
@@ -129,6 +132,20 @@
             <el-col :span="12">
               <div class="section-title">任务输入</div>
               <el-form :model="webTaskForm" label-position="top">
+                <el-form-item label="AI 模型配置" required>
+                  <el-select v-model="selectedModelConfigId" placeholder="选择 AI 模型" style="width: 100%">
+                    <el-option
+                      v-for="config in modelConfigs"
+                      :key="config.id"
+                      :label="`${config.name} (${config.model_name})`"
+                      :value="config.id"
+                    >
+                      <span style="float: left">{{ config.name }}</span>
+                      <span style="float: right; color: #8492a6; font-size: 13px">{{ config.model_name }}</span>
+                    </el-option>
+                  </el-select>
+                </el-form-item>
+                
                 <el-form-item label="任务描述" required>
                   <el-input
                     v-model="webTaskForm.description"
@@ -329,15 +346,15 @@
         </span>
       </template>
     </el-dialog>
-  </div>
-</template>
 
+  </BasePage>
+</template>
 <script setup>
-import { ref, reactive, onMounted, onUnmounted, nextTick, watch } from 'vue'
+import { ref, reactive, onMounted, onUnmounted, nextTick, watch, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { Cellphone, SwitchButton, VideoPlay, CircleCheckFilled, CircleCheck, Loading, DocumentAdd, UploadFilled, Search } from '@element-plus/icons-vue'
-import request from '@/utils/api' // 直接使用 request 实例
+import { Cellphone, SwitchButton, VideoPlay, CircleCheckFilled, CircleCheck, Loading, DocumentAdd, UploadFilled } from '@element-plus/icons-vue'
+import request from '@/utils/api'
 import { 
   getUiProjects, 
   runAdhocAITask, 
@@ -367,6 +384,39 @@ const currentExecutionId = ref(null)
 const appLogContainer = ref(null)
 const webLogContainer = ref(null)
 const plannedTasks = ref([])
+const currentPlan = ref('')
+
+const parsedLogs = computed(() => {
+  if (!logs.value) return []
+  return logs.value.split('\n').filter(line => line.trim()).map(line => {
+    // 匹配类似 Step 1: [Planner] ... 或 [System] ...
+    const timeMatch = line.match(/^(\d{2}:\d{2}:\d{2})/)
+    const time = timeMatch ? timeMatch[1] : ''
+    let content = time ? line.substring(time.length).trim() : line
+    
+    let type = 'default'
+    let tag = ''
+    
+    if (content.includes('[Planner]')) {
+      type = 'planner'
+      tag = '规划'
+      // 提取 Plan
+      const planMatch = content.match(/阶段目标: (.*)/)
+      if (planMatch) currentPlan.value = planMatch[1]
+    } else if (content.includes('[Critic]')) {
+      type = 'critic'
+      tag = '诊断'
+    } else if (content.includes('[Executor]')) {
+      type = 'executor'
+      tag = '执行'
+    } else if (content.includes('[System]')) {
+      type = 'system'
+      tag = '系统'
+    }
+    
+    return { time, tag, content, type }
+  })
+})
 
 // 保存用例相关
 const saveCaseDialogVisible = ref(false)
@@ -432,16 +482,19 @@ const loadModelConfigs = async () => {
 const autoSelectModel = () => {
   if (modelConfigs.value.length === 0) return
 
-  let preferredRole = activeTab.value === 'app' ? 'autoglm' : 'browser_use_text'
+  let preferredRole = activeTab.value === 'app' ? 'mobile_agent' : 'browser_use_text'
   
   const match = modelConfigs.value.find(c => c.role === preferredRole)
   if (match) {
     selectedModelConfigId.value = match.id
   } else {
-    // Fallback: 任何可用的模型
-    if (!selectedModelConfigId.value) {
-       selectedModelConfigId.value = modelConfigs.value[0].id
-    }
+    // Fallback: 如果没有专用的 mobile_agent，尝试找 autoglm 或 vision 模型
+    const fallback = modelConfigs.value.find(c => 
+      c.role === 'autoglm' || 
+      c.name.toLowerCase().includes('vision') || 
+      c.model_name.toLowerCase().includes('gpt-4o')
+    )
+    selectedModelConfigId.value = fallback ? fallback.id : modelConfigs.value[0].id
   }
 }
 
@@ -757,27 +810,6 @@ onMounted(() => {
 </script>
 
 <style lang="scss" scoped>
-.page-container {
-  padding: 20px;
-}
-
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-  
-  .page-title {
-    font-size: 20px;
-    font-weight: 600;
-    margin: 0;
-  }
-  
-  .header-controls {
-    display: flex;
-    gap: 15px;
-  }
-}
 
 .card-container {
   background-color: #fff;
@@ -798,24 +830,56 @@ onMounted(() => {
 .log-container {
   background-color: #1e1e1e;
   border-radius: 4px;
+  padding: 15px;
   height: 400px;
   overflow-y: auto;
-  padding: 15px;
-  color: #fff;
-  font-family: 'Consolas', 'Monaco', monospace;
-  
+  color: #d4d4d4;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 13px;
+  line-height: 1.6;
+
   .empty-logs {
     color: #909399;
     text-align: center;
     margin-top: 150px;
   }
-  
+
   .log-content {
     margin: 0;
     white-space: pre-wrap;
     word-wrap: break-word;
     font-size: 14px;
     line-height: 1.5;
+  }
+
+  .rich-logs {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .log-line {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+
+    .log-time { color: #858585; min-width: 60px; }
+    .log-tag {
+      padding: 0 4px;
+      border-radius: 2px;
+      font-size: 11px;
+      min-width: 40px;
+      text-align: center;
+      color: #fff;
+    }
+    
+    &.planner .log-tag { background-color: #e6a23c; }
+    &.critic .log-tag { background-color: #f56c6c; }
+    &.executor .log-tag { background-color: #409eff; }
+    &.system .log-tag { background-color: #909399; }
+    
+    &.planner .log-text { color: #e6a23c; font-weight: bold; }
+    &.critic.warning .log-text { color: #f56c6c; }
   }
 }
 
@@ -899,6 +963,13 @@ onMounted(() => {
       .task-desc {
         color: #409eff;
         font-weight: bold;
+      }
+    }
+    
+    &.failed {
+      background-color: #fef0f0;
+      .task-desc {
+        color: #f56c6c;
       }
     }
     

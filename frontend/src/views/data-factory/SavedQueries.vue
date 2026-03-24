@@ -1,123 +1,114 @@
 <template>
-  <div class="saved-queries-container">
-    <el-card shadow="hover" class="page-card">
-      <template #header>
-        <div class="card-header page-header" style="margin-bottom: 0;">
-          <h2 class="page-title">保存查询管理</h2>
-        </div>
-      </template>
-      
-      <div class="content">
-        <!-- 搜索和筛选 -->
-        <div class="search-filter">
-          <el-input
-            v-model="searchKeyword"
-            placeholder="搜索查询名称或描述"
-            clearable
-            class="search-input"
-          >
-            <template #prefix>
-              <el-icon><Search /></el-icon>
-            </template>
-          </el-input>
-          
-          <el-select
-            v-model="projectFilter"
-            placeholder="筛选项目"
-            clearable
-            class="filter-select"
-          >
-            <el-option label="全部" value="" />
-            <el-option
-              v-for="project in projects"
-              :key="project.id"
-              :label="project.name"
-              :value="project.id"
-            />
-          </el-select>
-        </div>
-        
-        <!-- 保存查询列表 -->
-        <el-table
-          v-loading="loading"
-          :data="filteredQueries"
-          style="width: 100%"
-          border
-          stripe
-          :default-sort="{ prop: 'created_at', order: 'descending' }"
+  <BasePage title="保存查询管理">
+    <div class="content">
+      <!-- 搜索和筛选 -->
+      <div class="search-filter">
+        <el-input
+          v-model="searchKeyword"
+          placeholder="搜索查询名称或描述"
+          clearable
+          class="search-input"
         >
-          <el-table-column prop="name" label="查询名称" min-width="180" />
-          <el-table-column prop="description" label="查询描述" min-width="250" />
-          <el-table-column prop="project.name" label="所属项目" width="180">
-            <template #default="scope">
-              {{ scope.row.project?.name || '无' }}
-            </template>
-          </el-table-column>
-          <el-table-column prop="natural_language" label="自然语言" min-width="200" show-overflow-tooltip />
-          <el-table-column label="SQL语句" min-width="250">
-            <template #default="scope">
-              <el-tooltip placement="top" :content="scope.row.sql || ''">
-                <span class="sql-preview">{{ (scope.row.sql || '').substring(0, 50) }}{{ (scope.row.sql || '').length > 50 ? '...' : '' }}</span>
-              </el-tooltip>
-            </template>
-          </el-table-column>
-          <el-table-column prop="created_by.username" label="创建人" width="120">
-            <template #default="scope">
-              {{ scope.row.created_by?.username || '无' }}
-            </template>
-          </el-table-column>
-          <el-table-column prop="created_at" label="创建时间" width="180" />
-          <el-table-column prop="updated_at" label="更新时间" width="180" />
-          <el-table-column label="操作" width="240" fixed="right">
-            <template #default="scope">
-              <el-button
-                type="primary"
-                size="small"
-                @click="handleViewQuery(scope.row)"
-              >
-                查看
-              </el-button>
-              <el-button
-                size="small"
-                @click="handleEditQuery(scope.row)"
-              >
-                编辑
-              </el-button>
-              <el-button
-                size="small"
-                type="success"
-                @click="handleExecuteQuery(scope.row)"
-              >
-                执行
-              </el-button>
-              <el-button
-                size="small"
-                type="danger"
-                @click="handleDeleteQuery(scope.row)"
-              >
-                删除
-              </el-button>
-            </template>
-          </el-table-column>
-        </el-table>
+          <template #prefix>
+            <el-icon><Search /></el-icon>
+          </template>
+        </el-input>
         
-        <!-- 分页 -->
-        <div class="pagination-container">
-          <el-pagination
-            v-model:current-page="currentPage"
-            v-model:page-size="pageSize"
-            :page-sizes="[10, 20, 50, 100]"
-            layout="total, sizes, prev, pager, next, jumper"
-            :total="filteredQueries.length"
-            @size-change="handleSizeChange"
-            @current-change="handleCurrentChange"
+        <el-select
+          v-model="projectFilter"
+          placeholder="筛选项目"
+          clearable
+          class="filter-select"
+        >
+          <el-option label="全部" value="" />
+          <el-option
+            v-for="project in projects"
+            :key="project.id"
+            :label="project.name"
+            :value="project.id"
           />
-        </div>
+        </el-select>
       </div>
-    </el-card>
-  </div>
+      
+      <!-- 保存查询列表 -->
+      <el-table
+        v-loading="loading"
+        :data="filteredQueries"
+        style="width: 100%"
+        border
+        stripe
+        :default-sort="{ prop: 'created_at', order: 'descending' }"
+      >
+        <el-table-column prop="name" label="查询名称" min-width="180" />
+        <el-table-column prop="description" label="查询描述" min-width="250" />
+        <el-table-column prop="project.name" label="所属项目" width="180">
+          <template #default="scope">
+            {{ scope.row.project?.name || '无' }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="natural_language" label="自然语言" min-width="200" show-overflow-tooltip />
+        <el-table-column label="SQL语句" min-width="250">
+          <template #default="scope">
+            <el-tooltip placement="top" :content="scope.row.sql || ''">
+              <span class="sql-preview">{{ (scope.row.sql || '').substring(0, 50) }}{{ (scope.row.sql || '').length > 50 ? '...' : '' }}</span>
+            </el-tooltip>
+          </template>
+        </el-table-column>
+        <el-table-column prop="created_by.username" label="创建人" width="120">
+          <template #default="scope">
+            {{ scope.row.created_by?.username || '无' }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="created_at" label="创建时间" width="180" />
+        <el-table-column prop="updated_at" label="更新时间" width="180" />
+        <el-table-column label="操作" width="240" fixed="right">
+          <template #default="scope">
+            <el-button
+              type="primary"
+              size="small"
+              @click="handleViewQuery(scope.row)"
+            >
+              查看
+            </el-button>
+            <el-button
+              size="small"
+              @click="handleEditQuery(scope.row)"
+            >
+              编辑
+            </el-button>
+            <el-button
+              size="small"
+              type="success"
+              @click="handleExecuteQuery(scope.row)"
+            >
+              执行
+            </el-button>
+            <el-button
+              size="small"
+              type="danger"
+              @click="handleDeleteQuery(scope.row)"
+            >
+              删除
+            </el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+      
+      <!-- 分页 -->
+      <div class="pagination-container">
+        <el-pagination
+          v-model:current-page="currentPage"
+          v-model:page-size="pageSize"
+          :page-sizes="[10, 20, 50, 100]"
+          layout="total, sizes, prev, pager, next, jumper"
+          :total="filteredQueries.length"
+          @size-change="handleSizeChange"
+          @current-change="handleCurrentChange"
+        />
+      </div>
+    </div>
+  </BasePage>
 </template>
-
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -245,13 +236,7 @@ onMounted(() => {
 
 <style scoped>
 /* 页面特定样式 */
-.page-container {
-  padding: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  max-width: 100%; /* 新增：覆盖全局样式的 max-width: 1600px，确保铺满 */
-}
+
 .saved-queries-container {
   width: 100%;
 }
@@ -266,11 +251,7 @@ onMounted(() => {
   align-items: center;
 }
 
-.page-title {
-  margin: 0;
-  font-size: 24px;
-  font-weight: 600;
-}
+
 
 .content {
   padding: 20px 0;

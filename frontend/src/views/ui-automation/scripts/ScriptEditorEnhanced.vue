@@ -1,14 +1,9 @@
 <template>
-  <div class="script-editor-enhanced">
-    <div class="page-header">
-      <h1 class="page-title">智能脚本生成</h1>
-      <div class="header-actions">
-        <el-select v-model="projectId" placeholder="选择项目" style="width: 200px; margin-right: 15px" @change="onProjectChange">
+  <BasePage title="智能脚本生成">
+    <template #actions><el-select v-model="projectId" placeholder="选择项目" style="width: 200px; margin-right: 15px" @change="onProjectChange">
           <el-option v-for="project in projects" :key="project.id" :label="project.name" :value="project.id" />
-        </el-select>
-      </div>
-    </div>
-
+        </el-select></template>
+    
     <div class="main-content">
       <!-- 左侧:���素库(页面树形式) -->
       <div class="left-panel">
@@ -24,6 +19,7 @@
             <template #prefix>
               <el-icon><Search /></el-icon>
             </template>
+  
           </el-input>
         </div>
 
@@ -169,9 +165,9 @@
         </el-tabs>
       </div>
     </div>
-  </div>
-</template>
 
+  </BasePage>
+</template>
 <script setup>
 import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -589,24 +585,11 @@ onMounted(async () => {
   flex-direction: column;
 }
 
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 15px 20px;
-  border-bottom: 1px solid #e6e6e6;
-  background: white;
-}
 
-.page-title {
-  margin: 0;
-  font-size: 24px;
-}
 
-.header-actions {
-  display: flex;
-  align-items: center;
-}
+
+
+
 
 .main-content {
   flex: 1;

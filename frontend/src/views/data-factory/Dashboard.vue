@@ -1,13 +1,5 @@
 <template>
-  <div class="dashboard-container">   
-    <el-card shadow="hover" class="page-card">
-      <template #header>
-        <div class="card-header page-header" style="margin-bottom: 0;">
-          <h2 class="page-title">数据工厂数据看板</h2>
-        </div>
-      </template>
-    </el-card>
-    <!-- 数据概览 -->
+  <BasePage title="数据工厂数据看板">
     <div class="stats-section">
       <el-row :gutter="20">
         <el-col :span="6">
@@ -182,9 +174,8 @@
         </el-col>
       </el-row>
     </div>
-  </div>
+  </BasePage>
 </template>
-
 <script setup>
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
@@ -268,7 +259,7 @@ const goToConfig = () => {
 }
 
 const goToProjects = () => {
-  router.push('/data-factory/projects')
+  router.push('/unified/projects')
 }
 
 const goToSavedQueries = () => {
@@ -323,12 +314,7 @@ onMounted(() => {
 
 <style scoped>
 /* 页面特定样式 */
-.page-container {
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  max-width: 100%; /* 新增：覆盖全局样式的 max-width: 1600px，确保铺满 */
-}
+
 .dashboard-container {
   width: 100%;
 }

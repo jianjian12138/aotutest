@@ -1,22 +1,17 @@
 <template>
-  <div class="page-container">
-    <div class="page-header">
-      <div class="header-content">
-        <h1 class="page-title">需求文档管理</h1>
-        <div class="header-actions">
-          <el-button type="primary" @click="openUploadDialog">
-            <el-icon><Upload /></el-icon> 上传需求文档
-          </el-button>
-          <el-button type="success" @click="openTextDialog">
-            <el-icon><EditPen /></el-icon> 录入文本需求
-          </el-button>
-        </div>
-      </div>
-    </div>
+  <BasePage title="需求文档管理">
+    <template #actions>
+      <PremiumButton type="primary" glow @click="openUploadDialog">
+        <el-icon><Upload /></el-icon> 上传需求文档
+      </PremiumButton>
+      <PremiumButton type="success" glow @click="openTextDialog">
+        <el-icon><EditPen /></el-icon> 录入文本需求
+      </PremiumButton>
+    </template>
 
-    <div class="main-content">
-      <el-card shadow="never" class="table-card">
-        <el-table :data="documents" v-loading="loading" style="width: 100%">
+    <div class="main-layout" style="width: 100%;">
+      <PremiumCard class="table-card" padding="0">
+        <el-table class="premium-table" :data="documents" v-loading="loading" style="width: 100%">
           <el-table-column prop="id" label="ID" width="80" />
           <el-table-column prop="title" label="文档标题" min-width="200">
             <template #default="scope">
@@ -54,7 +49,7 @@
           </el-table-column>
         </el-table>
         
-        <div class="pagination-container">
+        <div class="pagination-footer">
           <el-pagination
             v-model:current-page="currentPage"
             v-model:page-size="pageSize"
@@ -63,7 +58,7 @@
             @current-change="fetchDocuments"
           />
         </div>
-      </el-card>
+      </PremiumCard>
     </div>
 
     <!-- Upload Dialog -->
@@ -87,7 +82,7 @@
           >
             <el-button type="primary">点击选择文件</el-button>
             <template #tip>
-              <div class="el-upload__tip">支持 .txt, .md, .docx, .pdf 格式</div>
+              <div class="el-upload__tip">支持 .txt, .md, .docx, .pdf, .png, .jpg 格式</div>
             </template>
           </el-upload>
         </el-form-item>
@@ -113,8 +108,15 @@
         </el-descriptions>
 
         <div style="margin-top: 20px;">
-          <h4>文档内容</h4>
+          <h4>文档内容与预览</h4>
           <div class="content-box">
+             <el-image 
+                 v-if="['png', 'jpg'].includes(currentDoc?.document_type) && currentDoc?.file" 
+                 :src="currentDoc.file" 
+                 :preview-src-list="[currentDoc.file]"
+                 fit="contain"
+                 style="max-width: 100%; max-height: 400px; margin-bottom: 15px; border-radius: 4px; border: 1px solid #ebeef5; display: block;"
+             />
             <pre>{{ currentDoc?.extracted_text || '暂无内容' }}</pre>
           </div>
         </div>
@@ -132,7 +134,7 @@
         <el-empty v-else-if="currentDoc?.status === 'analyzed'" description="未识别到需求条目" />
       </div>
     </el-dialog>
-  </div>
+  </BasePage>
 </template>
 
 <script setup>
@@ -363,34 +365,10 @@ const viewDetails = async (row) => {
 </script>
 
 <style scoped>
-.page-container {
-  padding: 20px;
-}
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-}
-.header-content {
-  display: flex;
-  justify-content: space-between;
-  width: 100%;
-  align-items: center;
-}
-.page-title {
-  font-size: 20px;
-  font-weight: bold;
-}
 .document-title {
   color: #409eff;
   cursor: pointer;
   font-weight: 500;
-}
-.pagination-container {
-  margin-top: 20px;
-  display: flex;
-  justify-content: flex-end;
 }
 .content-box {
   background-color: #f5f7fa;

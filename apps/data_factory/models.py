@@ -137,3 +137,56 @@ class TableMetadata(models.Model):
         if self.schema_name:
             return f'{self.schema_name}.{self.table_name}'
         return self.table_name
+
+
+class DataSource(models.Model):
+    """通用数据源管理 (例如: MySQL, PostgreSQL, Redis, MongoDB)"""
+    project = models.ForeignKey(DataFactoryProject, on_delete=models.CASCADE, verbose_name='所属项目', null=True, blank=True)
+    name = models.CharField(max_length=255, verbose_name='数据源名称')
+    type = models.CharField(max_length=50, choices=[
+        ('mysql', 'MySQL'),
+        ('postgresql', 'PostgreSQL'),
+        ('redis', 'Redis'),
+        ('mongodb', 'MongoDB'),
+        ('oracle', 'Oracle'),
+        ('sqlserver', 'SQL Server')
+    ], default='mysql', verbose_name='数据源类型')
+    host = models.CharField(max_length=255, verbose_name='主机地址')
+    port = models.IntegerField(verbose_name='端口')
+    username = models.CharField(max_length=100, blank=True, null=True, verbose_name='用户名')
+    password = models.CharField(max_length=255, blank=True, null=True, verbose_name='密码')
+    database = models.CharField(max_length=100, blank=True, null=True, verbose_name='数据库名/索引编号')
+    extra_config = models.JSONField(default=dict, blank=True, verbose_name='其他配置')
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, verbose_name='创建人')
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='创建时间')
+    updated_at = models.DateTimeField(auto_now=True, verbose_name='更新时间')
+    is_active = models.BooleanField(default=True, verbose_name='是否活跃')
+
+    class Meta:
+        verbose_name = '通用数据源'
+        verbose_name_plural = '通用数据源'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.name} ({self.type})'
+
+
+class DataPool(models.Model):
+    """测试数据池 (存储生成的、用来进行数据驱动测试的集合)"""
+    project = models.ForeignKey(DataFactoryProject, on_delete=models.CASCADE, verbose_name='所属项目', null=True, blank=True)
+    name = models.CharField(max_length=255, verbose_name='数据池名称')
+    description = models.TextField(blank=True, null=True, verbose_name='描述')
+    schema_definition = models.JSONField(default=list, blank=True, verbose_name='数据结构定义(Schema)')
+    data = models.JSONField(default=list, blank=True, verbose_name='池数据(JSON Array)')
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, verbose_name='创建人')
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='创建时间')
+    updated_at = models.DateTimeField(auto_now=True, verbose_name='更新时间')
+
+    class Meta:
+        verbose_name = '数据池'
+        verbose_name_plural = '数据池'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return self.name
+

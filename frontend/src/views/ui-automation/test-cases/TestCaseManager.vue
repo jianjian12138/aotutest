@@ -1,9 +1,6 @@
 <template>
-  <div class="test-case-manager">
-    <div class="page-header">
-      <h1 class="page-title">测试用例管理</h1>
-      <div class="header-actions">
-        <el-select v-model="projectId" placeholder="选择项目" style="width: 200px; margin-right: 15px" @change="onProjectChange">
+  <BasePage title="测试用例管理">
+    <template #actions><el-select v-model="projectId" placeholder="选择项目" style="width: 200px; margin-right: 15px" @change="onProjectChange">
           <el-option v-for="project in projects" :key="project.id" :label="project.name" :value="project.id" />
         </el-select>
         <el-button type="warning" @click="openRecorderDialog" style="margin-right: 10px">
@@ -13,14 +10,45 @@
         <el-button type="primary" @click="showCreateDialog = true">
           <el-icon><Plus /></el-icon>
           新建测试用例
-        </el-button>
-      </div>
-    </div>
-
+        </el-button></template>
+    
     <div class="main-content">
-      <!-- 左侧：测试用例列表 -->
+      <!-- 最左侧：模块树 -->
+      <div class="module-panel">
+        <div class="panel-header" style="padding: 10px 15px;">
+          <h3 style="font-size: 15px; margin: 0;">用例模块</h3>
+          <div class="panel-actions">
+            <el-button type="primary" link size="small" @click="showCreateModuleDialog = true" title="创建模块">
+              <el-icon><FolderAdd /></el-icon>
+            </el-button>
+          </div>
+        </div>
+        <div class="module-tree-container">
+          <el-tree
+            ref="moduleTreeRef"
+            :data="moduleTreeData"
+            :props="moduleTreeProps"
+            node-key="id"
+            :expand-on-click-node="false"
+            :default-expanded-keys="expandedModuleKeys"
+            @node-click="onModuleNodeClick"
+            @node-contextmenu="onModuleNodeRightClick"
+            highlight-current
+          >
+            <template #default="{ node, data }">
+              <div class="tree-node">
+                <el-icon><Folder /></el-icon>
+                <span class="node-label" style="font-size: 14px;">{{ node.label }}</span>
+                <span v-if="data.case_count > 0" class="case-count-tag">{{ data.case_count }}</span>
+              </div>
+            </template>
+          </el-tree>
+        </div>
+      </div>
+
+      <!-- 中间：测试用例列表 -->
       <div class="left-panel">
-        <div class="panel-header">
+        <div class="panel-header" style="padding: 10px 15px;">
           <h3>测试用例列表</h3>
           <el-input
             v-model="searchKeyword"
@@ -32,6 +60,7 @@
             <template #prefix>
               <el-icon><Search /></el-icon>
             </template>
+  
           </el-input>
         </div>
 
@@ -91,6 +120,7 @@
                 <el-option label="Selenium" value="selenium" />
                 <el-option label="Airtest" value="airtest" />
                 <el-option label="Appium" value="appium" />
+                <el-option label="微信Minium" value="minium" />
               </el-select>
               <el-select 
                 v-model="selectedDevice" 
@@ -107,13 +137,21 @@
                   :value="device.id" 
                 />
               </el-select>
-              <el-select v-model="selectedBrowser" placeholder="选择浏览器" size="small" style="width: 120px; margin-right: 10px" v-show="selectedEngine !== 'appium' && selectedEngine !== 'airtest'">
+              <el-select v-model="selectedBrowser" placeholder="选择浏览器" size="small" style="width: 120px; margin-right: 10px" v-show="['playwright', 'selenium'].includes(selectedEngine)">
                 <el-option label="Chrome" value="chrome" />
                 <el-option label="Firefox" value="firefox" />
                 <el-option label="Safari" value="safari" />
                 <el-option label="Edge" value="edge" />
               </el-select>
-              <el-select v-model="headlessMode" placeholder="运行模式" size="small" style="width: 110px; margin-right: 10px" v-show="selectedEngine !== 'appium' && selectedEngine !== 'airtest'">
+              <el-select v-model="selectedH5Device" placeholder="H5设备模拟" size="small" style="width: 140px; margin-right: 10px" v-show="['playwright', 'selenium'].includes(selectedEngine)" clearable>
+                <el-option label="不模拟(桌面端)" value="" />
+                <el-option label="iPhone 12" value="iPhone 12" />
+                <el-option label="iPhone 12 Pro" value="iPhone 12 Pro" />
+                <el-option label="iPhone 13" value="iPhone 13" />
+                <el-option label="Pixel 5" value="Pixel 5" />
+                <el-option label="Galaxy S5" value="Galaxy S5" />
+              </el-select>
+              <el-select v-model="headlessMode" placeholder="运行模式" size="small" style="width: 110px; margin-right: 10px" v-show="['playwright', 'selenium'].includes(selectedEngine)">
                 <el-option label="有头模式" :value="false" />
                 <el-option label="无头模式" :value="true" />
               </el-select>
@@ -231,6 +269,16 @@
                               </el-button>
                             </el-tooltip>
                           </div>
+                        </div>
+
+                        <!-- 提取变量 -->
+                        <div v-if="element.action_type === 'getText'" class="step-param">
+                          <label>提取变量名：</label>
+                          <el-input
+                            v-model="element.extract_key"
+                            placeholder="如填入 'TOKEN'，后续可用 ${TOKEN} 获取"
+                            size="small"
+                          />
                         </div>
 
                         <!-- 等待时间 -->
@@ -562,6 +610,42 @@
       </div>
     </div>
 
+    <!-- 新建/编辑模块对话框 -->
+    <el-dialog v-model="showCreateModuleDialog" :title="editingModule ? '编辑模块' : '创建模块'" width="450px">
+      <el-form ref="moduleFormRef" :model="moduleForm" :rules="moduleRules" label-width="90px">
+        <el-form-item label="模块名称" prop="name">
+          <el-input v-model="moduleForm.name" placeholder="请输入模块名称" />
+        </el-form-item>
+        <el-form-item label="父级模块" prop="parent">
+          <el-tree-select
+            v-model="moduleForm.parent"
+            :data="moduleTreeData"
+            :props="moduleTreeProps"
+            node-key="id"
+            value-key="id"
+            placeholder="请选择父级模块(可选)"
+            check-strictly
+            clearable
+            style="width: 100%"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="showCreateModuleDialog = false">取消</el-button>
+          <el-button type="primary" @click="saveModuleForm">确定</el-button>
+        </span>
+      </template>
+    </el-dialog>
+
+    <!-- 右键菜单 -->
+    <ul v-show="showContextMenu" class="context-menu" :style="{ left: contextMenuX + 'px', top: contextMenuY + 'px' }">
+      <li @click="addTestCaseToModule">添加用例</li>
+      <li @click="addSubModule">添加子模块</li>
+      <li @click="editModuleNode">编辑</li>
+      <li @click="deleteModuleNode">删除</li>
+    </ul>
+
     <!-- 新建/编辑测试用例对话框 -->
     <el-dialog
       v-model="showCreateDialog"
@@ -571,6 +655,19 @@
       <el-form :model="testCaseForm" label-width="100px">
         <el-form-item label="用例名称" required>
           <el-input v-model="testCaseForm.name" placeholder="请输入测试用例名称" />
+        </el-form-item>
+        <el-form-item label="所属模块">
+          <el-tree-select
+            v-model="testCaseForm.module_id"
+            :data="moduleTreeData"
+            :props="moduleTreeProps"
+            node-key="id"
+            value-key="id"
+            placeholder="请选择所属模块(可选)"
+            check-strictly
+            clearable
+            style="width: 100%"
+          />
         </el-form-item>
         <el-form-item label="用例描述">
           <el-input
@@ -740,14 +837,14 @@
         </el-tab-pane>
       </el-tabs>
     </el-dialog>
-  </div>
-</template>
 
+  </BasePage>
+</template>
 <script setup>
 import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
-  Search, Plus, Edit, Delete, Check, CaretRight, ArrowUp, ArrowDown, Rank, Picture, Warning, View, ZoomIn, Refresh, WarningFilled, MagicStick, InfoFilled, VideoCamera, CopyDocument
+  Search, Plus, Edit, Delete, Check, CaretRight, ArrowUp, ArrowDown, Rank, Picture, Warning, View, ZoomIn, Refresh, WarningFilled, MagicStick, InfoFilled, VideoCamera, CopyDocument, Folder, FolderAdd
 } from '@element-plus/icons-vue'
 import draggable from 'vuedraggable'
 import { useUserStore } from '@/stores/user'
@@ -762,7 +859,11 @@ import {
   runTestCase as runTestCaseApi,
   copyTestCase as copyTestCaseApi,
   getLocatorStrategies,
-  getDeviceList
+  getDeviceList,
+  getUiTestCaseModules,
+  createUiTestCaseModule,
+  updateUiTestCaseModule,
+  deleteUiTestCaseModule
 } from '@/api/ui_automation'
 import { getVannaConfigs, generateSql } from '@/api/data-factory'
 
@@ -787,6 +888,7 @@ const isRunning = ref(false)
 const selectedEngine = ref('playwright')  // 默认使用Playwright
 const selectedBrowser = ref('chrome')  // 默认使用Chrome
 const selectedDevice = ref('') // 选中的设备
+const selectedH5Device = ref('') // 选中的H5模拟设备
 const deviceList = ref([]) // 设备列表
 const headlessMode = ref(false)  // 默认使用有头模式
 const showVariableHelper = ref(false)
@@ -825,11 +927,31 @@ const copyCommand = () => {
   })
 }
 
+// 模块树相关
+const moduleTreeData = ref([])
+const expandedModuleKeys = ref([])
+const selectedModuleId = ref(null)
+const selectedModuleNode = ref(null)
+const moduleTreeProps = { children: 'children', label: 'name' }
+const moduleTreeRef = ref(null)
+
+const showCreateModuleDialog = ref(false)
+const editingModule = ref(null)
+const moduleFormRef = ref(null)
+const moduleForm = reactive({ name: '', parent: null })
+const moduleRules = { name: [{ required: true, message: '请输入模块名称', trigger: 'blur' }] }
+
+const showContextMenu = ref(false)
+const contextMenuX = ref(0)
+const contextMenuY = ref(0)
+const rightClickedModule = ref(null)
+
 // 表单数据
 const testCaseForm = reactive({
   name: '',
   description: '',
-  priority: 'medium'
+  priority: 'medium',
+  module_id: null
 })
 
 // 计算属性
@@ -869,6 +991,19 @@ const loadProjects = async () => {
   }
 }
 
+const loadModuleTree = async () => {
+  if (!projectId.value) {
+    moduleTreeData.value = []
+    return
+  }
+  try {
+    const res = await getUiTestCaseModules({ project: projectId.value })
+    moduleTreeData.value = res.data?.results || res.data || []
+  } catch(error) {
+    console.error('获取模块树失败:', error)
+  }
+}
+
 const loadTestCases = async () => {
   if (!projectId.value) {
     testCases.value = []
@@ -876,7 +1011,11 @@ const loadTestCases = async () => {
   }
 
   try {
-    const response = await getTestCases({ project: projectId.value })
+    const params = { project: projectId.value }
+    if (selectedModuleId.value) {
+      params.module = selectedModuleId.value
+    }
+    const response = await getTestCases(params)
     testCases.value = response.data.results || response.data
   } catch (error) {
     console.error('获取测试用例失败:', error)
@@ -948,13 +1087,99 @@ const handleGenerateSqlInline = async (element) => {
 
 const onProjectChange = async () => {
   selectedTestCase.value = null
+  selectedModuleId.value = null
   currentSteps.value = []
   executionResult.value = null
 
   await Promise.all([
+    loadModuleTree(),
     loadTestCases(),
     loadElements()
   ])
+}
+
+const onModuleNodeClick = (data) => {
+  selectedModuleId.value = data.id
+  selectedModuleNode.value = data
+  loadTestCases() // reload test cases filtered by module
+}
+
+const onModuleNodeRightClick = (event, data) => {
+  event.preventDefault()
+  showContextMenu.value = false
+  rightClickedModule.value = data
+  contextMenuX.value = event.clientX
+  contextMenuY.value = event.clientY
+  showContextMenu.value = true
+  
+  const hideMenu = () => {
+    showContextMenu.value = false
+    document.removeEventListener('click', hideMenu)
+  }
+  setTimeout(() => document.addEventListener('click', hideMenu), 100)
+}
+
+const addTestCaseToModule = () => {
+  if (rightClickedModule.value) {
+    testCaseForm.module_id = rightClickedModule.value.id
+  }
+  showCreateDialog.value = true
+  editingTestCase.value = null
+  testCaseForm.name = ''
+  testCaseForm.description = ''
+  testCaseForm.priority = 'medium'
+}
+
+const addSubModule = () => {
+  editingModule.value = null
+  moduleForm.name = ''
+  moduleForm.parent = rightClickedModule.value ? rightClickedModule.value.id : null
+  showCreateModuleDialog.value = true
+}
+
+const editModuleNode = () => {
+  editingModule.value = rightClickedModule.value
+  moduleForm.name = rightClickedModule.value.name
+  moduleForm.parent = rightClickedModule.value.parent || null
+  showCreateModuleDialog.value = true
+}
+
+const deleteModuleNode = async () => {
+  if (!rightClickedModule.value) return
+  try {
+    await ElMessageBox.confirm(`确定删除模块 "${rightClickedModule.value.name}" 吗？该目录下的所有用例及子模块将解除关联或被删除。`, '提示', { type: 'warning' })
+    await deleteUiTestCaseModule(rightClickedModule.value.id)
+    ElMessage.success('删除成功')
+    if (selectedModuleId.value === rightClickedModule.value.id) {
+      selectedModuleId.value = null
+      loadTestCases()
+    }
+    loadModuleTree()
+  } catch(e) {}
+}
+
+const saveModuleForm = async () => {
+  if (!moduleFormRef.value) return
+  const valid = await moduleFormRef.value.validate()
+  if (!valid) return
+  try {
+    const data = {
+      name: moduleForm.name,
+      parent: moduleForm.parent || null,
+      project: projectId.value
+    }
+    if (editingModule.value) {
+      await updateUiTestCaseModule(editingModule.value.id, data)
+      ElMessage.success('修改成功')
+    } else {
+      await createUiTestCaseModule(data)
+      ElMessage.success('创建成功')
+    }
+    showCreateModuleDialog.value = false
+    loadModuleTree()
+  } catch(e) {
+    ElMessage.error(editingModule.value ? '修改失败' : '创建失败')
+  }
 }
 
 const selectTestCase = (testCase) => {
@@ -1090,9 +1315,12 @@ const runTestCase = async (testCase) => {
       const device = deviceList.value.find(d => d.id === selectedDevice.value)
       const deviceName = device ? `${device.name} (${device.ip})` : '未选择设备'
       message += `, 设备: ${deviceName})`
+    } else if (selectedEngine.value === 'minium') {
+      message += `)`
     } else {
       const modeText = headlessMode.value ? '无头模式' : '有头模式'
-      message += `, 浏览器: ${selectedBrowser.value.toUpperCase()}, ${modeText})`
+      const h5Text = selectedH5Device.value ? `, 设备模拟: ${selectedH5Device.value}` : ''
+      message += `, 浏览器: ${selectedBrowser.value.toUpperCase()}, ${modeText}${h5Text})`
     }
     
     ElMessage.info(message)
@@ -1102,7 +1330,8 @@ const runTestCase = async (testCase) => {
       engine: selectedEngine.value,
       browser: selectedBrowser.value,
       headless: headlessMode.value,
-      device_id: selectedDevice.value
+      device_id: selectedDevice.value,
+      device_name: selectedH5Device.value
     })
 
     executionResult.value = response.data
@@ -1160,6 +1389,7 @@ const editTestCase = (testCase) => {
   testCaseForm.name = testCase.name
   testCaseForm.description = testCase.description || ''
   testCaseForm.priority = testCase.priority || 'medium'
+  testCaseForm.module_id = testCase.module ? testCase.module.id : (testCase.module_id || null)
   showCreateDialog.value = true
 }
 
@@ -1312,6 +1542,7 @@ const saveTestCaseForm = async () => {
       name: testCaseForm.name,
       description: testCaseForm.description,
       priority: testCaseForm.priority,
+      module_id: testCaseForm.module_id || null,
       project_id: projectId.value,
       steps: []
     }
@@ -1358,6 +1589,7 @@ const resetForm = () => {
   testCaseForm.name = ''
   testCaseForm.description = ''
   testCaseForm.priority = 'medium'
+  testCaseForm.module_id = null
 }
 
 // 辅助方法
@@ -1522,47 +1754,86 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.page-container {
-  padding: 0;
-  display: flex;
-  flex-direction: column;
 
-  max-width: 100%; /* 新增：覆盖全局样式的 max-width: 1600px，确保铺满 */
-}
 .test-case-manager {
   height: 100vh;
   display: flex;
   flex-direction: column;
 }
 
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 15px 20px;
-  border-bottom: 1px solid #e6e6e6;
-  background: white;
-}
 
-.page-title {
-  margin: 0;
-  font-size: 24px;
-}
 
-.header-actions {
-  display: flex;
-  align-items: center;
-}
+
+
+
 
 .main-content {
   flex: 1;
   display: flex;
   overflow: hidden;
+  gap: 15px;
+}
+
+.module-panel {
+  width: 250px;
+  border: 1px solid #e6e6e6;
+  border-radius: 6px;
+  background: white;
+  display: flex;
+  flex-direction: column;
+}
+
+.module-tree-container {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px;
+}
+
+.tree-node {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.case-count-tag {
+  background: #f0f2f5;
+  color: #909399;
+  font-size: 12px;
+  padding: 0 6px;
+  border-radius: 10px;
+  margin-left: auto;
+}
+
+.context-menu {
+  position: fixed;
+  background: white;
+  border: 1px solid #e4e7ed;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
+  padding: 5px 0;
+  margin: 0;
+  list-style: none;
+  z-index: 3000;
+  min-width: 120px;
+}
+
+.context-menu li {
+  padding: 8px 15px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #606266;
+}
+
+.context-menu li:hover {
+  background-color: #f5f7fa;
+  color: #409eff;
 }
 
 .left-panel {
-  width: 350px;
-  border-right: 1px solid #e6e6e6;
+  width: 320px;
+  border: 1px solid #e6e6e6;
+  border-radius: 6px;
   background: white;
   display: flex;
   flex-direction: column;
@@ -1652,6 +1923,8 @@ onMounted(async () => {
   background: white;
   display: flex;
   flex-direction: column;
+  border: 1px solid #e6e6e6;
+  border-radius: 6px;
 }
 
 .test-case-detail {

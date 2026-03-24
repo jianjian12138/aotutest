@@ -1,15 +1,11 @@
 <template>
-  <div class="scan-tasks">
-    <el-card shadow="hover">
-      <template #header>
-        <div class="card-header page-header" style="margin-bottom: 0;">
-          <h2 class="page-title">扫描任务管理</h2>
-          <el-button type="primary" @click="handleCreateTask">
-            <el-icon><Plus /></el-icon>
-            新建扫描任务
-          </el-button>
-        </div>
-      </template>
+  <BasePage title="扫描任务管理">
+    <template #actions>
+      <el-button type="primary" @click="handleCreateTask">
+        <el-icon><Plus /></el-icon>
+        新建任务
+      </el-button>
+    </template>
       
       <!-- 搜索和筛选 -->
       <div class="search-filter">
@@ -106,7 +102,6 @@
           @current-change="handleCurrentChange"
         />
       </div>
-    </el-card>
     
     <!-- 新建任务对话框 -->
     <el-dialog
@@ -174,9 +169,8 @@
         </span>
       </template>
     </el-dialog>
-  </div>
+  </BasePage>
 </template>
-
 <script setup>
 import { ref, reactive, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
@@ -216,7 +210,7 @@ const currentTask = ref({})
 const fetchConfigs = async () => {
   try {
     const response = await getSecurityConfigs({ page_size: 100 })
-    configs.value = response.results || []
+    configs.value = response.data?.results || []
   } catch (error) {
     console.error('获取配置列表失败:', error)
   }
@@ -233,8 +227,8 @@ const fetchData = async () => {
       is_active: statusFilter.value
     }
     const response = await getSecurityProjects(params)
-    scanTasks.value = response.results
-    pagination.total = response.count
+    scanTasks.value = response.data?.results || []
+    pagination.total = response.data?.count || 0
   } catch (error) {
     ElMessage.error('获取扫描任务失败')
   } finally {

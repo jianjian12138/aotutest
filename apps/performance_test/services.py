@@ -174,11 +174,40 @@ class LocustService:
         ).order_by('order')
         
         script = [
-            "from locust import HttpUser, task, between",
             "import json",
+            "import time",
+            "import re",
+            "from locust import HttpUser, task, between, events",
+            "from faker import Faker",
+            "",
+            "fake = Faker('zh_CN')",
+            "",
+            "def resolve_vars(text):",
+            "    if not isinstance(text, str): return text",
+            "    # Resolve dynamic variables",
+            "    def repl(match):",
+            "        var_name = match.group(1).strip()",
+            "        if var_name == '$timestamp': return str(int(time.time() * 1000))",
+            "        if var_name.startswith('$faker.'):",
+            "            method_name = var_name[7:]",
+            "            if hasattr(fake, method_name):",
+            "                try:",
+            "                    return str(getattr(fake, method_name)())",
+            "                except: pass",
+            "        return match.group(0)",
+            "    return re.sub(r'\\{\\{\\s*([^}]+)\\s*\\}\\}', repl, text)",
+            "",
+            "def resolve_dict(d):",
+            "    if isinstance(d, dict):",
+            "        return {k: resolve_dict(v) for k, v in d.items()}",
+            "    elif isinstance(d, list):",
+            "        return [resolve_dict(i) for i in d]",
+            "    elif isinstance(d, str):",
+            "        return resolve_vars(d)",
+            "    return d",
             "",
             "class WebsiteUser(HttpUser):",
-            "    wait_time = between(1, 5)",
+            "    wait_time = between(1, 5) # Default wait time, can be overridden per task",
             ""
         ]
         
@@ -189,23 +218,84 @@ class LocustService:
             headers = req.headers or {}
             params = req.params or {}
             body = req.body or {}
+            assertions = req.assertions or []
             
-            # Simple variable replacement (needs improvement for real usage)
-            url = url.replace('{', '{{').replace('}', '}}')
+            # Escape strings for script generation
+            url_str = url.replace("'", "\\'")
             
             task_def = [
                 f"    @task({req_link.weight})",
                 f"    def task_{idx}(self):",
-                f"        self.client.{method}(",
-                f"            url='{url}',",
-                f"            headers={json.dumps(headers)},",
-                f"            params={json.dumps(params)},",
+                f"        url = resolve_vars('{url_str}')",
+                f"        headers = resolve_dict({json.dumps(headers)})",
+                f"        params = resolve_dict({json.dumps(params)})",
             ]
             
-            if method in ['post', 'put', 'patch']:
-                task_def.append(f"            json={json.dumps(body)},")
+            # format headers properly
+            task_def.append("        # Format headers map")
+            task_def.append("        final_headers = {}")
+            task_def.append("        if isinstance(headers, list):")
+            task_def.append("            for h in headers:")
+            task_def.append("                if isinstance(h, dict) and h.get('enabled', True) and h.get('key'):")
+            task_def.append("                    final_headers[h['key']] = h.get('value', '')")
+            task_def.append("        else: final_headers = headers")
+            
+            task_def.append("        # Format params map")
+            task_def.append("        final_params = {}")
+            task_def.append("        if isinstance(params, list):")
+            task_def.append("            for p in params:")
+            task_def.append("                if isinstance(p, dict) and p.get('enabled', True) and p.get('key'):")
+            task_def.append("                    final_params[p['key']] = p.get('value', '')")
+            task_def.append("        else: final_params = params")
+            
+            req_kwargs = "url=url, headers=final_headers, params=final_params"
+            
+            if method in ['post', 'put', 'patch'] and body:
+                if body.get('type') == 'json':
+                    task_def.append(f"        req_body = resolve_dict({json.dumps(body.get('data', {}))})")
+                    req_kwargs += ", json=req_body"
+                else:
+                    task_def.append(f"        req_body = resolve_vars({json.dumps(body.get('data', ''))})")
+                    req_kwargs += ", data=req_body"
+            
+            task_def.append(f"        with self.client.{method}({req_kwargs}, catch_response=True) as response:")
+            task_def.append("            try:")
+            
+            # Generate assertions
+            if assertions:
+                for a_idx, assertion in enumerate(assertions):
+                    a_type = assertion.get('type')
+                    expected = assertion.get('expected')
+                    
+                    if a_type == 'status_code':
+                        task_def.append(f"                if str(response.status_code) != '{expected}':")
+                        task_def.append(f"                    response.failure(f'Status {response.status_code} != {expected}')")
+                        task_def.append(f"                    return")
+                        
+                    elif a_type == 'contains':
+                        task_def.append(f"                if '{expected}' not in response.text:")
+                        task_def.append(f"                    response.failure('Text not found in response')")
+                        task_def.append(f"                    return")
+                        
+                    elif a_type == 'json_path':
+                        json_path = assertion.get('json_path', '')
+                        expected_val = assertion.get('expected')
+                        task_def.append("                try:")
+                        task_def.append("                    resp_json = response.json()")
+                        task_def.append(f"                    from jsonpath_ng import parse")
+                        task_def.append(f"                    matches = parse('{json_path}').find(resp_json)")
+                        task_def.append(f"                    actual = matches[0].value if matches else None")
+                        task_def.append(f"                    if str(actual) != str('{expected_val}'):")
+                        task_def.append(f"                        response.failure(f'JSONPath {json_path} value {{actual}} != {expected_val}')")
+                        task_def.append(f"                        return")
+                        task_def.append("                except Exception as e:")
+                        task_def.append("                    response.failure(f'JSON parsing/path failed: {e}')")
+                        task_def.append("                    return")
+                        
+            task_def.append("                response.success()")
+            task_def.append("            except Exception as assertion_err:")
+            task_def.append("                response.failure(str(assertion_err))")
                 
-            task_def.append("        )")
             script.extend(task_def)
             script.append("")
             

@@ -1,34 +1,62 @@
 <template>
-  <div class="page-container">
-    <div class="page-header">
-      <h1 class="page-title">测试用例</h1>
-      <div class="header-actions">
-        <el-button 
-          v-if="selectedTestCases.length > 0" 
-          type="danger" 
-          @click="batchDeleteTestCases"
-          :disabled="isDeleting">
-          <el-icon><Delete /></el-icon>
-          批量删除 ({{ selectedTestCases.length }})
-        </el-button>
-        <el-button type="success" @click="exportToExcel">
-          <el-icon><Download /></el-icon>
-          导出Excel
-        </el-button>
-        <el-button type="warning" @click="handleImport">
-          <el-icon><Upload /></el-icon>
-          导入用例
-        </el-button>
-        <el-button type="primary" @click="$router.push('/ai-generation/testcases/create')">
-          <el-icon><Plus /></el-icon>
-          新建用例
-        </el-button>
-      </div>
-    </div>
-    
-    <div class="card-container">
+  <BasePage title="测试用例">
+    <template #actions>
+      <PremiumButton 
+        v-if="selectedTestCases.length > 0" 
+        type="danger" 
+        @click="batchDeleteTestCases"
+        :disabled="isDeleting">
+        <el-icon><Delete /></el-icon>
+        批量删除 ({{ selectedTestCases.length }})
+      </PremiumButton>
+      <PremiumButton type="success" @click="exportToExcel">
+        <el-icon><Download /></el-icon>
+        导出Excel
+      </PremiumButton>
+      <PremiumButton type="warning" @click="handleImport">
+        <el-icon><Upload /></el-icon>
+        导入用例
+      </PremiumButton>
+      <PremiumButton type="primary" glow @click="$router.push('/ai-generation/testcases/create')">
+        <el-icon><Plus /></el-icon>
+        新建用例
+      </PremiumButton>
+    </template>
+    <div class="main-layout" style="display: flex; gap: 20px; align-items: flex-start;">
+      <!-- 最左侧：模块树 -->
+      <PremiumCard class="module-panel" padding="16px" style="width: 280px; flex-shrink: 0; min-height: 500px">
+        <div class="sidebar-header" style="margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center;">
+          <h3 style="margin: 0; font-size: 16px;">用例模块</h3>
+          <el-button type="primary" link size="small" @click="showCreateModuleDialog = true" title="创建模块">
+            <el-icon><FolderAdd /></el-icon>
+          </el-button>
+        </div>
+        <div class="module-tree-container" style="max-height: calc(100vh - 200px); overflow-y: auto;">
+          <el-tree
+            ref="moduleTreeRef"
+            :data="moduleTreeData"
+            :props="moduleTreeProps"
+            node-key="id"
+            :expand-on-click-node="false"
+            :default-expanded-keys="expandedModuleKeys"
+            @node-click="onModuleNodeClick"
+            @node-contextmenu="onModuleNodeRightClick"
+            highlight-current
+          >
+            <template #default="{ node, data }">
+              <div class="tree-node" style="display: flex; align-items: center; gap: 8px; width: 100%">
+                <el-icon><Folder /></el-icon>
+                <span class="node-label" style="font-size: 14px;">{{ node.label }}</span>
+                <span v-if="data.case_count > 0" style="background: #f0f2f5; color: #909399; font-size: 12px; padding: 0 6px; border-radius: 10px; margin-left: auto;">{{ data.case_count }}</span>
+              </div>
+            </template>
+          </el-tree>
+        </div>
+      </PremiumCard>
+
+    <div class="testcase-list-wrapper" style="flex: 1; min-width: 0;">
       <!-- 搜索和筛选 -->
-      <div class="filter-bar">
+      <PremiumCard class="filter-card" padding="16px 24px">
         <el-row :gutter="20">
           <el-col :span="5">
             <el-input
@@ -68,10 +96,11 @@
             </el-select>
           </el-col>
         </el-row>
-      </div>
+      </PremiumCard>
       
       <!-- 测试用例表格 -->
-      <el-table 
+      <PremiumCard class="table-card" padding="0">
+        <el-table class="premium-table" 
         :data="testcases" 
         v-loading="loading" 
         style="width: 100%"
@@ -133,16 +162,19 @@
             {{ formatDate(row.created_at) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="150" fixed="right">
+        <el-table-column label="操作" width="180" fixed="right">
           <template #default="{ row }">
-            <el-button size="small" @click="editTestCase(row)">编辑</el-button>
-            <el-button size="small" type="danger" @click="deleteTestCase(row)">删除</el-button>
+            <div class="action-buttons">
+              <el-button link type="primary" @click="editTestCase(row)">编辑</el-button>
+              <el-divider direction="vertical" />
+              <el-button link type="danger" @click="deleteTestCase(row)">删除</el-button>
+            </div>
           </template>
         </el-table-column>
       </el-table>
       
       <!-- 分页 -->
-      <div class="pagination-container">
+        <div class="pagination-footer">
         <el-pagination
           v-model:current-page="currentPage"
           v-model:page-size="pageSize"
@@ -152,11 +184,49 @@
           @size-change="handleSizeChange"
           @current-change="handleCurrentChange"
         />
-      </div>
+        </div>
+      </PremiumCard>
+    </div>
     </div>
 
+    <!-- 新建/编辑模块对话框 -->
+    <el-dialog v-model="showCreateModuleDialog" :title="editingModule ? '编辑模块' : '创建模块'" width="450px" class="premium-dialog">
+      <el-form ref="moduleFormRef" :model="moduleForm" :rules="moduleRules" label-width="90px">
+        <el-form-item label="模块名称" prop="name">
+          <el-input v-model="moduleForm.name" placeholder="请输入模块名称" />
+        </el-form-item>
+        <el-form-item label="父级模块" prop="parent">
+          <el-tree-select
+            v-model="moduleForm.parent"
+            :data="moduleTreeData"
+            :props="moduleTreeProps"
+            node-key="id"
+            value-key="id"
+            placeholder="请选择父级模块(可选)"
+            check-strictly
+            clearable
+            style="width: 100%"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="showCreateModuleDialog = false">取消</el-button>
+          <el-button type="primary" @click="saveModuleForm">确定</el-button>
+        </span>
+      </template>
+    </el-dialog>
+
+    <!-- 右键菜单 -->
+    <ul v-show="showContextMenu" class="context-menu" :style="{ left: contextMenuX + 'px', top: contextMenuY + 'px', position: 'fixed', background: 'white', border: '1px solid #e4e7ed', boxShadow: '0 2px 12px 0 rgba(0,0,0,0.1)', borderRadius: '4px', padding: '5px 0', margin: '0', listStyle: 'none', zIndex: 3000, minWidth: '120px' }">
+      <li class="context-menu-item" @click="addTestCaseToModule" style="padding: 8px 15px; cursor: pointer; fontSize: 14px; color: #606266;">添加用例</li>
+      <li class="context-menu-item" @click="addSubModule" style="padding: 8px 15px; cursor: pointer; fontSize: 14px; color: #606266;">添加子模块</li>
+      <li class="context-menu-item" @click="editModuleNode" style="padding: 8px 15px; cursor: pointer; fontSize: 14px; color: #606266;">编辑</li>
+      <li class="context-menu-item" @click="deleteModuleNode" style="padding: 8px 15px; cursor: pointer; fontSize: 14px; color: #606266;">删除</li>
+    </ul>
+
     <!-- 导入对话框 -->
-    <el-dialog v-model="importDialogVisible" title="导入测试用例" width="500px">
+    <el-dialog v-model="importDialogVisible" title="导入测试用例" width="500px" class="premium-dialog">
       <el-form :model="importForm" label-width="100px">
         <el-form-item label="目标项目" required>
           <el-select v-model="importForm.projectId" placeholder="请选择项目" style="width: 100%">
@@ -200,22 +270,22 @@
         </el-form-item>
       </el-form>
       <template #footer>
-        <span class="dialog-footer">
+        <div class="dialog-footer">
           <el-button @click="importDialogVisible = false">取消</el-button>
-          <el-button type="primary" @click="submitImport" :loading="isImporting">
+          <PremiumButton type="primary" @click="submitImport" :loading="isImporting" glow>
             导入
-          </el-button>
-        </span>
+          </PremiumButton>
+        </div>
       </template>
     </el-dialog>
-  </div>
-</template>
 
+  </BasePage>
+</template>
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox, ElUpload } from 'element-plus'
-import { Plus, Search, Download, Delete, Upload } from '@element-plus/icons-vue'
+import { Plus, Search, Download, Delete, Upload, Folder, FolderAdd } from '@element-plus/icons-vue'
 import api from '@/utils/api'
 import dayjs from 'dayjs'
 import * as XLSX from 'xlsx'
@@ -233,6 +303,123 @@ const priorityFilter = ref('')
 const statusFilter = ref('')
 const selectedTestCases = ref([])
 const isDeleting = ref(false)
+
+// Module variables
+const moduleTreeData = ref([])
+const expandedModuleKeys = ref([])
+const selectedModuleId = ref(null)
+const selectedModuleNode = ref(null)
+const moduleTreeProps = { children: 'children', label: 'name' }
+const moduleTreeRef = ref(null)
+
+const showCreateModuleDialog = ref(false)
+const editingModule = ref(null)
+const moduleFormRef = ref(null)
+const moduleForm = reactive({ name: '', parent: null })
+const moduleRules = { name: [{ required: true, message: '请输入模块名称', trigger: 'blur' }] }
+
+const showContextMenu = ref(false)
+const contextMenuX = ref(0)
+const contextMenuY = ref(0)
+const rightClickedModule = ref(null)
+
+const getTestCaseModules = (params) => api.get('/testcases/modules/tree/', { params })
+const createTestCaseModule = (data) => api.post('/testcases/modules/', data)
+const updateTestCaseModule = (id, data) => api.patch(`/testcases/modules/${id}/`, data)
+const deleteTestCaseModule = (id) => api.delete(`/testcases/modules/${id}/`)
+
+const loadModuleTree = async () => {
+  if (!projectFilter.value && projects.value.length > 0) {
+    projectFilter.value = projects.value[0].id
+  }
+  if (!projectFilter.value) {
+    moduleTreeData.value = []
+    return
+  }
+  try {
+    const res = await getTestCaseModules({ project: projectFilter.value })
+    moduleTreeData.value = res.data?.results || res.data || []
+  } catch(error) {
+    console.error('获取模块树失败:', error)
+  }
+}
+
+const onModuleNodeClick = (data) => {
+  selectedModuleId.value = data.id
+  selectedModuleNode.value = data
+  fetchTestCases()
+}
+
+const onModuleNodeRightClick = (event, data) => {
+  event.preventDefault()
+  showContextMenu.value = false
+  rightClickedModule.value = data
+  contextMenuX.value = event.clientX
+  contextMenuY.value = event.clientY
+  showContextMenu.value = true
+  
+  const hideMenu = () => {
+    showContextMenu.value = false
+    document.removeEventListener('click', hideMenu)
+  }
+  setTimeout(() => document.addEventListener('click', hideMenu), 100)
+}
+
+const addTestCaseToModule = () => {
+  router.push({ path: '/ai-generation/testcases/create', query: { module_id: rightClickedModule.value.id } })
+}
+
+const addSubModule = () => {
+  editingModule.value = null
+  moduleForm.name = ''
+  moduleForm.parent = rightClickedModule.value ? rightClickedModule.value.id : null
+  showCreateModuleDialog.value = true
+}
+
+const editModuleNode = () => {
+  editingModule.value = rightClickedModule.value
+  moduleForm.name = rightClickedModule.value.name
+  moduleForm.parent = rightClickedModule.value.parent || null
+  showCreateModuleDialog.value = true
+}
+
+const deleteModuleNode = async () => {
+  if (!rightClickedModule.value) return
+  try {
+    await ElMessageBox.confirm(`确定删除模块 "${rightClickedModule.value.name}" 吗？该目录下的所有用例及子模块将解除关联或被删除。`, '提示', { type: 'warning' })
+    await deleteTestCaseModule(rightClickedModule.value.id)
+    ElMessage.success('删除成功')
+    if (selectedModuleId.value === rightClickedModule.value.id) {
+      selectedModuleId.value = null
+      fetchTestCases()
+    }
+    loadModuleTree()
+  } catch(e) {}
+}
+
+const saveModuleForm = async () => {
+  if (!moduleFormRef.value) return
+  const valid = await moduleFormRef.value.validate()
+  if (!valid) return
+  try {
+    const data = {
+      name: moduleForm.name,
+      parent: moduleForm.parent || null,
+      project: projectFilter.value
+    }
+    if (editingModule.value) {
+      await updateTestCaseModule(editingModule.value.id, data)
+      ElMessage.success('修改成功')
+    } else {
+      await createTestCaseModule(data)
+      ElMessage.success('创建成功')
+    }
+    showCreateModuleDialog.value = false
+    loadModuleTree()
+  } catch(e) {
+    ElMessage.error(editingModule.value ? '修改失败' : '创建失败')
+  }
+}
 
 // Import Dialog
 const importDialogVisible = ref(false)
@@ -300,6 +487,9 @@ const fetchTestCases = async () => {
       priority: priorityFilter.value,
       status: statusFilter.value
     }
+    if (selectedModuleId.value) {
+      params.module = selectedModuleId.value
+    }
     const response = await api.get('/testcases/', { params })
     testcases.value = response.data.results || []
     total.value = response.data.count || 0
@@ -317,6 +507,8 @@ const handleSearch = () => {
 
 const handleFilter = () => {
   currentPage.value = 1
+  selectedModuleId.value = null
+  loadModuleTree()
   fetchTestCases()
 }
 
@@ -595,6 +787,11 @@ const fetchProjects = async () => {
   try {
     const response = await api.get('/projects/')
     projects.value = response.data.results || response.data || []
+    if (!projectFilter.value && projects.value.length > 0) {
+      projectFilter.value = projects.value[0].id
+      loadModuleTree()
+      fetchTestCases()
+    }
   } catch (error) {
     ElMessage.error('获取项目列表失败')
   }
@@ -602,11 +799,56 @@ const fetchProjects = async () => {
 
 onMounted(() => {
   fetchProjects()
-  fetchTestCases()
+  if (projectFilter.value) {
+    fetchTestCases()
+  }
 })
 </script>
 
 <style lang="scss" scoped>
+
+.testcase-list-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.filter-card {
+  margin-bottom: 8px;
+}
+
+.text-right {
+  text-align: right;
+}
+
+.total-text {
+  font-size: 14px;
+  color: var(--slate-500);
+}
+
+.pagination-footer {
+  padding: 24px;
+  display: flex;
+  justify-content: flex-end;
+  border-top: 1px solid var(--border-light);
+  background: var(--slate-50);
+}
+
+.dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+:deep(.premium-table) {
+  .el-table__row {
+    transition: background-color 0.3s;
+    &:hover {
+      background-color: var(--slate-50) !important;
+    }
+  }
+}
+
 .priority-tag {
   &.low { color: #67c23a; }
   &.medium { color: #e6a23c; }
@@ -614,43 +856,12 @@ onMounted(() => {
   &.critical { color: #f56c6c; font-weight: bold; }
 }
 /* 页面特定样式 */
-.page-container {
-  padding: 0;
-  display: flex;
-  flex-direction: column;
 
-  max-width: 100%; /* 新增：覆盖全局样式的 max-width: 1600px，确保铺满 */
-}
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 15px 20px;
-  border-bottom: 1px solid #e6e6e6;
-  background: white;
-  flex-shrink: 0;
-}
 
-.page-title {
-  margin: 0;
-  font-size: 24px;
-  font-weight: 600;
-  color: #303133;
-  position: relative;
-  padding-left: 16px;
-}
 
-.page-title::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 4px;
-  height: 20px;
-  background: var(--primary-color, #409eff);
-  border-radius: 2px;
-}
+
+
+
 .version-tags {
   display: flex;
   flex-wrap: wrap;

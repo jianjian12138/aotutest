@@ -1,19 +1,14 @@
 <template>
-  <div class="agent-management">
-    <div class="page-header">
-      <h1 class="page-title">节点管理</h1>
-      <div class="header-actions">
-        <el-button type="primary" @click="loadNodes">
+  <BasePage title="节点管理">
+    <template #actions><el-button type="primary" @click="loadNodes">
           <el-icon><Refresh /></el-icon>
           刷新列表
         </el-button>
         <el-button type="success" @click="showGuideDialog = true">
           <el-icon><InfoFilled /></el-icon>
           接入指南
-        </el-button>
-      </div>
-    </div>
-
+        </el-button></template>
+    
     <div class="main-content">
       <el-card class="node-list-card">
         <el-table
@@ -29,6 +24,7 @@
                 {{ row.node_type === 'recorder' ? '录制节点' : '执行节点' }}
               </el-tag>
             </template>
+  
           </el-table-column>
           <el-table-column prop="status" label="状态" width="100">
             <template #default="{ row }">
@@ -124,9 +120,9 @@
         </span>
       </template>
     </el-dialog>
-  </div>
+  
+  </BasePage>
 </template>
-
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -268,18 +264,9 @@ onMounted(() => {
   flex-direction: column;
 }
 
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-}
 
-.page-title {
-  margin: 0;
-  font-size: 24px;
-  color: #303133;
-}
+
+
 
 .main-content {
   flex: 1;

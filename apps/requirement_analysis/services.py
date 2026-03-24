@@ -82,6 +82,9 @@ class DocumentProcessor:
             return cls.extract_text_from_docx(file_path)
         elif document.document_type == 'txt':
             return cls.extract_text_from_txt(file_path)
+        elif document.document_type in ['png', 'jpg']:
+            from .ocr_service import OCRService
+            return OCRService.extract_text_from_image(file_path)
         else:
             return "不支持的文档类型"
 
@@ -236,16 +239,43 @@ class AIService:
         
         # 1. 准备 RAG 上下文
         context = ""
+        context_sources = []
         if knowledge_base_ids:
-            from apps.assistant.models import KnowledgeDocument
+            from apps.assistant.models import KnowledgeDocument, DocumentChunk
             try:
-                # 简单实现：获取文档的前 2000 个字符作为上下文
-                docs = KnowledgeDocument.objects.filter(id__in=knowledge_base_ids)
-                for doc in docs:
-                    context += f"\n--- 参考文档: {doc.title} ---\n{doc.content[:2000]}...\n"
-                logger.info(f"已加载 {len(docs)} 个知识库文档作为上下文")
+                # 简单关键词匹配检索，查找相关的各个切片 (Chunks)
+                logger.info(f"开始 RAG 检索，知识库 IDs: {knowledge_base_ids}")
+                chunks = DocumentChunk.objects.filter(document_id__in=knowledge_base_ids)
+                
+                # 简单的 TF-IDF 替代：统计需求名和描述在 Chunk 中的出现频次
+                req_text = f"{requirement.requirement_name} {requirement.description}"
+                import re
+                words = [w for w in re.split(r'\W+', req_text) if len(w) > 1]
+                
+                scored_chunks = []
+                for chunk in chunks:
+                    score = sum(1 for w in words if w.lower() in chunk.content.lower())
+                    if score > 0:
+                        scored_chunks.append((score, chunk))
+                
+                # 按相关度排序并取前 3 个最相关的片段
+                scored_chunks.sort(key=lambda x: x[0], reverse=True)
+                top_chunks = scored_chunks[:3]
+                
+                for score, chunk in top_chunks:
+                    context += f"\n--- 引用自: {chunk.document.title} (相关度: {score}) ---\n{chunk.content}\n"
+                    context_sources.append(chunk.document.title)
+                    
+                if not top_chunks:
+                    # 如果没有匹配的切片，回退到原逻辑加载文档开头
+                    docs = KnowledgeDocument.objects.filter(id__in=knowledge_base_ids)
+                    for doc in docs:
+                        context += f"\n--- 参考文档: {doc.title} ---\n{doc.content[:1000]}...\n"
+                        context_sources.append(doc.title)
+                        
+                logger.info(f"RAG 检索完成，提取了 {len(top_chunks)} 个相关片段作为上下文")
             except Exception as e:
-                logger.error(f"加载知识库文档失败: {e}")
+                logger.error(f"加载知识库文档切片失败: {e}")
 
         # 2. 准备提示词模板
         prompt_template = ""
@@ -258,6 +288,9 @@ class AIService:
             except Exception as e:
                 logger.error(f"加载提示词配置失败: {e}")
         
+        # 引入提示词配置
+        from apps.requirement_analysis.prompts import DEFAULT_TEST_CASE_PROMPT
+        
         # 模拟构建最终 Prompt (实际场景中会发给 LLM)
         full_prompt = f"""
         基于以下需求生成测试用例:
@@ -266,7 +299,7 @@ class AIService:
         
         {context}
         
-        {prompt_template if prompt_template else "请生成覆盖正常、异常和边界场景的测试用例。"}
+        {prompt_template if prompt_template else DEFAULT_TEST_CASE_PROMPT}
         """
         
         # 生成唯一case_id的辅助函数
@@ -295,8 +328,11 @@ class AIService:
             
             # 增强模拟生成逻辑：如果使用了知识库，在用例中体现
             rag_note = ""
-            if knowledge_base_ids:
-                rag_note = " [基于知识库增强]"
+            rag_steps = ""
+            if knowledge_base_ids and context_sources:
+                sources_str = ", ".join(set(context_sources[:2]))
+                rag_note = f" [基于知识库 {sources_str} 增强]"
+                rag_steps = f"\n*参考上下文中 {sources_str} 的特定规则进行验证*"
             
             # 根据需求类型生成不同的测试用例
             if "登录" in requirement.requirement_name:
@@ -305,7 +341,7 @@ class AIService:
                     "title": f"验证用户使用有效凭证登录系统的认证流程和权限获取{rag_note}",
                     "priority": test_priority,
                     "precondition": "系统正常运行，测试用户账号已创建",
-                    "test_steps": "1. 打开登录页面\n2. 输入有效的用户名和密码\n3. 点击登录按钮\n4. 检查登录结果和页面跳转",
+                    "test_steps": "执行以下 Maestro UI 自动化脚本:\n```yaml\nappId: com.example.app\n---\n- launchApp\n- tapOn: \"用户名\"\n- inputText: \"admin\"\n- tapOn: \"密码\"\n- inputText: \"123456\"\n- tapOn: \"登录\"\n- assertVisible: \"主页\"\n```\n" + rag_steps,
                     "expected_result": "用户成功登录系统，跳转到主页面，显示用户信息和相应权限功能"
                 })
             elif "数据" in requirement.requirement_name:
@@ -314,7 +350,7 @@ class AIService:
                     "title": f"测试数据录入功能在各种输入场景下的验证机制和保存结果{rag_note}",
                     "priority": test_priority,
                     "precondition": "系统正常运行，用户已登录具备数据操作权限",
-                    "test_steps": "1. 进入数据录入页面\n2. 填写必填字段信息\n3. 提交数据\n4. 验证数据保存结果",
+                    "test_steps": "执行以下 Maestro UI 自动化脚本:\n```yaml\nappId: com.example.app\n---\n- launchApp\n- tapOn: \"数据录入\"\n- tapOn: \"必填字段\"\n- inputText: \"测试数据\"\n- tapOn: \"提交\"\n- assertVisible: \"保存成功\"\n```\n" + rag_steps,
                     "expected_result": "数据成功保存到数据库，页面显示保存成功提示，可以查询到新录入的数据"
                 })
             elif "报告" in requirement.requirement_name:
@@ -323,7 +359,7 @@ class AIService:
                     "title": f"验证报告生成功能在不同格式和数据量下的处理能力和输出质量{rag_note}",
                     "priority": test_priority, 
                     "precondition": "系统正常运行，存在可用于生成报告的数据",
-                    "test_steps": "1. 进入报告生成页面\n2. 选择报告类型和参数\n3. 点击生成报告\n4. 检查生成的报告内容和格式",
+                    "test_steps": "1. 进入报告生成页面\n2. 选择报告类型和参数\n3. 点击生成报告\n4. 检查生成的报告内容和格式" + rag_steps,
                     "expected_result": "报告成功生成，内容准确完整，格式符合要求，可以正常下载"
                 })
             else:
@@ -332,7 +368,7 @@ class AIService:
                     "title": f"验证{requirement.requirement_name}功能的基本操作流程和预期结果{rag_note}",
                     "priority": test_priority,
                     "precondition": "系统正常运行，用户已登录",
-                    "test_steps": f"1. 访问{requirement.requirement_name}功能\n2. 执行主要操作步骤\n3. 验证操作结果",
+                    "test_steps": f"1. 访问{requirement.requirement_name}功能\n2. 执行主要操作步骤\n3. 验证操作结果" + rag_steps,
                     "expected_result": f"{requirement.requirement_name}功能正常工作，操作结果符合预期"
                 })
         

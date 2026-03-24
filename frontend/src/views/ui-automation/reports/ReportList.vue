@@ -1,18 +1,29 @@
 <template>
-  <div class="report-view">
-    <div class="page-header">
-      <h1 class="page-title">测试报告</h1>
-      <div class="header-actions">
-        <el-select v-model="selectedProject" placeholder="选择项目" style="width: 200px; margin-right: 15px" @change="onProjectChange">
-          <el-option v-for="project in projects" :key="project.id" :label="project.name" :value="project.id" />
-        </el-select>
-        <el-button type="primary" @click="refreshReports">
-          <el-icon><Refresh /></el-icon>
-          刷新报告
-        </el-button>
-      </div>
-    </div>
+  <BasePage title="UI测试报告">
+    <template #actions>
+      <el-button type="primary" @click="goToUnifiedReports">
+        <el-icon><View /></el-icon>
+        跳转到统一管理
+      </el-button>
+    </template>
 
+    <el-alert
+      title="提示"
+      type="info"
+      :closable="false"
+      style="margin-bottom: 20px"
+    >
+      UI自动化测试报告已整合到【统一管理】模块，请点击上方按钮跳转查看所有测试报告。
+    </el-alert>
+
+    <el-select v-model="selectedProject" placeholder="选择项目" style="width: 200px; margin-right: 15px" @change="onProjectChange">
+      <el-option v-for="project in projects" :key="project.id" :label="project.name" :value="project.id" />
+    </el-select>
+    <el-button type="primary" @click="refreshReports">
+      <el-icon><Refresh /></el-icon>
+      刷新报告
+    </el-button>
+    
     <div class="main-content">
       <div class="content-wrapper">
       <el-table :data="reports" v-loading="loading" style="width: 100%">
@@ -24,6 +35,7 @@
               {{ getStatusText(row.status) }}
             </el-tag>
           </template>
+
         </el-table-column>
         <el-table-column label="测试引擎" width="120">
           <template #default="{ row }">
@@ -290,18 +302,26 @@
         <el-button @click="showCaseDetailDialog = false">关闭</el-button>
       </template>
     </el-dialog>
-  </div>
-</template>
 
+  </BasePage>
+</template>
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Refresh, Document, Delete, WarningFilled } from '@element-plus/icons-vue'
+import { Refresh, Document, Delete, WarningFilled, View } from '@element-plus/icons-vue'
 import {
   getUiProjects,
   getTestExecutions,
   deleteTestExecution
 } from '@/api/ui_automation'
+
+const router = useRouter()
+
+// 跳转到统一管理测试报告页面
+const goToUnifiedReports = () => {
+  router.push('/unified/reports')
+}
 
 const reports = ref([])
 const projects = ref([])
@@ -523,25 +543,11 @@ onMounted(async () => {
   background: #f5f5f5;
 }
 
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 15px 20px;
-  border-bottom: 1px solid #e6e6e6;
-  background: white;
-}
 
-.page-title {
-  margin: 0;
-  font-size: 24px;
-  color: #303133;
-}
 
-.header-actions {
-  display: flex;
-  align-items: center;
-}
+
+
+
 
 .main-content {
   flex: 1;

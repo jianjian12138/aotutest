@@ -1,0 +1,18 @@
+﻿File: apps.reports.views
+Methods in TestReportViewSet:
+  ACTION: ai_efficiency, detail=False, url_path=ai_efficiency
+  ACTION: analyze, detail=True, url_path=analyze
+  ACTION: dashboard, detail=False, url_path=dashboard
+  ACTION: defect_distribution, detail=False, url_path=defect_distribution
+  ACTION: execution_trend, detail=False, url_path=execution_trend
+  ACTION: export_report, detail=False, url_path=export_report
+  ACTION: failed_cases_top, detail=False, url_path=failed_cases_top
+  ACTION: get_export_file, detail=True, url_path=export
+  ACTION: ping, detail=True, url_path=ping
+  ACTION: status_distribution, detail=False, url_path=status_distribution
+  ACTION: team_workload, detail=False, url_path=team_workload
+
+Testing dispatch print:
+DEBUG: [dispatch] GET /, action=NONE, kwargs={}
+DEBUG: [dispatch] Exception: 'TestReportViewSet' object has no attribute 'action_map'
+Dispatch failed (expected since no kwargs/etc): 'TestReportViewSet' object has no attribute 'action_map'

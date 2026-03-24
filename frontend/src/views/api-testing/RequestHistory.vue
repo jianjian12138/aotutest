@@ -1,8 +1,6 @@
 <template>
-  <div class="page-container">
-    <div class="page-header">
-      <h3 class="page-title">请求历史</h3>
-    </div>
+  <BasePage title="请求历史">
+    
     
     <div class="main-content">
       <div class="card-container">
@@ -167,11 +165,13 @@
         <el-button type="primary" @click="retryRequest(selectedHistory)">
           重新发送
         </el-button>
+        <el-button type="primary" @click="copyRequest(selectedHistory)">
+          复制请求
+        </el-button>
       </template>
     </el-dialog>
-  </div>
+  </BasePage>
 </template>
-
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -393,43 +393,13 @@ onMounted(() => {
 
 <style scoped>
 /* 页面特定样式 */
-.page-container {
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  max-width: 100%; /* 新增：覆盖全局样式的 max-width: 1600px，确保铺满 */
-}
 
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 15px 20px;
-  border-bottom: 1px solid #e6e6e6;
-  background: white;
-  flex-shrink: 0;
-}
 
-.page-title {
-  margin: 0;
-  font-size: 24px;
-  font-weight: 600;
-  color: #303133;
-  position: relative;
-  padding-left: 16px;
-}
 
-.page-title::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 4px;
-  height: 20px;
-  background: var(--primary-color, #409eff);
-  border-radius: 2px;
-}
+
+
+
+
 
 .main-content {
   flex: 1;

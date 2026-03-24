@@ -1,20 +1,20 @@
 """
 API导入的Celery异步任务
 """
+from apps.notifications.models import NotificationConfig, NotificationLog
 import logging
 import json
 import yaml
-from celery import shared_task
 from django.db import transaction
 from django.utils import timezone
 from apps.api_testing.models import ApiProject, ApiCollection, ApiRequest, ApiImportTask
 from django.contrib.auth import get_user_model
+from .import_utils import parse_openapi_spec
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
 
-@shared_task(bind=True)
-def import_api_data_task(self, project_id, file_content, file_format, import_mode, user_id, task_id=None):
+def import_api_data_task(project_id, file_content, file_format, import_mode, user_id, task_id=None):
     """
     异步导入API数据任务
     
@@ -304,96 +304,58 @@ def _import_swagger_data(file_content, project, user):
     导入Swagger/OpenAPI数据 - 优化版本，使用批量操作
     """
     try:
-        # 处理JSON格式的Swagger数据
-        try:
-            data = json.loads(file_content)
-        except json.JSONDecodeError:
-            # 尝试解析YAML格式
-            data = yaml.safe_load(file_content)
+        spec_data = parse_openapi_spec(file_content)
+        if not spec_data:
+            raise ValueError("无法解析 OpenAPI 规范文件")
+            
+        collections_count = 0
+        requests_count = 0
         
-        # 解析Swagger数据
-        paths = data.get('paths', {})
-        
-        # 收集所有需要创建的集合
-        tag_set = set()
-        for path, path_item in paths.items():
-            for method, operation in path_item.items():
-                tags = operation.get('tags', [])
-                tag_set.update(tags)
-        
-        # 创建集合映射
+        # 缓存已创建的集合
         tag_collections = {}
-        collections_to_create = []
         
-        # 收集需要创建的集合
-        for tag in tag_set:
-            collections_to_create.append({
-                'name': tag,
-                'description': f'{tag}相关接口',
-                'project': project,
-                'parent': None
-            })
-        
-        # 添加默认集合
-        collections_to_create.append({
-            'name': '默认集合',
-            'description': '未分类接口',
-            'project': project,
-            'parent': None
-        })
-        
-        # 批量创建集合
-        created_collections = []
         with transaction.atomic():
-            for i, coll_data in enumerate(collections_to_create):
-                coll = ApiCollection.objects.create(
-                    project=coll_data['project'],
-                    name=coll_data['name'],
-                    description=coll_data['description'],
-                    parent=coll_data['parent'],
-                    order=i
+            for req_data in spec_data['requests']:
+                tag_name = req_data['tag']
+                
+                # 获取或创建集合
+                if tag_name not in tag_collections:
+                    collection, created = ApiCollection.objects.get_or_create(
+                        project=project,
+                        name=tag_name,
+                        defaults={
+                            'description': f'{tag_name}相关接口',
+                            'order': ApiCollection.objects.filter(project=project).count()
+                        }
+                    )
+                    tag_collections[tag_name] = collection
+                    if created:
+                        collections_count += 1
+                        
+                collection = tag_collections[tag_name]
+                
+                # 创建请求
+                ApiRequest.objects.create(
+                    collection=collection,
+                    name=req_data['name'],
+                    description=req_data['description'],
+                    method=req_data['method'],
+                    url=req_data['url'],
+                    headers=req_data['headers'],
+                    params=req_data['params'],
+                    body=req_data['body'],
+                    created_by=user,
+                    order=ApiRequest.objects.filter(collection=collection).count()
                 )
-                created_collections.append(coll)
-                
-                # 构建标签到集合的映射
-                if coll.name != '默认集合':
-                    tag_collections[coll.name] = coll
-        
-        # 获取默认集合
-        default_collection = next(coll for coll in created_collections if coll.name == '默认集合')
-        
-        # 收集所有需要创建的请求
-        requests_to_create = []
-        
-        # 遍历所有路径和请求
-        for path, path_item in paths.items():
-            for method, operation in path_item.items():
-                tags = operation.get('tags', [])
-                collection = tag_collections.get(tags[0]) if tags else default_collection
-                
-                # 收集请求数据
-                requests_to_create.append({
-                    'collection': collection,
-                    'name': operation.get('summary', operation.get('operationId', path)),
-                    'description': operation.get('description', ''),
-                    'method': method.upper(),
-                    'url': f"{{base_url}}{path}",
-                    'headers': [],
-                    'params': {},
-                    'body': {},
-                    'created_by': user,
-                    'order': len(requests_to_create)  # 临时order
-                })
-        
-        # 批量创建请求
-        with transaction.atomic():
-            for req_data in requests_to_create:
-                ApiRequest.objects.create(**req_data)
+                requests_count += 1
         
         return {
-            'collections': len(created_collections),
-            'requests': len(requests_to_create)
+            'collections': collections_count,
+            'requests': requests_count
         }
+    except Exception as e:
+        logger.error(f"解析Swagger数据失败: {str(e)}", exc_info=True)
+        raise
     except Exception as e:
         logger.error(f"解析Swagger数据失败: {str(e)}", exc_info=True)
         raise

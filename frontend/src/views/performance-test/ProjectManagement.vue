@@ -1,17 +1,10 @@
 <template>
-  <div class="config-container">
-    <el-card shadow="hover" class="page-card">
-      <template #header>
-        <div class="card-header page-header" style="margin-bottom: 0;">
-          <h2 class="page-title">项目管理</h2>
-          <div class="header-actions">
-            <el-button type="primary" @click="handleCreateProject">
+  <BasePage title="项目管理">
+    <template #actions><el-button type="primary" @click="handleCreateProject">
               <el-icon><Plus /></el-icon>
               新建项目
-            </el-button>
-          </div>
-        </div>
-      </template>
+            </el-button></template>
+    
       
       <div class="content">
         <!-- 搜索和筛选 -->
@@ -98,7 +91,6 @@
           />
         </div>
       </div>
-    </el-card>
     
     <!-- 新建项目对话框 -->
     <el-dialog
@@ -132,16 +124,11 @@
         </span>
       </template>
     </el-dialog>
-  </div>
+  </BasePage>
 </template>
+
 <style scoped>
-.page-container {
-  padding: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  max-width: 100%; /* 新增：覆盖全局样式的 max-width: 1600px，确保铺满 */
-}
+
 </style>
 <script setup>
 import { ref, onMounted, reactive } from 'vue'

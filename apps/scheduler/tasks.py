@@ -1,4 +1,4 @@
-from celery import shared_task
+from apps.notifications.models import NotificationConfig, NotificationLog
 from django.utils import timezone
 from .models import ScheduledTask, TaskExecutionLog
 from .executor import TaskExecutor
@@ -6,7 +6,6 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-@shared_task
 def execute_scheduled_task(task_id):
     """
     执行定时任务的 Celery Task

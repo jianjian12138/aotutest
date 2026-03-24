@@ -1,8 +1,28 @@
 from django.db import models
 from django.utils import timezone
-from apps.users.models import User
-from apps.projects.models import Project
-from apps.versions.models import Version
+from apps.core_platform.models import User
+from apps.core_platform.models import Project
+from apps.core_platform.models import Version
+
+
+class TestCaseModule(models.Model):
+    """测试用例模块模型"""
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='test_case_modules', verbose_name='所属项目')
+    name = models.CharField(max_length=200, verbose_name='模块名称')
+    parent = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True, related_name='children', verbose_name='父模块')
+    order = models.IntegerField(default=0, verbose_name='排序')
+    created_at = models.DateTimeField(default=timezone.now, verbose_name='创建时间')
+    updated_at = models.DateTimeField(auto_now=True, verbose_name='更新时间')
+
+    class Meta:
+        db_table = 'testcase_modules'
+        verbose_name = '测试用例模块'
+        verbose_name_plural = '测试用例模块'
+        ordering = ['order', 'created_at']
+
+    def __str__(self):
+        return self.name
+
 
 class TestCase(models.Model):
     """测试用例模型"""
@@ -29,6 +49,7 @@ class TestCase(models.Model):
     ]
     
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='testcases')
+    module = models.ForeignKey(TestCaseModule, on_delete=models.SET_NULL, null=True, blank=True, related_name='testcases', verbose_name='所属模块')
     versions = models.ManyToManyField(Version, blank=True, related_name='testcases', verbose_name='关联版本')
     title = models.CharField(max_length=500, verbose_name='用例标题')
     description = models.TextField(blank=True, verbose_name='用例描述')

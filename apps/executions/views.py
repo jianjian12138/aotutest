@@ -4,7 +4,7 @@ from rest_framework.decorators import action
 from django.utils import timezone
 from .models import TestPlan, TestRun, TestRunCase, TestRunCaseHistory
 from apps.testcases.models import TestCase
-from apps.projects.models import Project
+from apps.core_platform.models import Project
 from .serializers import (TestPlanSerializer, TestRunSerializer, TestRunCaseSerializer, 
                          TestPlanDetailSerializer, TestRunCaseDetailSerializer, 
                          TestRunCaseHistorySerializer)
@@ -13,7 +13,7 @@ class TestPlanViewSet(viewsets.ModelViewSet):
     """
     测试计划视图集
     """
-    queryset = TestPlan.objects.all().order_by('-created_at')
+    queryset = TestPlan.objects.select_related('creator', 'version').prefetch_related('projects').order_by('-created_at')
     serializer_class = TestPlanSerializer
 
     def get_serializer_class(self):
@@ -27,7 +27,7 @@ class TestPlanViewSet(viewsets.ModelViewSet):
         version_id = self.request.data.get('version')
         version = None
         if version_id:
-            from apps.versions.models import Version
+            from apps.core_platform.models import Version
             try:
                 version = Version.objects.get(id=version_id)
             except Version.DoesNotExist:
@@ -121,7 +121,7 @@ class TestPlanViewSet(viewsets.ModelViewSet):
         version_id = self.request.data.get('version')
         version = None
         if version_id:
-            from apps.versions.models import Version
+            from apps.core_platform.models import Version
             try:
                 version = Version.objects.get(id=version_id)
             except Version.DoesNotExist:
@@ -145,7 +145,7 @@ class TestRunViewSet(viewsets.ModelViewSet):
     """
     测试执行视图集
     """
-    queryset = TestRun.objects.all().order_by('-created_at')
+    queryset = TestRun.objects.select_related('assignee').prefetch_related('run_cases', 'run_cases__testcase').order_by('-created_at')
     serializer_class = TestRunSerializer
 
 class TestRunCaseViewSet(viewsets.ModelViewSet):

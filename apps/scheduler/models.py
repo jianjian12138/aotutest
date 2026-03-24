@@ -1,53 +1,8 @@
 from django.db import models
 from django.conf import settings
 from django.utils import timezone
-from apps.projects.models import Project
-
-class NotificationConfig(models.Model):
-    """通知配置模型"""
-    CONFIG_TYPE_CHOICES = [
-        ('webhook_feishu', '飞书机器人'),
-        ('webhook_wechat', '企业微信机器人'),
-        ('webhook_dingtalk', '钉钉机器人'),
-        ('email', '邮件通知'),
-    ]
-
-    name = models.CharField(max_length=100, verbose_name='配置名称')
-    config_type = models.CharField(max_length=20, choices=CONFIG_TYPE_CHOICES, default='webhook_feishu', verbose_name='配置类型')
-    
-    # Webhook配置
-    webhook_url = models.CharField(max_length=500, blank=True, null=True, verbose_name='Webhook URL')
-    secret = models.CharField(max_length=200, blank=True, null=True, verbose_name='加签密钥', help_text='钉钉等需要')
-    
-    # 邮件配置
-    smtp_server = models.CharField(max_length=200, blank=True, null=True, verbose_name='SMTP服务器')
-    smtp_port = models.IntegerField(default=465, verbose_name='SMTP端口')
-    smtp_user = models.CharField(max_length=100, blank=True, null=True, verbose_name='SMTP用户名')
-    smtp_password = models.CharField(max_length=100, blank=True, null=True, verbose_name='SMTP密码')
-    email_from = models.CharField(max_length=100, blank=True, null=True, verbose_name='发件人邮箱')
-    use_tls = models.BooleanField(default=False, verbose_name='使用TLS')
-    use_ssl = models.BooleanField(default=True, verbose_name='使用SSL')
-    email_recipients = models.JSONField(default=list, blank=True, verbose_name='默认收件人列表')
-    
-    is_active = models.BooleanField(default=True, verbose_name='是否启用')
-    description = models.TextField(blank=True, verbose_name='描述')
-    
-    project = models.ForeignKey(Project, on_delete=models.CASCADE, null=True, blank=True, verbose_name='关联项目', help_text='为空则为全局配置')
-    api_project = models.ForeignKey('api_testing.ApiProject', on_delete=models.CASCADE, null=True, blank=True, verbose_name='关联API项目')
-    
-    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, verbose_name='创建者', related_name='scheduler_notification_configs')
-    created_at = models.DateTimeField(auto_now_add=True, verbose_name='创建时间')
-    updated_at = models.DateTimeField(auto_now=True, verbose_name='更新时间')
-
-    class Meta:
-        db_table = 'scheduler_notification_configs'
-        verbose_name = '通知配置'
-        verbose_name_plural = '通知配置'
-        ordering = ['-created_at']
-
-    def __str__(self):
-        return self.name
-
+from apps.core_platform.models import Project
+from apps.notifications.models import NotificationConfig
 
 class ScheduledTask(models.Model):
     """统一调度任务模型"""
@@ -100,7 +55,7 @@ class ScheduledTask(models.Model):
     failed_runs = models.IntegerField(default=0, verbose_name='失败运行次数')
     
     # 通知
-    notification_config = models.ForeignKey(NotificationConfig, on_delete=models.SET_NULL, null=True, blank=True, verbose_name='通知配置')
+    notification_config = models.ForeignKey(NotificationConfig, on_delete=models.SET_NULL, null=True, blank=True, verbose_name='通知配置', related_name='scheduler_tasks')
     notify_on_success = models.BooleanField(default=False, verbose_name='成功时通知')
     notify_on_failure = models.BooleanField(default=True, verbose_name='失败时通知')
     

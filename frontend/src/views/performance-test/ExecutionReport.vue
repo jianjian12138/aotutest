@@ -1,10 +1,6 @@
 <template>
-  <div class="execution-report">
-    <div class="page-header">
-      <div class="header-left">
-        <el-button @click="$router.back()" icon="ArrowLeft" circle plain style="margin-right: 15px" />
-        <h2 class="page-title">性能测试报告 - {{ execution.id }}</h2>
-      </div>
+  <BasePage :title="'测试报告 - ' + (execution.id || '')">
+    <template #actions>
       <div class="header-right">
         <el-tag :type="getStatusTagType(execution.status)" style="margin-right: 10px">
           {{ getStatusText(execution.status) }}
@@ -13,7 +9,7 @@
           <el-icon><Download /></el-icon> 下载报告
         </el-button>
       </div>
-    </div>
+    </template>
 
     <div class="report-content" v-loading="loading">
       <div v-if="execution.report_html" class="iframe-container">
@@ -23,9 +19,8 @@
         <el-empty description="暂无报告数据" />
       </div>
     </div>
-  </div>
+  </BasePage>
 </template>
-
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -97,27 +92,14 @@ onMounted(() => {
   background-color: #f5f7fa;
 }
 
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 15px 20px;
-  background: white;
-  border-bottom: 1px solid #e6e6e6;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.05);
-}
+
 
 .header-left {
   display: flex;
   align-items: center;
 }
 
-.page-title {
-  margin: 0;
-  font-size: 18px;
-  font-weight: 600;
-  color: #303133;
-}
+
 
 .report-content {
   flex: 1;

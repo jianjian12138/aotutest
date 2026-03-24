@@ -51,31 +51,102 @@ class VariableResolver:
             'md5': self._md5,
         }
     
-    def resolve(self, text):
+    def resolve(self, text, context_vars=None):
         """解析文本中的所有变量表达式
         
         Args:
-            text: 包含变量表达式的文本，如 "user_${random_string(6)}@test.com"
+            text: 包含变量表达式的文本，如 "user_${random_string(6)}@test.com" 或 "{{$faker.name}}" 或 "${my_var}"
+            context_vars: 运行时上下文变量字典，如 {"my_var": "123"}
             
         Returns:
-            解析后的文本，如 "user_abc123@test.com"
+            解析后的文本，如 "user_abc123@test.com" 或 "张三" 或 "123"
         """
         if not text or not isinstance(text, str):
             return text
+            
+        context_vars = context_vars or {}
+            
+        import time
+        from faker import Faker
+        import logging
+        logger = logging.getLogger(__name__)
+        fake = Faker('zh_CN')
         
-        # 匹配 ${function_name(args)} 模式
-        pattern = r'\$\{([^}]+)\}'
+        # 1. 解析旧版 ${function_name(args)} 模式
+        pattern_func = r'\$\{([^}]+)\}'
         
         def replace_func(match):
             expression = match.group(1)
+            # 先尝试从传入的从上下文中获取变量
+            if expression in context_vars:
+                return str(context_vars[expression])
+                
             try:
                 return str(self._evaluate_expression(expression))
             except Exception as e:
-                # 如果解析失败，保留原始表达式
-                print(f"⚠️  变量解析失败: ${{{expression}}} - {str(e)}")
+                # 如果既不是变量又不是函数，保留原貌或提示不存在
+                # print(f"⚠️  表达式解析失败: ${{{expression}}} - {str(e)}")
                 return match.group(0)
+                
+        text = re.sub(pattern_func, replace_func, text)
+
+        # 2. 解析API风格动态数据模式 {{$faker.xxx}}, {{$timestamp}}, {{$uuid}}
+        def dynamic_replacer(match):
+            var_name = match.group(1).strip()
+            
+            if var_name == '$timestamp':
+                return str(int(time.time() * 1000))
+            elif var_name == '$uuid':
+                return str(uuid.uuid4())
+                
+            elif var_name.startswith('$faker.'):
+                faker_method = var_name[7:]
+                if hasattr(fake, faker_method):
+                    try:
+                        method = getattr(fake, faker_method)
+                        return str(method())
+                    except Exception as e:
+                        logger.warning(f"⚠️ Faker数据生成失败 {faker_method}: {str(e)}")
+                        return match.group(0)
+                else:
+                    return match.group(0)
+                    
+            elif var_name.startswith('$pool.'):
+                # {{$pool.pool_name.field_name}}
+                parts = var_name.split('.')
+                if len(parts) >= 3:
+                    pool_name = parts[1]
+                    field_name = parts[2]
+                    try:
+                        from apps.data_factory.models import DataPool
+                        pool = DataPool.objects.filter(name=pool_name).first()
+                        if pool and pool.data and len(pool.data) > 0:
+                            # 随机或顺取一条数据
+                            import random
+                            row = random.choice(pool.data)
+                            return str(row.get(field_name, match.group(0)))
+                        else:
+                            return match.group(0)
+                    except Exception as e:
+                        logger.warning(f"⚠️ DataPool数据提取失败 {var_name}: {str(e)}")
+                        return match.group(0)
+                        
+            return match.group(0)
+            
+        dynamic_pattern = r'\{\{\s*(\$[a-zA-Z0-9_\.]+)\s*\}\}'
+        text = re.sub(dynamic_pattern, dynamic_replacer, text)
         
-        return re.sub(pattern, replace_func, text)
+        # 3. 解析双大括号格式的普通变量 {{my_var}} (保留兼容性)
+        def var_replacer(match):
+            var_name = match.group(1).strip()
+            if var_name in context_vars:
+                return str(context_vars[var_name])
+            return match.group(0)
+            
+        var_pattern = r'\{\{([^$].*?)\}\}'
+        text = re.sub(var_pattern, var_replacer, text)
+        
+        return text
     
     def _evaluate_expression(self, expression):
         """评估单个表达式
@@ -505,11 +576,12 @@ class VariableResolver:
 _resolver = VariableResolver()
 
 
-def resolve_variables(text):
+def resolve_variables(text, context_vars=None):
     """便捷函数：解析文本中的变量表达式
     
     Args:
         text: 包含变量表达式的文本
+        context_vars: 上下文变量字典，用于替换普通变量
         
     Returns:
         解析后的文本
@@ -518,7 +590,7 @@ def resolve_variables(text):
         >>> resolve_variables("user_${random_string(6)}@test.com")
         "user_abc123@test.com"
         
-        >>> resolve_variables("手机号：${random_phone()}")
-        "手机号：13812345678"
+        >>> resolve_variables("TOKEN=${user_token}", {"user_token": "abc"})
+        "TOKEN=abc"
     """
-    return _resolver.resolve(text)
+    return _resolver.resolve(text, context_vars=context_vars)

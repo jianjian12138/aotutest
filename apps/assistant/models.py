@@ -1,6 +1,9 @@
 from django.db import models
 from django.utils import timezone
-from apps.users.models import User
+from apps.core_platform.models import User
+from .mcp_service import MCPService
+from .skills_service import SkillsService
+from apps.requirement_analysis.models import AIModelConfig
 
 
 class DifyConfig(models.Model):
@@ -198,3 +201,44 @@ class AssistantMessage(models.Model):
     
     def __str__(self):
         return f"{self.get_message_type_display()}: {self.content[:50]}"
+
+
+class AgentSkill(models.Model):
+    """动态技能定义"""
+    name = models.CharField(max_length=100, unique=True, verbose_name="技能标识(英文)")
+    display_name = models.CharField(max_length=100, verbose_name="技能展示名")
+    description = models.TextField(verbose_name="技能描述(供大模型理解)")
+    executor_code = models.TextField(verbose_name="Python执行代码", blank=True, null=True)
+    is_active = models.BooleanField(default=True, verbose_name="是否启用")
+    created_at = models.DateTimeField(default=timezone.now, verbose_name="创建时间")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="更新时间")
+
+    class Meta:
+        db_table = 'agent_skills'
+        verbose_name = 'Agent 技能'
+        verbose_name_plural = 'Agent 技能'
+
+    def __str__(self):
+        return self.display_name
+
+
+class AgentProfile(models.Model):
+    """动态专家画像定义"""
+    name = models.CharField(max_length=100, verbose_name="Agent标识", unique=True)
+    display_name = models.CharField(max_length=100, verbose_name="展示名称")
+    description = models.TextField(blank=True, null=True, verbose_name="简单描述")
+    system_prompt = models.TextField(verbose_name="System Prompt")
+    llm_config = models.ForeignKey(AIModelConfig, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="绑定的专属大模型(可选)")
+    skills = models.ManyToManyField(AgentSkill, blank=True, verbose_name="挂载的Skills")
+    is_active = models.BooleanField(default=True, verbose_name="是否启用")
+    created_at = models.DateTimeField(default=timezone.now, verbose_name="创建时间")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="更新时间")
+
+    class Meta:
+        db_table = 'agent_profiles'
+        verbose_name = 'Agent 专家画像'
+        verbose_name_plural = 'Agent 专家画像'
+
+    def __str__(self):
+        return self.display_name
+

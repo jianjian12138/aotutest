@@ -1,7 +1,7 @@
 from django.db import models
 from django.utils import timezone
-from apps.users.models import User
-from apps.projects.models import Project
+from apps.core_platform.models import User
+from apps.core_platform.models import Project
 import json
 import httpx
 import asyncio
@@ -17,6 +17,8 @@ class RequirementDocument(models.Model):
         ('pdf', 'PDF文档'),
         ('docx', 'Word文档'),
         ('txt', '文本文档'),
+        ('png', 'PNG图片'),
+        ('jpg', 'JPEG图片'),
     ]
     
     STATUS_CHOICES = [
@@ -340,6 +342,51 @@ class TestCaseGenerationTask(models.Model):
 class AIModelService:
     """AI模型服务类"""
     
+    @staticmethod
+    async def call_openai_compatible_api_stream(config: AIModelConfig, messages: List[Dict[str, str]]):
+        """流式调用OpenAI兼容格式的API"""
+        headers = {
+            'Authorization': f'Bearer {config.api_key}',
+            'Content-Type': 'application/json',
+            'Accept': 'text/event-stream'
+        }
+        
+        data = {
+            'model': config.model_name,
+            'messages': messages,
+            'max_tokens': config.max_tokens,
+            'temperature': config.temperature,
+            'top_p': config.top_p,
+            'stream': True
+        }
+        
+        base_url = config.base_url.rstrip('/')
+        if not base_url.endswith('/chat/completions'):
+            if base_url.endswith('/v1'):
+                url = f"{base_url}/chat/completions"
+            else:
+                url = f"{base_url}/v1/chat/completions"
+        else:
+            url = base_url
+            
+        try:
+            async with httpx.AsyncClient(timeout=300.0) as client:
+                async with client.stream('POST', url, headers=headers, json=data) as response:
+                    response.raise_for_status()
+                    async for line in response.aiter_lines():
+                        if line.startswith('data: ') and line != 'data: [DONE]':
+                            try:
+                                chunk = json.loads(line[6:])
+                                if 'choices' in chunk and len(chunk['choices']) > 0:
+                                    delta = chunk['choices'][0].get('delta', {})
+                                    if 'content' in delta and delta['content']:
+                                        yield delta['content']
+                            except Exception as e:
+                                pass
+        except Exception as e:
+            logger.error(f"Streaming API error: {e}")
+            yield f"\\n[Streaming Interrupted: {str(e)}]"
+
     @staticmethod
     async def call_openai_compatible_api(config: AIModelConfig, messages: List[Dict[str, str]]) -> Dict[str, Any]:
         """调用OpenAI兼容格式的API"""

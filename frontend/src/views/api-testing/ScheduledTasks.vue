@@ -1,16 +1,16 @@
 <template>
-  <div class="page-container">
-    <div class="page-header">
-      <div class="title-container">
-        <span class="page-title">定时任务管理</span>
-      </div>
-      <div class="header-actions">
+  <BasePage title="定时任务">
+    <template #actions><el-button type="primary" @click="handleCreateClick">
+          <el-icon><Plus /></el-icon>
+          新建定时任务
+        </el-button></template>
+    
+    <div class="header-actions">
         <el-button type="primary" @click="handleCreateClick">
           <el-icon><Plus /></el-icon>
           新建定时任务
         </el-button>
       </div>
-    </div>
 
     <div class="main-content">
       <div class="card-container">
@@ -295,9 +295,9 @@
         <el-table-column prop="error_message" label="错误信息" width="300" show-overflow-tooltip />
       </el-table>
     </el-dialog>
-  </div>
-</template>
 
+  </BasePage>
+</template>
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -700,49 +700,15 @@ const deleteTask = async (task) => {
 
 <style scoped>
 /* 页面特定样式 */
-.page-container {
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  max-width: 100%; /* 新增：覆盖全局样式的 max-width: 1600px，确保铺满 */
-}
 
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 15px 20px;
-  border-bottom: 1px solid #e6e6e6;
-  background: white;
-  flex-shrink: 0;
-}
 
-.page-title {
-  margin: 0;
-  font-size: 24px;
-  font-weight: 600;
-  color: #303133;
-  position: relative;
-  padding-left: 16px;
-}
 
-.page-title::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 4px;
-  height: 20px;
-  background: var(--primary-color, #409eff);
-  border-radius: 2px;
-}
 
-.header-actions {
-  display: flex;
-  align-items: center;
-  gap: 15px;
-}
+
+
+
+
+
 
 .main-content {
   flex: 1;

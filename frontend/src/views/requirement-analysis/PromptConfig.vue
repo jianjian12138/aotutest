@@ -1,10 +1,13 @@
 <template>
-  <div class="page-container">
-    <div class="page-header">
-      <div class="header-content">
-        <h1 class="page-title">提示词配置</h1>
-      </div>
-    </div>
+  <BasePage title="提示词配置">
+    <template #actions>
+      <button class="load-defaults-btn" @click="loadDefaultPrompts">
+        📂 加载默认提示词
+      </button>
+      <button class="add-config-btn" @click="openAddModal">
+        ➕ 添加配置
+      </button>
+    </template>
 
     <div class="card-container main-content">
       <!-- 配置列表 -->
@@ -237,9 +240,8 @@
         </div>
       </div>
     </div>
-  </div>
+  </BasePage>
 </template>
-
 <script>
 import api from '@/utils/api'
 import { ElMessage } from 'element-plus'
@@ -471,75 +473,15 @@ export default {
 
 <style scoped>
 /* 页面特定样式 */
-.page-container {
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  
-  max-width: 100%; /* 新增：覆盖全局样式的 max-width: 1600px，确保铺满 */
-}
-
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 15px 20px;
-  border-bottom: 1px solid #e6e6e6;
-  background: white;
-  flex-shrink: 0;
-}
-
-.page-title {
-  margin: 0;
-  font-size: 24px;
-  font-weight: 600;
-  color: #303133;
-  position: relative;
-  padding-left: 16px;
-}
-
-.page-title::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 4px;
-  height: 20px;
-  background: var(--primary-color, #409eff);
-  border-radius: 2px;
-}
-
-.header-actions {
-  display: flex;
-  gap: 15px;
-}
-
 .prompt-config {
   padding: 20px;
   max-width: 1400px;
   margin: 0 auto;
 }
 
-/* .page-header styles removed to match ProjectList.vue global styles */
-
-.section-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 30px;
-  flex-wrap: wrap;
-  gap: 15px;
-}
-
 .section-header h2 {
   color: #2c3e50;
   margin: 0;
-}
-
-.header-actions {
-  display: flex;
-  gap: 10px;
 }
 
 .load-defaults-btn {
@@ -1054,11 +996,6 @@ export default {
     flex-direction: column;
     gap: 15px;
     align-items: flex-start;
-  }
-  
-  .header-actions {
-    flex-direction: column;
-    width: 100%;
   }
   
   .empty-actions {

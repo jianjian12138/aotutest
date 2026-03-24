@@ -1,3 +1,4 @@
+from apps.notifications.models import NotificationConfig, NotificationLog
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
@@ -10,6 +11,7 @@ from .views import (
     TaskNotificationSettingViewSet, OperationLogViewSet,
     ApiDashboardViewSet,
     ApiTestCaseViewSet,
+    ApiTestCaseModuleViewSet,
     ApiTestCaseStepViewSet,
     ApiTestCaseExecutionViewSet,
     TestSuiteTestCaseViewSet
@@ -22,6 +24,7 @@ router.register(r'collections', ApiCollectionViewSet)
 router.register(r'requests', ApiRequestViewSet)
 router.register(r'environments', EnvironmentViewSet)
 router.register(r'testcases', ApiTestCaseViewSet)
+router.register(r'testcase-modules', ApiTestCaseModuleViewSet)
 router.register(r'teststeps', ApiTestCaseStepViewSet)
 router.register(r'testcase-executions', ApiTestCaseExecutionViewSet)
 router.register(r'histories', RequestHistoryViewSet)

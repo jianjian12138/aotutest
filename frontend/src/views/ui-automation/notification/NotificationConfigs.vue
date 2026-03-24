@@ -1,9 +1,7 @@
 <template>
-  <div class="page-container">
-    <div class="page-header">
-      <h1 class="page-title">自动化通知配置</h1>
-    </div>
-
+  <BasePage title="自动化通知配置">
+    
+    
     <div class="card-container">
       <p class="description-text">配置飞书、企微、钉钉Webhook机器人地址</p>
       
@@ -182,9 +180,9 @@
         </el-tab-pane>
       </el-tabs>
     </div>
-  </div>
-</template>
 
+  </BasePage>
+</template>
 <script>
 import {Setting} from '@element-plus/icons-vue'
 import {ref, reactive, onMounted} from 'vue'

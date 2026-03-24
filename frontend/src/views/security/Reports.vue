@@ -1,15 +1,5 @@
 <template>
-  <div class="reports">
-    <el-card shadow="hover">
-      <template #header>
-        <div class="card-header page-header" style="margin-bottom: 0;">
-          <h2 class="page-title">测试报告</h2>
-          <el-button type="primary" @click="handleGenerateReport">
-            <el-icon><Plus /></el-icon>
-            生成报告
-          </el-button>
-        </div>
-      </template>
+  <BasePage title="测试报告">
       
       <!-- 搜索和筛选 -->
       <div class="search-filter">
@@ -151,10 +141,8 @@
           </span>
         </template>
       </el-dialog>
-    </el-card>
-  </div>
+  </BasePage>
 </template>
-
 <script setup>
 import { ref, onMounted, reactive } from 'vue'
 import { useRouter } from 'vue-router'
@@ -199,8 +187,8 @@ const fetchData = async () => {
     }
     // Using security executions as reports
     const response = await getSecurityReports(params)
-    reports.value = response.results
-    pagination.total = response.count
+    reports.value = response.data?.results || []
+    pagination.total = response.data?.count || 0
   } catch (error) {
     ElMessage.error('获取报告列表失败')
   } finally {

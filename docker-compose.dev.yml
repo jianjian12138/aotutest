@@ -1,0 +1,83 @@
+version: '3.8'
+
+services:
+  # Redis服务
+  redis:
+    image: redis:7-alpine
+    container_name: testing-platform-redis-dev
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    networks:
+      - testing-network
+
+  # Django后端服务（开发模式）
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: testing-platform-backend-dev
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - DEBUG=True
+      - SECRET_KEY=django-insecure-dev-key
+      - ALLOWED_HOSTS=localhost,127.0.0.1,0.0.0.0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    volumes:
+      - ./backend:/app
+      - backend_media_dev:/app/media
+      - backend_logs_dev:/app/logs
+    depends_on:
+      - redis
+    networks:
+      - testing-network
+    command: python manage.py runserver 0.0.0.0:8000
+
+  # Celery Worker（开发模式）
+  celery_worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: testing-platform-celery-worker-dev
+    restart: unless-stopped
+    environment:
+      - DEBUG=True
+      - SECRET_KEY=django-insecure-dev-key
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    volumes:
+      - ./backend:/app
+      - backend_media_dev:/app/media
+      - backend_logs_dev:/app/logs
+    depends_on:
+      - redis
+    networks:
+      - testing-network
+    command: celery -A backend worker -l info --loglevel=debug
+
+  # Vue前端服务（开发模式）
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: testing-platform-frontend-dev
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - testing-network
+
+networks:
+  testing-network:
+    driver: bridge
+
+volumes:
+  backend_media_dev:
+    driver: local
+  backend_logs_dev:
+    driver: local

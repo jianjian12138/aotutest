@@ -6,7 +6,9 @@ from .models import (
     DataFactoryProject,
     SavedQuery,
     QueryHistory,
-    TableMetadata
+    TableMetadata,
+    DataSource,
+    DataPool
 )
 
 User = get_user_model()
@@ -91,3 +93,39 @@ class TableMetadataSerializer(serializers.ModelSerializer):
     class Meta:
         model = TableMetadata
         fields = ['id', 'table_name', 'description', 'database', 'schema', 'column_count', 'columns', 'created_at', 'updated_at', 'config']
+
+
+class DataSourceSerializer(serializers.ModelSerializer):
+    """数据源序列化器"""
+    created_by = UserSerializer(read_only=True)
+    project_detail = DataFactoryProjectSerializer(source='project', read_only=True)
+
+    class Meta:
+        model = DataSource
+        fields = '__all__'
+        extra_kwargs = {
+            'password': {'write_only': True},
+        }
+
+    def to_representation(self, instance):
+        ret = super().to_representation(instance)
+        # 掩码密码
+        if 'password' in ret and ret['password']:
+            ret['password'] = '********'
+        return ret
+
+
+class DataPoolSerializer(serializers.ModelSerializer):
+    """数据池序列化器"""
+    created_by = UserSerializer(read_only=True)
+    project_detail = DataFactoryProjectSerializer(source='project', read_only=True)
+    row_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = DataPool
+        fields = '__all__'
+
+    def get_row_count(self, obj):
+        if hasattr(obj, 'data') and isinstance(obj.data, list):
+            return len(obj.data)
+        return 0

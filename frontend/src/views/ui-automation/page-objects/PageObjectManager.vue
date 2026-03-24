@@ -1,18 +1,13 @@
 <template>
-  <div class="page-object-manager">
-    <div class="page-header">
-      <h1 class="page-title">页面对象管理</h1>
-      <div class="header-actions">
-        <el-select v-model="projectId" placeholder="选择项目" style="width: 200px; margin-right: 15px" @change="onProjectChange">
+  <BasePage title="页面对象管理">
+    <template #actions><el-select v-model="projectId" placeholder="选择项目" style="width: 200px; margin-right: 15px" @change="onProjectChange">
           <el-option v-for="project in projects" :key="project.id" :label="project.name" :value="project.id" />
         </el-select>
         <el-button type="primary" @click="showCreateDialog = true">
           <el-icon><Plus /></el-icon>
           新增页面对象
-        </el-button>
-      </div>
-    </div>
-
+        </el-button></template>
+    
     <div class="main-content">
       <!-- 页面对象列表 -->
       <div class="left-panel">
@@ -28,6 +23,7 @@
             <template #prefix>
               <el-icon><Search /></el-icon>
             </template>
+  
           </el-input>
         </div>
 
@@ -294,9 +290,9 @@
         </span>
       </template>
     </el-dialog>
-  </div>
-</template>
 
+  </BasePage>
+</template>
 <script setup>
 import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -738,25 +734,11 @@ onMounted(async () => {
   flex-direction: column;
 }
 
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 15px 20px;
-  border-bottom: 1px solid #e6e6e6;
-  background: white;        /* 背景色为白色 */
-  flex-shrink: 0; 
-}
 
-.page-title {
-  margin: 0;
-  font-size: 24px;
-}
 
-.header-actions {
-  display: flex;
-  align-items: center;
-}
+
+
+
 
 .main-content {
   flex: 1;

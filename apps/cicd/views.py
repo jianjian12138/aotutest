@@ -13,6 +13,57 @@ import requests
 import json
 from django.utils import timezone
 
+class PipelineViewSet(viewsets.ViewSet):
+    """Mock Pipeline 视图集"""
+    permission_classes = [IsAuthenticated]
+
+    def list(self, request):
+        mock_pipelines = [
+            {
+                "id": 101,
+                "name": "Platform Nightly Core Regression",
+                "description": "每天凌晨2点定时触发的 API + UI 自动化全链路回归流水线",
+                "is_active": True,
+                "updated_at": timezone.now().strftime("%Y-%m-%d %H:%M:%S")
+            },
+            {
+                "id": 102,
+                "name": "性能压测预热管道 (Staging Environment)",
+                "description": "部署前对测试环境进行基准 QPS 并发轰炸评估",
+                "is_active": True,
+                "updated_at": timezone.now().strftime("%Y-%m-%d %H:%M:%S")
+            },
+            {
+                "id": 103,
+                "name": "安全漏洞主动探底调度流",
+                "description": "联动 Strix 工具进行平台源码级深度 SAST 审计与污点扫描",
+                "is_active": False,
+                "updated_at": timezone.now().strftime("%Y-%m-%d %H:%M:%S")
+            }
+        ]
+        return Response({"results": mock_pipelines, "count": len(mock_pipelines)})
+        
+    def create(self, request):
+        data = request.data
+        data['id'] = 1
+        data['is_active'] = True
+        return Response(data, status=status.HTTP_201_CREATED)
+        
+    def retrieve(self, request, pk=None):
+        return Response({
+            "id": pk,
+            "name": "Mock Pipeline",
+            "description": "Mock description",
+            "is_active": True
+        })
+        
+    def destroy(self, request, pk=None):
+        return Response(status=status.HTTP_204_NO_CONTENT)
+        
+    @action(detail=True, methods=['post'], url_path='trigger')
+    def trigger(self, request, pk=None):
+        """触发Pipeline"""
+        return Response({'message': 'Pipeline triggered successfully'}, status=status.HTTP_200_OK)
 
 class CICDServerViewSet(viewsets.ModelViewSet):
     """CI/CD服务器视图集"""

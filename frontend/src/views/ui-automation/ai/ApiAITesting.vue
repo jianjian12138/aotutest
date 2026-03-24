@@ -1,28 +1,25 @@
 <template>
-  <div class="page-container">
-    <div class="page-header">
-      <h1 class="page-title">API 智能测试实验室</h1>
-      <div class="header-controls">
-        <el-select v-model="projectId" placeholder="选择项目" style="width: 200px" @change="onProjectChange">
-          <el-option v-for="project in projects" :key="project?.id" :label="project?.name" :value="project?.id" />
-        </el-select>
-        
-        <el-select v-model="selectedModelConfigId" placeholder="选择 AI 模型" style="width: 250px">
-          <el-option 
-            v-for="config in modelConfigs" 
-            :key="config?.id" 
-            :label="`${config?.name} (${config?.model_type})`" 
-            :value="config?.id" 
-          />
-        </el-select>
-      </div>
-    </div>
-
+  <BasePage title="API 智能测试实验室">
+    
     <div class="card-container">
           <el-row :gutter="20">
             <el-col :span="12">
               <div class="section-title">任务输入</div>
               <el-form :model="taskForm" label-position="top">
+                <el-form-item label="AI 模型配置" required>
+                  <el-select v-model="selectedModelConfigId" placeholder="选择 AI 模型" style="width: 100%">
+                    <el-option
+                      v-for="config in modelConfigs"
+                      :key="config.id"
+                      :label="`${config.name} (${config.model_name})`"
+                      :value="config.id"
+                    >
+                      <span style="float: left">{{ config.name }}</span>
+                      <span style="float: right; color: #8492a6; font-size: 13px">{{ config.model_name }}</span>
+                    </el-option>
+                  </el-select>
+                </el-form-item>
+
                 <el-form-item label="任务描述" required>
                   <el-input
                     v-model="taskForm.description"
@@ -148,9 +145,9 @@
         </span>
       </template>
     </el-dialog>
-  </div>
-</template>
 
+  </BasePage>
+</template>
 <script setup>
 import { ref, reactive, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { useRoute } from 'vue-router'
@@ -169,7 +166,7 @@ const route = useRoute()
 const projects = ref([])
 const projectId = ref('')
 const modelConfigs = ref([])
-const selectedModelConfigId = ref('')
+const selectedModelConfigId = ref(null)
 
 const running = ref(false)
 const analyzing = ref(false)
@@ -205,12 +202,13 @@ const loadModelConfigs = async () => {
     
     modelConfigs.value = results.filter(c => c.is_active)
     
-    if (modelConfigs.value.length > 0 && !selectedModelConfigId.value) {
-      selectedModelConfigId.value = modelConfigs.value[0].id
+    // 自动选择一个推荐的模型
+    if (modelConfigs.value.length > 0) {
+      const match = modelConfigs.value.find(c => c.role === 'writer' || c.model_name.toLowerCase().includes('gpt'))
+      selectedModelConfigId.value = match ? match.id : modelConfigs.value[0].id
     }
   } catch (error) {
     console.error('加载模型配置失败:', error)
-    ElMessage.error('加载模型配置失败')
   }
 }
 
@@ -394,27 +392,6 @@ onMounted(() => {
 </script>
 
 <style lang="scss" scoped>
-.page-container {
-  padding: 20px;
-}
-
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-  
-  .page-title {
-    font-size: 20px;
-    font-weight: 600;
-    margin: 0;
-  }
-  
-  .header-controls {
-    display: flex;
-    gap: 15px;
-  }
-}
 
 .card-container {
   background-color: #fff;

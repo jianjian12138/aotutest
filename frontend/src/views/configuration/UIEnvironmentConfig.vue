@@ -1,11 +1,6 @@
 <template>
-  <div class="page-container">
-    <div class="page-header">
-      <h3 class="page-title">自动化环境配置</h3>
-      <div class="header-actions">
-        <!-- Actions if any -->
-      </div>
-    </div>
+  <BasePage title="自动化环境配置">
+    <template #actions><!-- Actions if any --></template>
 
     <div class="main-content">
       <div class="card-container scrollable-content">
@@ -150,9 +145,10 @@
       </div>
       </div>
     </div>
-  </div>
-</template>
+  
 
+  </BasePage>
+</template>
 <script setup>
 import { ref, onMounted } from 'vue'
 import { Refresh, ArrowDown, ArrowUp } from '@element-plus/icons-vue'
@@ -217,47 +213,15 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.page-container {
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
-  padding: 0;
-  background-color: var(--el-bg-color-page);
-  max-width: 100%; /* 新增：覆盖全局样式的 max-width: 1600px，确保铺满 */
-}
 
-.page-header {
-  flex-shrink: 0;
-  padding: 16px 24px;
-  background: #fff;
-  border-bottom: 1px solid var(--el-border-color-light);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
 
-.page-title {
-  font-size: 24px;
-  font-weight: 600;
-  color: var(--el-text-color-primary);
-  display: flex;
-  align-items: center;
-  margin: 0;
-}
 
-.page-title::before {
-  content: '';
-  width: 4px;
-  height: 16px;
-  background-color: var(--el-color-primary);
-  margin-right: 8px;
-  border-radius: 2px;
-}
 
-.header-actions {
-  display: flex;
-  gap: 12px;
-}
+
+
+
+
+
 
 .main-content {
   flex: 1;

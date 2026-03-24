@@ -1,17 +1,12 @@
 <template>
-  <div class="test-case-manager">
-    <div class="page-header">
-      <h1 class="page-title">脚本列表</h1>
-      <div class="header-actions">
-        <el-select v-model="selectedProject" placeholder="选择项目" style="width: 200px; margin-right: 15px" @change="onProjectChange">
+  <BasePage title="脚本列表">
+    <template #actions><el-select v-model="selectedProject" placeholder="选择项目" style="width: 200px; margin-right: 15px" @change="onProjectChange">
           <el-option v-for="project in projects" :key="project.id" :label="project.name" :value="project.id" />
         </el-select>
         <el-button type="primary" @click="goToScriptEditor">
           <el-icon><Plus /></el-icon>
           新建脚本
-        </el-button>
-      </div>
-    </div>
+        </el-button></template>
     
     <div class="main-content">
       <!-- 左侧：脚本列表 -->
@@ -23,11 +18,12 @@
               v-model="searchKeyword"
               placeholder="搜索脚本名称..."
               clearable
-              style="width: 200px; margin-right: 10px"
+              class="search-input"
             >
               <template #prefix>
                 <el-icon><Search /></el-icon>
-              </template>
+            </template>
+  
             </el-input>
             <el-button type="primary" @click="handleSearch">
               <el-icon><Search /></el-icon>
@@ -235,9 +231,9 @@
         <el-button type="primary" @click="saveEditedScript" :loading="saving">保存</el-button>
       </template>
     </el-dialog>
-  </div>
-</template>
 
+  </BasePage>
+</template>
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -725,24 +721,11 @@ onMounted(async () => {
   flex-direction: column;
 }
 
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 15px 20px;
-  border-bottom: 1px solid #e6e6e6;
-  background: white;
-}
 
-.page-title {
-  margin: 0;
-  font-size: 24px;
-}
 
-.header-actions {
-  display: flex;
-  align-items: center;
-}
+
+
+
 
 .main-content {
   flex: 1;
@@ -762,18 +745,28 @@ onMounted(async () => {
   padding: 15px;
   border-bottom: 1px solid #e6e6e6;
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .panel-header h3 {
   margin: 0;
 }
 
+.search-filter {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+
+.search-input {
+  flex: 1;
+}
+
 .test-case-list {
   flex: 1;
   overflow-y: auto;
-  padding: 15px;
+  padding: 12px 15px 15px;
 }
 
 .test-case-item {

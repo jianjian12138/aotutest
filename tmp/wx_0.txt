@@ -1,0 +1,260 @@
+URL: https://mp.weixin.qq.com/s/wC8pW0c_H6HPILMKxYhscQ
+TITLE: Pytest测试框架：如何确保登录模块先执行并共享登录状态
+
+CONTENT:
+点击蓝字，立即关注
+在接口自动化测试中，我们经常会遇到这样的场景：多个接口依赖登录接口返回的token。如果简单地将所有测试用例放在一起执行，可能会因为执行顺序不确定而导致后续接口因token不存在而失败。
+本文将介绍一种基于
+Pytest
+的解决方案，通过控制用例执行顺序和共享登录数据，优雅地解决依赖登录的问题。
+0
+1
+解决方案概述
+我们将使用两个核心特性：
+Pytest-order 插件：
+控制登录用例第一个执行。
+session 级别的 fixture：
+在多个测试用例之间共享登录后得到的 token 和用户名。
+同时，我们还会处理一种边界情况：
+如果登录失败，后续依赖登录的用例应直接跳过，而不是全部失败，避免测试报告被大量错误淹没。
+02
+详细步骤
+1. 安装 Pytest-order
+Pytest-order 是一个Pytest插件，可以通过标记（mark）来指定测试用例的执行顺序。
+pip install pytest-
+order
+2. 在 conftest.py 中定义共享存储
+我们需要一个全局的存储空间，用于保存登录后的数据。使用 scope="session" 的 fixture 最为合适，它会在整个测试会话期间只创建一次，并在所有测试用例中共享。
+# conftest.py
+import
+pytest
+@pytest.fixture(
+scope=
+"session"
+)
+def
+api_logined_data
+():
+"""存储登录后得到的 token 和 username"""
+return
+{}
+# 初始为空字典，后续由登录用例填充
+3. 标记登录用例为第一个执行
+在登录测试函数上使用 @Pytest.mark.order(1)，确保它第一个运行。
+# test_login.py
+import
+pytest
+@pytest.mark.order(
+1
+)
+def
+test_api_login
+(
+api_client, api_logined_data
+):
+"""登录接口测试用例，执行成功后保存 token 和 username"""
+response = api_client.post(
+"/login"
+, json={
+"username"
+:
+"test"
+,
+"password"
+:
+"123456"
+})
+assert
+response.status_code ==
+200
+data = response.json()
+token = data.get(
+"token"
+)
+username = data.get(
+"username"
+)
+assert
+token
+is
+not
+None
+assert
+username
+is
+not
+None
+# 保存到共享 fixture 中
+api_logined_data[
+"token"
+] = token
+api_logined_data[
+"username"
+] = username
+print
+(
+f"登录成功，token:
+{token}
+, username:
+{username}
+"
+)
+注意：
+api_client 是你可能自定义的 HTTP 请求 fixture，本文中仅作示意。
+4. 在其他测试用例中使用共享数据
+其他接口测试用例可以通过注入 api_logined_data 来获取 token 和 username，并在请求头中使用。
+# test_other.py
+import
+pytest
+def
+test_get_user_profile
+(
+api_client, api_logined_data
+):
+"""获取用户信息接口，依赖登录 token"""
+token = api_logined_data.get(
+"token"
+)
+username = api_logined_data.get(
+"username"
+)
+# 后续会处理 token 不存在的情况，这里先假设存在
+headers = {
+"token"
+: token,
+"username"
+: username}
+response = api_client.get(
+"/user/profile"
+, headers=headers)
+assert
+response.status_code ==
+200
+5. 处理登录失败的情况：跳过后续依赖用例
+如果登录用例失败（例如断言失败或抛出异常），后续使用共享数据的用例会因为 api_logined_data 中没有 token 而报 KeyError，导致大量失败。更合理的做法是当登录数据不存在时，直接跳过当前用例，表示该用例因前置条件不满足而无法执行。
+我们可以使用 pytest.skip 来实现：
+# test_other.py
+import
+pytest
+def
+test_get_user_profile
+(
+api_client, api_logined_data
+):
+try
+:
+token = api_logined_data[
+"token"
+]
+username = api_logined_data[
+"username"
+]
+except
+KeyError:
+pytest.skip(
+"登录失败或未执行，跳过当前用例"
+)
+headers = {
+"token"
+: token,
+"username"
+: username}
+response = api_client.get(
+"/user/profile"
+, headers=headers)
+assert
+response.status_code ==
+200
+这样，如果登录用例失败，后续所有依赖登录的用例都会被标记为 skipped，而不会显示为失败。测试报告会更清晰地反映出真正的问题所在。
+03
+完整示例代码结构
+为了方便理解，这里给出一个简化后的项目结构示例：
+├── conftest.py
+# 存放共享 fixture
+├── test_login.py
+# 登录用例，标记 order=1
+├── test_user.py
+# 用户相关接口，依赖登录数据
+└── test_order.py
+# 其他模块，同样依赖登录数据
+conftest.py
+import
+pytest
+@pytest.fixture(
+scope=
+"session"
+)
+def
+api_logined_data
+():
+return
+{}
+test_login.py
+import
+pytest
+@pytest.mark.order(
+1
+)
+def
+test_api_login
+(
+api_logined_data
+):
+# 模拟登录成功，保存数据
+api_logined_data[
+"token"
+] =
+"fake_token_123"
+api_logined_data[
+"username"
+] =
+"test_user"
+assert
+True
+# 实际测试中应有真实断言
+test_user.py
+import
+pytest
+def
+test_get_profile
+(
+api_logined_data
+):
+try
+:
+token = api_logined_data[
+"token"
+]
+username = api_logined_data[
+"username"
+]
+except
+KeyError:
+pytest.skip(
+"登录失败，跳过"
+)
+# 使用 token 和 username 发起请求...
+assert
+token ==
+"fake_token_123"
+04
+注意事项
+pytest-order 的标记方式：
+除了 @Pytest.mark.order(1)，还可以使用 before、after 等更灵活的标记，具体可参考其官方文档。
+fixture 的 scope 选择：
+这里使用 session 是因为登录数据只需获取一次，且在整个测试过程中保持不变。如果 token 会过期，可能需要考虑更复杂的刷新机制。
+跳过与失败的取舍：
+用 Pytest.skip 跳过依赖用例，而不是让它们因为 KeyError 而失败，可以让测试报告更聚焦于真正的失败点（登录失败本身）。
+数据隔离：
+如果有多组测试数据（例如不同用户），可以考虑将共享数据设计为字典的字典，或以其他方式隔离，避免数据污染。
+05
+总结
+通过 Pytest-order 控制用例顺序 + session 级别 fixture 共享数据，我们可以轻松实现“先登录，后执行其他接口”的测试需求。
+同时，使用 Pytest.skip 优雅地处理登录失败的场景，让测试结果更加清晰。这套方案已经在多个接口自动化项目中实践，稳定可靠，值得一试。
+END
+链接：
+https://juejin.cn/post/7611832090888945704
+本文为51Testing经授权转载，转载文章所包含的文字来源于作者。如因内容或版权等问题，请联系51Testing进行删除
+点点赞
+点分享
+点推荐

@@ -26,7 +26,7 @@ export const useUserStore = defineStore('user', () => {
 
   const login = async (credentials) => {
     try {
-      const response = await api.post('/auth/login/', credentials)
+      const response = await api.post('/users/login/', credentials)
 
       // 保存双token
       accessToken.value = response.data.access
@@ -52,7 +52,7 @@ export const useUserStore = defineStore('user', () => {
   const register = async (userData) => {
     try {
       // 临时使用测试接口
-      const response = await api.post('/auth/test-register/', userData)
+      const response = await api.post('/users/test-register/', userData)
 
       // 保存双token
       accessToken.value = response.data.access || response.data.token
@@ -92,7 +92,7 @@ export const useUserStore = defineStore('user', () => {
       // 如果token已过期，直接清除本地状态即可，避免401死循环
       if (refreshToken.value && !isTokenExpired.value) {
         try {
-          await api.post('/auth/logout/', { refresh: refreshToken.value })
+          await api.post('/users/logout/', { refresh: refreshToken.value })
         } catch (apiError) {
           // logout API调用失败不影响本地清除操作
           console.error('Logout API调用失败:', apiError)
@@ -120,7 +120,7 @@ export const useUserStore = defineStore('user', () => {
   // 刷新access token
   const refreshAccessToken = async () => {
     try {
-      const response = await api.post('/auth/token/refresh/', {
+      const response = await api.post('/users/token/refresh/', {
         refresh: refreshToken.value
       })
 
@@ -161,7 +161,7 @@ export const useUserStore = defineStore('user', () => {
 
   const fetchProfile = async () => {
     try {
-      const response = await api.get('/auth/profile/')
+      const response = await api.get('/users/profile/')
       user.value = response.data
       localStorage.setItem('user', JSON.stringify(user.value))
       return response.data

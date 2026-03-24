@@ -1,12 +1,5 @@
 <template>
-  <div class="dashboard-container">
-    <el-card shadow="hover" class="page-card">
-      <template #header>
-        <div class="card-header page-header" style="margin-bottom: 0;">
-          <h2 class="page-title">数据看板</h2>
-        </div>
-      </template>
-    </el-card>
+  <BasePage title="数据看板">
     <!-- 数据概览 -->
     <div class="stats-section">
       <el-row :gutter="20">
@@ -250,9 +243,8 @@
         </div>
       </el-card>
     </div>
-  </div>
+  </BasePage>
 </template>
-
 <script setup>
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'

@@ -1,14 +1,12 @@
 <template>
-  <div class="page-container">
-    <div class="page-header">
-      <h3 class="page-title">自动化测试</h3>
-      <div class="header-actions">
-        <el-button type="primary" @click="showCreateSuiteDialog = true">
-          <el-icon><Plus /></el-icon>
-          新建测试套件
-        </el-button>
-      </div>
-    </div>
+  <BasePage title="自动化测试">
+    <template #actions>
+      <el-button type="primary" @click="showCreateSuiteDialog = true">
+        <el-icon><Plus /></el-icon>
+        新建测试套件
+      </el-button>
+    </template>
+    
 
     <div class="main-content">
       <div class="card-container">
@@ -449,9 +447,8 @@
         <el-button @click="showExecutionDialog = false">关闭</el-button>
       </template>
     </el-dialog>
-  </div>
+  </BasePage>
 </template>
-
 <script setup>
 import { ref, reactive, onMounted, computed, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -959,49 +956,15 @@ onMounted(() => {
 }
 
 /* 页面特定样式 */
-.page-container {
-  padding: 0;
-  display: flex;
-  flex-direction: column;
 
-  max-width: 100%; /* 新增：覆盖全局样式的 max-width: 1600px，确保铺满 */
-}
 
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 15px 20px;
-  border-bottom: 1px solid #e6e6e6;
-  background: white;
-  flex-shrink: 0;
-}
 
-.page-title {
-  margin: 0;
-  font-size: 24px;
-  font-weight: 600;
-  color: #303133;
-  position: relative;
-  padding-left: 16px;
-}
 
-.page-title::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 4px;
-  height: 20px;
-  background: var(--primary-color, #409eff);
-  border-radius: 2px;
-}
 
-.header-actions {
-  display: flex;
-  gap: 15px;
-}
+
+
+
+
 
 .main-content {
   flex: 1;

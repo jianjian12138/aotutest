@@ -1,9 +1,5 @@
 <template>
-  <div class="page-container">
-    <div class="page-header">
-      <h1 class="page-title">AI生成用例记录</h1>
-    </div>
-
+  <BasePage title="AI生成用例记录">
     <div class="card-container">
     <div class="filters-section">
       <div class="filter-card">
@@ -54,6 +50,16 @@
         <div class="stat-item">
           <span class="stat-number">{{ allStats.failed }}</span>
           <span class="stat-label">失败</span>
+        </div>
+      </div>
+      <div class="charts-section">
+        <div class="chart-card">
+          <div class="chart-title">状态分布</div>
+          <div class="chart-container" ref="statusPieRef"></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">概览对比</div>
+          <div class="chart-container" ref="barRef"></div>
         </div>
       </div>
     </div>
@@ -239,7 +245,7 @@
           </div>
           <div class="detail-item">
             <label>测试步骤:</label>
-            <p class="test-steps" v-html="selectedTestCaseDetail.test_steps"></p>
+            <div class="test-steps markdown-body" v-html="formatMarkdown(selectedTestCaseDetail.test_steps)"></div>
           </div>
           <div class="detail-item">
             <label>预期结果:</label>
@@ -378,12 +384,13 @@
         </div>
       </div>
     </div>
-  </div>
+  </BasePage>
 </template>
-
 <script>
 import api from '@/utils/api'
 import { ElMessage } from 'element-plus'
+import * as echarts from 'echarts'
+import { marked } from 'marked'
 
 export default {
   name: 'GeneratedTestCaseList',
@@ -428,7 +435,9 @@ export default {
         completed: 0,
         running: 0,
         failed: 0
-      }
+      },
+      statusPieChart: null,
+      barChart: null
     }
   },
 
@@ -466,9 +475,77 @@ export default {
     this.loadTasks()
     this.fetchProjects()
     this.fetchAllVersions()
+    window.addEventListener('resize', this.handleResize)
   },
   
   methods: {
+    formatMarkdown(text) {
+      if (!text) return ''
+      try {
+        return marked.parse(text)
+      } catch (e) {
+        return text
+      }
+    },
+    handleResize() {
+      if (this.statusPieChart) this.statusPieChart.resize()
+      if (this.barChart) this.barChart.resize()
+    },
+    renderCharts() {
+      const pieDom = this.$refs.statusPieRef
+      const barDom = this.$refs.barRef
+      if (pieDom && !this.statusPieChart) {
+        this.statusPieChart = echarts.init(pieDom)
+      }
+      if (barDom && !this.barChart) {
+        this.barChart = echarts.init(barDom)
+      }
+      const pieOption = {
+        tooltip: { trigger: 'item' },
+        legend: { bottom: 0 },
+        series: [
+          {
+            name: '状态',
+            type: 'pie',
+            radius: ['45%','70%'],
+            avoidLabelOverlap: false,
+            itemStyle: { borderRadius: 6, borderColor: '#fff', borderWidth: 2 },
+            label: { formatter: '{b}: {c} ({d}%)' },
+            data: [
+              { value: this.allStats.completed, name: '已完成' },
+              { value: this.allStats.running, name: '进行中' },
+              { value: this.allStats.failed, name: '失败' }
+            ]
+          }
+        ]
+      }
+      const barOption = {
+        tooltip: { trigger: 'axis' },
+        xAxis: { type: 'category', data: ['总数', '已完成', '进行中', '失败'] },
+        yAxis: { type: 'value' },
+        series: [
+          {
+            data: [
+              this.allStats.total,
+              this.allStats.completed,
+              this.allStats.running,
+              this.allStats.failed
+            ],
+            type: 'bar',
+            itemStyle: {
+              color: function(params) {
+                const colors = ['#3498db','#67C23A','#E6A23C','#F56C6C']
+                return colors[params.dataIndex] || '#409EFF'
+              },
+              borderRadius: [6,6,0,0]
+            },
+            barWidth: '40%'
+          }
+        ]
+      }
+      if (this.statusPieChart) this.statusPieChart.setOption(pieOption)
+      if (this.barChart) this.barChart.setOption(barOption)
+    },
     async loadTasks() {
       this.isLoading = true
       try {
@@ -587,7 +664,6 @@ export default {
     },
 
     updateStats() {
-      // 不再使用当前页数据统计，改为调用专门的统计方法
       this.loadAllStats()
     },
 
@@ -612,22 +688,21 @@ export default {
         const response = await api.get(url)
         const allTasks = response.data.results || response.data || []
         
-        // 统计各状态的数量
         this.allStats.total = allTasks.length
         this.allStats.completed = allTasks.filter(t => t.status === 'completed').length
         this.allStats.running = allTasks.filter(t => ['pending', 'generating', 'reviewing'].includes(t.status)).length
         this.allStats.failed = allTasks.filter(t => t.status === 'failed').length
+        this.$nextTick(() => this.renderCharts())
         
       } catch (error) {
-        console.error('获取统计数据失败:', error)
-        // 如果获取统计失败，使用分页信息的总数作为备选
         this.allStats.total = this.pagination.total || 0
         this.allStats.completed = 0
         this.allStats.running = 0
         this.allStats.failed = 0
+        this.$nextTick(() => this.renderCharts())
       }
     },
-
+ 
     getStatusText(status) {
       const statusMap = {
         'pending': '需求分析中',
@@ -999,60 +1074,10 @@ export default {
 
 <style scoped>
 /* 页面特定样式 */
-.page-container {
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  
-  max-width: 100%; /* 新增：覆盖全局样式的 max-width: 1600px，确保铺满 */
-}
-
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 15px 20px;
-  border-bottom: 1px solid #e6e6e6;
-  background: white;
-  flex-shrink: 0;
-}
-
-.page-title {
-  margin: 0;
-  font-size: 24px;
-  font-weight: 600;
-  color: #303133;
-  position: relative;
-  padding-left: 16px;
-}
-
-.page-title::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 4px;
-  height: 20px;
-  background: var(--primary-color, #409eff);
-  border-radius: 2px;
-}
-
-.header-actions {
-  display: flex;
-  gap: 15px;
-}
 .generated-testcase-list {
   padding: 20px;
   max-width: 1400px;
   margin: 0 auto;
-}
-
-/* .page-header styles removed to match ProjectList.vue global styles */
-
-/* 过滤器部分 */
-.filters-section {
-  margin-bottom: 15px; /* 进一步减少底部边距 */
 }
 
 .filter-card {
@@ -1150,7 +1175,7 @@ export default {
   padding: 25px;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
   display: flex;
-  gap: 40px; /* 调整间距，因为现在有4个项目 */
+  gap: 40px;
   justify-content: center;
 }
 
@@ -1170,6 +1195,31 @@ export default {
 .stat-label {
   color: #666;
   font-size: 0.9rem;
+}
+
+.charts-section {
+  margin-top: 16px;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+.chart-card {
+  background: white;
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.chart-title {
+  font-size: 14px;
+  color: #606266;
+  margin-bottom: 8px;
+}
+
+.chart-container {
+  width: 100%;
+  height: 260px;
 }
 
 /* 测试用例列表 */

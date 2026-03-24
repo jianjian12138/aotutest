@@ -1,12 +1,8 @@
 <template>
-  <div class="page-container">
-    <div class="page-header">
-      <h1 class="page-title">{{ isEdit ? '编辑评审' : '创建评审' }}</h1>
-      <div>
-        <el-button @click="$router.back()">返回</el-button>
-        <el-button type="primary" @click="saveReview" :loading="saving">保存</el-button>
-      </div>
-    </div>
+  <BasePage :title=" isEdit ? '编辑评审' : '创建评审' ">
+    
+    
+
 
     <div class="form-container">
       <el-form :model="form" :rules="rules" ref="formRef" label-width="120px">
@@ -166,9 +162,9 @@
         <el-button type="primary" @click="confirmTestcaseSelection">确定</el-button>
       </template>
     </el-dialog>
-  </div>
-</template>
 
+  </BasePage>
+</template>
 <script setup>
 import { ref, reactive, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -229,7 +225,7 @@ const fetchProjects = async () => {
 
 const fetchProjectUsers = async () => {
   try {
-    const response = await api.get('/auth/users/')
+    const response = await api.get('/users/list/')
     projectUsers.value = response.data.results || response.data || []
     console.log('All users:', projectUsers.value) // 调试用
   } catch (error) {
@@ -494,13 +490,7 @@ onMounted(() => {
 
 <style lang="scss" scoped>
 /* 页面特定样式 */
-.page-container {
-  padding: 0;
-  display: flex;
-  flex-direction: column;
 
-  max-width: 100%; /* 新增：覆盖全局样式的 max-width: 1600px，确保铺满 */
-}
 
 .testcase-selector {
   .search-bar {

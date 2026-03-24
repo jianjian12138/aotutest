@@ -1,17 +1,13 @@
 <template>
-  <div class="scheduled-task-management">
-    <el-card shadow="hover">
-      <template #header>
-        <div class="card-header page-header" style="margin-bottom: 0;">
-          <h2 class="page-title">定时任务管理</h2>
-          <el-button type="primary" @click="handleCreateScheduledTask">
-            <el-icon><Plus /></el-icon>
-            新建定时任务
-          </el-button>
-        </div>
-      </template>
-      
-      <!-- 搜索和筛选 -->
+  <BasePage title="定时任务管理">
+    <template #actions>
+      <el-button type="primary" @click="handleCreateScheduledTask">
+        <el-icon><Plus /></el-icon>
+        新建任务
+      </el-button>
+    </template>
+
+    <div class="content">
       <div class="search-filter">
         <el-row :gutter="20">
           <el-col :span="8">
@@ -111,7 +107,6 @@
           @current-change="handleCurrentChange"
         />
       </div>
-    </el-card>
     
     <!-- 新建定时任务对话框 -->
     <el-dialog
@@ -156,8 +151,8 @@
       </template>
     </el-dialog>
   </div>
+  </BasePage>
 </template>
-
 <script setup>
 import { ref, onMounted, reactive } from 'vue'
 import { useRouter } from 'vue-router'
@@ -395,13 +390,7 @@ onMounted(() => {
 
 <style scoped>
 /* 页面特定样式 */
-.page-container {
-  padding: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  max-width: 100%; /* 新增：覆盖全局样式的 max-width: 1600px，确保铺满 */
-}
+
 .scheduled-task-management {
   padding: 0;
 }

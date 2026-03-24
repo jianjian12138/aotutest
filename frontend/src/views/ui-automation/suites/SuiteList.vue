@@ -1,17 +1,12 @@
 <template>
-  <div class="test-case-manager">
-    <div class="page-header">
-      <h1 class="page-title">测试套件管理</h1>
-      <div class="header-actions">
-        <el-select v-model="projectId" placeholder="选择项目" style="width: 200px; margin-right: 15px" @change="onProjectChange">
+  <BasePage title="测试套件管理">
+    <template #actions><el-select v-model="projectId" placeholder="选择项目" style="width: 200px; margin-right: 15px" @change="onProjectChange">
           <el-option v-for="project in projects" :key="project.id" :label="project.name" :value="project.id" />
         </el-select>
         <el-button type="primary" @click="handleNewSuite">
           <el-icon><Plus /></el-icon>
           新增套件
-        </el-button>
-      </div>
-    </div>
+        </el-button></template>
     
     <div class="main-content">
       <!-- 左侧：套件列表 -->
@@ -29,7 +24,8 @@
             >
               <template #prefix>
                 <el-icon><Search /></el-icon>
-              </template>
+            </template>
+  
             </el-input>
             <el-button type="primary" size="default" style="margin-left: 10px" @click="handleSearch">
               查询
@@ -229,9 +225,10 @@
           <el-select v-model="runConfig.engine" placeholder="请选择测试引擎">
             <el-option label="Playwright" value="playwright" />
             <el-option label="Selenium" value="selenium" />
+            <el-option label="微信Minium" value="minium" />
           </el-select>
         </el-form-item>
-        <el-form-item label="浏览器">
+        <el-form-item label="浏览器" v-show="runConfig.engine !== 'minium'">
           <el-select v-model="runConfig.browser" placeholder="请选择浏览器">
             <el-option label="Chrome" value="chrome" />
             <el-option label="Firefox" value="firefox" />
@@ -239,7 +236,17 @@
             <el-option label="Edge" value="edge" />
           </el-select>
         </el-form-item>
-        <el-form-item label="执行模式">
+        <el-form-item label="H5设备模拟" v-show="['playwright', 'selenium'].includes(runConfig.engine)">
+          <el-select v-model="runConfig.device_name" placeholder="选择H5模拟设备" clearable>
+            <el-option label="不模拟(桌面端)" value="" />
+            <el-option label="iPhone 12" value="iPhone 12" />
+            <el-option label="iPhone 12 Pro" value="iPhone 12 Pro" />
+            <el-option label="iPhone 13" value="iPhone 13" />
+            <el-option label="Pixel 5" value="Pixel 5" />
+            <el-option label="Galaxy S5" value="Galaxy S5" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="执行模式" v-show="runConfig.engine !== 'minium'">
           <el-radio-group v-model="runConfig.headless">
             <el-radio :label="false">有头模式</el-radio>
             <el-radio :label="true">无头模式</el-radio>
@@ -259,9 +266,9 @@
         </span>
       </template>
     </el-dialog>
-  </div>
+  
+  </BasePage>
 </template>
-
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -322,7 +329,8 @@ const testCaseSearchText = ref('')
 const runConfig = reactive({
   engine: 'playwright',
   browser: 'chrome',
-  headless: false
+  headless: false,
+  device_name: ''
 })
 const currentRunningSuite = ref(null)
 
@@ -554,7 +562,8 @@ const confirmRunSuite = async () => {
       use_ai: false,
       engine: runConfig.engine,
       browser: runConfig.browser,
-      headless: runConfig.headless
+      headless: runConfig.headless,
+      device_name: runConfig.device_name
     }
 
     const response = await runTestSuite(currentRunningSuite.value.id, requestData)
@@ -778,24 +787,11 @@ const handleNewSuite = async () => {
   flex-direction: column;
 }
 
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 15px 20px;
-  border-bottom: 1px solid #e6e6e6;
-  background: white;
-}
 
-.page-title {
-  margin: 0;
-  font-size: 24px;
-}
 
-.header-actions {
-  display: flex;
-  align-items: center;
-}
+
+
+
 
 .main-content {
   flex: 1;

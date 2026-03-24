@@ -1,31 +1,27 @@
 <template>
-  <div class="page-container">
-    <div class="page-header">
-      <h1 class="page-title">用户管理</h1>
-      <div class="header-actions">
-        <el-input
-          v-model="searchKeyword"
-          placeholder="搜索用户名/邮箱"
-          clearable
-          style="width: 300px; margin-right: 10px"
-          @input="handleSearch"
-        >
-          <template #prefix>
-            <el-icon><Search /></el-icon>
-          </template>
-        </el-input>
-        <el-button type="primary" @click="showAddDialog = true">
-          <el-icon><Plus /></el-icon>
-          新增用户
-        </el-button>
-      </div>
-    </div>
+  <BasePage title="用户管理">
+    <template #actions>
+      <el-input
+        v-model="searchKeyword"
+        placeholder="搜索用户名/邮箱"
+        clearable
+        style="width: 300px; margin-right: 10px"
+        @input="handleSearch"
+      >
+        <template #prefix>
+          <el-icon><Search /></el-icon>
+        </template>
+      </el-input>
+      <el-button type="primary" @click="showAddDialog = true">
+        <el-icon><Plus /></el-icon>
+        新增用户
+      </el-button>
+    </template>
     
-    <div class="card-container">
-      <div class="content">
-        <!-- 用户列表 -->
-        <el-table 
-          :data="filteredUsers" 
+    <div class="content">
+      <!-- 用户列表 -->
+      <el-table 
+        :data="filteredUsers" 
           v-loading="loading" 
           style="width: 100%"
           border
@@ -66,18 +62,16 @@
           </el-table-column>
         </el-table>
 
-        <!-- 分页 -->
-        <div class="pagination-container">
-          <el-pagination
-            v-model:current-page="currentPage"
-            v-model:page-size="pageSize"
-            :page-sizes="[10, 20, 50, 100]"
-            :total="total"
-            layout="total, sizes, prev, pager, next, jumper"
-            @size-change="handleSizeChange"
-            @current-change="handleCurrentChange"
-          />
-        </div>
+      <div class="pagination-container">
+        <el-pagination
+          v-model:current-page="currentPage"
+          v-model:page-size="pageSize"
+          :page-sizes="[10, 20, 50, 100]"
+          :total="total"
+          layout="total, sizes, prev, pager, next, jumper"
+          @size-change="handleSizeChange"
+          @current-change="handleCurrentChange"
+        />
       </div>
     </div>
 
@@ -165,7 +159,7 @@
         </el-button>
       </template>
     </el-dialog>
-  </div>
+  </BasePage>
 </template>
 
 <script setup>
@@ -264,7 +258,7 @@ const filteredUsers = computed(() => {
 const loadUsers = async () => {
   loading.value = true
   try {
-    const response = await api.get('/users/users/')
+    const response = await api.get('/users/list/')
     users.value = response.data.results || response.data
     total.value = response.data.count || users.value.length
   } catch (error) {
@@ -327,7 +321,7 @@ const handleAddUser = async () => {
   
   submitting.value = true
   try {
-    const response = await api.post('/users/users/', {
+    const response = await api.post('/users/register/', {
       username: addForm.username,
       email: addForm.email,
       password: addForm.password,
@@ -383,7 +377,7 @@ const handleUpdateUser = async () => {
       data.password = editForm.password
     }
     
-    await api.put(`/users/users/${editForm.id}/`, data)
+    await api.put(`/users/${editForm.id}/`, data)
     
     ElMessage.success('用户更新成功')
     showEditDialog.value = false
@@ -409,7 +403,7 @@ const handleDelete = async (user) => {
       }
     )
     
-    await api.delete(`/users/users/${user.id}/`)
+    await api.delete(`/users/${user.id}/`)
     ElMessage.success('用户删除成功')
     await loadUsers()
   } catch (error) {
@@ -423,7 +417,7 @@ const handleDelete = async (user) => {
 // 修改用户状态
 const handleStatusChange = async (user) => {
   try {
-    await api.patch(`/users/users/${user.id}/`, {
+    await api.patch(`/users/${user.id}/`, {
       is_active: user.is_active
     })
     ElMessage.success('用户状态更新成功')
@@ -443,49 +437,6 @@ onMounted(async () => {
 
 <style scoped>
 /* 页面特定样式 */
-.page-container {
-  height: 100vh;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  max-width: 100%; /* 新增：覆盖全局样式的 max-width: 1600px，确保铺满 */
-}
-
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 15px 20px;
-  border-bottom: 1px solid #e6e6e6;
-  background: white;
-  flex-shrink: 0;
-}
-
-.page-title {
-  margin: 0;
-  font-size: 24px;
-  font-weight: 600;
-  color: #303133;
-  position: relative;
-  padding-left: 16px;
-}
-
-.page-title::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 4px;
-  height: 20px;
-  background: var(--primary-color, #409eff);
-  border-radius: 2px;
-}
-
-.header-actions {
-  display: flex;
-  gap: 15px;
-}
 
 .content {
   padding: 0;

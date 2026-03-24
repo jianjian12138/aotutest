@@ -173,3 +173,36 @@ export function getOperationLogs(params) {
     params
   })
 }
+
+// ==================== API测试模块相关API ====================
+
+export function getApiTestCaseModules(params) {
+  return api({
+    url: '/api-testing/testcase-modules/tree/',
+    method: 'get',
+    params
+  })
+}
+
+export function createApiTestCaseModule(data) {
+  return api({
+    url: '/api-testing/testcase-modules/',
+    method: 'post',
+    data
+  })
+}
+
+export function updateApiTestCaseModule(id, data) {
+  return api({
+    url: `/api-testing/testcase-modules/${id}/`,
+    method: 'patch',
+    data
+  })
+}
+
+export function deleteApiTestCaseModule(id) {
+  return api({
+    url: `/api-testing/testcase-modules/${id}/`,
+    method: 'delete'
+  })
+}

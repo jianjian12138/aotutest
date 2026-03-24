@@ -1,0 +1,34 @@
+
+    <html>
+    <head>
+        <title>Automated Test Report - Dev Environment</title>
+        <style>
+            body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f7f6; }
+            h1 { color: #333; text-align: center; }
+            h2 { color: #444; border-bottom: 2px solid #ddd; padding-bottom: 5px; }
+            .summary-card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 20px; }
+            table { width: 100%; border-collapse: collapse; background: white; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border-radius: 8px; overflow: hidden; }
+            th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
+            th { background-color: #f8f9fa; font-weight: bold; color: #333; }
+            tr:hover { background-color: #f1f3f5; }
+            .Pass { color: #28a745; font-weight: bold; }
+            .Fail { color: #dc3545; font-weight: bold; }
+        </style>
+    </head>
+    <body>
+        <h1>Automated Test Report</h1>
+        <div class="summary-card">
+            <h3>Environment Tested</h3>
+            <p><strong>API Backend:</strong> http://127.0.0.1:8000</p>
+            <p><strong>Web Frontend:</strong> http://127.0.0.1:3000</p>
+            <p><strong>Test Date:</strong> 2026-03-24 11:40:27</p>
+        </div>
+    <h2>API Tests</h2><table><tr><th>Test Name</th><th>Status</th><th>Details</th></tr><tr><td>GET /api/schema/</td><td class='Pass'>Pass</td><td>Status: 200, Time: 2.11s</td></tr><tr><td>GET /api/invalid/</td><td class='Pass'>Pass</td><td>Correct 404 response</td></tr></table><br><h2>WEB Tests</h2><table><tr><th>Test Name</th><th>Status</th><th>Details</th></tr><tr><td>Web Initialization</td><td class='Fail'>Fail</td><td>BrowserType.launch: Executable doesn&#x27;t exist at C:\Users\admin\AppData\Local\ms-playwright\chromium_headless_shell-1200\chrome-headless-shell-win64\chrome-headless-shell.exe
+╔════════════════════════════════════════════════════════════╗
+║ Looks like Playwright was just installed or updated.       ║
+║ Please run the following command to download new browsers: ║
+║                                                            ║
+║     playwright install                                     ║
+║                                                            ║
+║ &lt;3 Playwright Team                                         ║
+╚════════════════════════════════════════════════════════════╝</td></tr></table><br><h2>PERFORMANCE Tests</h2><table><tr><th>Test Name</th><th>Status</th><th>Details</th></tr><tr><td>20 Concurrent Requests</td><td class='Fail'>Fail</td><td>Success: 0/20, Avg Time: 5.205s</td></tr></table><br><h2>SECURITY Tests</h2><table><tr><th>Test Name</th><th>Status</th><th>Details</th></tr><tr><td>Security Headers Check</td><td class='Pass'>Pass</td><td>Issues found (expected in dev): Missing X-Frame-Options</td></tr><tr><td>Basic SQLi Handling</td><td class='Pass'>Pass</td><td>Returned handled status code: 200</td></tr></table><br></body></html>

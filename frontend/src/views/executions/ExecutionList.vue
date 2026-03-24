@@ -1,8 +1,6 @@
 <template>
-  <div class="page-container">
-    <div class="page-header">
-      <h1 class="page-title">执行记录</h1>
-    </div>
+  <BasePage title="执行记录">
+    
     
     <div class="card-container">
       <el-card shadow="hover">
@@ -18,7 +16,7 @@
           >
             <template #prefix>
               <el-icon><Search /></el-icon>
-            </template>
+  
           </el-input>
           <el-button type="primary" @click="handleSearch">搜索</el-button>
         </div>
@@ -66,8 +64,9 @@
       </el-card>
     </div>
   </div>
-</template>
 
+  </BasePage>
+</template>
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
@@ -149,12 +148,8 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.page-container {
-  padding: 20px;
-}
-.page-header {
-  margin-bottom: 20px;
-}
+
+
 .search-filter {
   margin-bottom: 20px;
   display: flex;

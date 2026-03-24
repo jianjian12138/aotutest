@@ -1,8 +1,6 @@
 <template>
-  <div class="page-container">
-    <div class="page-header">
-      <h1 class="page-title">个人设置</h1>
-    </div>
+  <BasePage title="个人设置">
+    
     
     <div class="card-container">
       <el-tabs v-model="activeTab">
@@ -47,9 +45,8 @@
         </el-tab-pane>
       </el-tabs>
     </div>
-  </div>
+  </BasePage>
 </template>
-
 <script setup>
 import { ref } from 'vue'
 import { useUserStore } from '@/stores/user'

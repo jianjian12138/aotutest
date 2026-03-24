@@ -1,141 +1,134 @@
 <template>
-  <div class="sql-generation-container">
-    <el-card shadow="hover" class="main-card">
-      <template #header>
-        <div class="card-header page-header" style="margin-bottom: 0;">
-          <h2 class="page-title">SQL 生成</h2>
-          <div class="header-actions">
-            <el-button type="primary" size="small" @click="generateSqlAction">
-              <el-icon><ChatDotRound /></el-icon>
-              生成 SQL
-            </el-button>
-            <el-button size="small" @click="executeSqlAction" :disabled="!generatedSql">
-              <el-icon><VideoPlay /></el-icon>
-              执行 SQL
-            </el-button>
-            <el-button size="small" @click="saveQueryDialogVisible = true" :disabled="!generatedSql">
-              <el-icon><Document /></el-icon>
-              保存查询
-            </el-button>
-          </div>
-        </div>
-      </template>
-      
-      <div class="generation-content">
-        <!-- 配置选择和自然语言输入 -->
-        <div class="input-section">
-          <el-row :gutter="20">
-            <el-col :span="8">
-              <el-form-item label="SQL生成配置">
-                <el-select
-                  v-model="selectedConfig"
-                  placeholder="选择 AI SQL 配置"
-                  style="width: 100%"
-                  @change="handleConfigChange"
+  <BasePage title="SQL 生成">
+    <template #actions>
+      <el-button type="primary" size="small" @click="generateSqlAction">
+        <el-icon><ChatDotRound /></el-icon>
+        生成 SQL
+      </el-button>
+      <el-button size="small" @click="executeSqlAction" :disabled="!generatedSql">
+        <el-icon><VideoPlay /></el-icon>
+        执行 SQL
+      </el-button>
+      <el-button size="small" @click="saveQueryDialogVisible = true" :disabled="!generatedSql">
+        <el-icon><Document /></el-icon>
+        保存查询
+      </el-button>
+    </template>
+    
+    <div class="generation-content">
+      <!-- 配置选择和自然语言输入 -->
+      <div class="input-section">
+        <el-row :gutter="20">
+          <el-col :span="8">
+            <el-form-item label="SQL生成配置">
+              <el-select
+                v-model="selectedConfig"
+                placeholder="选择 AI SQL 配置"
+                style="width: 100%"
+                @change="handleConfigChange"
+              >
+                <el-option
+                  v-for="config in configs"
+                  :key="config.id"
+                  :label="config.name"
+                  :value="config.id"
                 >
-                  <el-option
-                    v-for="config in configs"
-                    :key="config.id"
-                    :label="config.name"
-                    :value="config.id"
-                  >
-                    <span>{{ config.name }}</span>
-                    <span v-if="!config.is_active" style="color: #909399; font-size: 12px; margin-left: 10px;">(已停用)</span>
-                  </el-option>
-                </el-select>
-              </el-form-item>
-            </el-col>
-          </el-row>
-          
-          <el-form-item label="自然语言查询">
-            <el-input
-              v-model="naturalLanguage"
-              type="textarea"
-              :rows="4"
-              placeholder="请输入您的查询需求，例如：查询最近7天的活跃用户数量"
-              resize="vertical"
-            />
-          </el-form-item>
-        </div>
+                  <span>{{ config.name }}</span>
+                  <span v-if="!config.is_active" style="color: #909399; font-size: 12px; margin-left: 10px;">(已停用)</span>
+                </el-option>
+              </el-select>
+            </el-form-item>
+          </el-col>
+        </el-row>
         
-        <!-- 生成的SQL和执行结果 -->
-        <div class="result-section">
-          <el-tabs v-model="activeTab">
-            <el-tab-pane label="生成的SQL" name="sql">
-              <div class="sql-content">
-                <div v-if="loading" class="loading-sql">
-                  <el-skeleton :rows="10" animated />
-                </div>
-                <div v-else-if="errorMessage" class="error-message">
-                  <el-alert
-                    title="生成失败"
-                    :description="errorMessage"
-                    type="error"
-                    show-icon
-                    :closable="false"
-                  />
-                </div>
-                <div v-else-if="generatedSql" class="generated-sql">
-                  <pre><code>{{ generatedSql }}</code></pre>
-                </div>
-                <div v-else class="empty-sql">
-                  <el-empty description="输入自然语言查询后点击生成按钮" />
-                </div>
-              </div>
-            </el-tab-pane>
-            
-            <el-tab-pane label="执行结果" name="result">
-              <div class="execution-result">
-                <div v-if="executionLoading" class="loading-result">
-                  <el-skeleton :rows="15" animated />
-                </div>
-                <div v-else-if="executionError" class="error-message">
-                  <el-alert
-                    title="执行失败"
-                    :description="executionError"
-                    type="error"
-                    show-icon
-                    :closable="false"
-                  />
-                </div>
-                <div v-else-if="executionResult" class="result-data">
-                  <div class="result-header">
-                    <div class="result-stats">
-                      <span class="stat-item">
-                        <el-icon><Document /></el-icon>
-                        行数: {{ executionResult.row_count || 0 }}
-                      </span>
-                      <span class="stat-item">
-                        <el-icon><Timer /></el-icon>
-                        执行时间: {{ executionResult.execution_time || 0 }}ms
-                      </span>
-                    </div>
-                    <el-button size="small" type="primary" @click="exportResult">
-                      <el-icon><Download /></el-icon>
-                      导出结果
-                    </el-button>
-                  </div>
-                  
-                  <el-table :data="executionResult.rows || []" stripe style="width: 100%" max-height="500px">
-                    <el-table-column
-                      v-for="(col, index) in executionResult.columns || []"
-                      :key="index"
-                      :prop="col"
-                      :label="col"
-                      sortable
-                      show-overflow-tooltip
-                    />
-                  </el-table>
-                </div>
-                <div v-else class="empty-result">
-                  <el-empty description="执行SQL后显示结果" />
-                </div>
-              </div>
-            </el-tab-pane>
-          </el-tabs>
-        </div>
+        <el-form-item label="自然语言查询">
+          <el-input
+            v-model="naturalLanguage"
+            type="textarea"
+            :rows="4"
+            placeholder="请输入您的查询需求，例如：查询最近7天的活跃用户数量"
+            resize="vertical"
+          />
+        </el-form-item>
       </div>
-    </el-card>
+      
+      <!-- 生成的SQL和执行结果 -->
+      <div class="result-section">
+        <el-tabs v-model="activeTab">
+          <el-tab-pane label="生成的SQL" name="sql">
+            <div class="sql-content">
+              <div v-if="loading" class="loading-sql">
+                <el-skeleton :rows="10" animated />
+              </div>
+              <div v-else-if="errorMessage" class="error-message">
+                <el-alert
+                  title="生成失败"
+                  :description="errorMessage"
+                  type="error"
+                  show-icon
+                  :closable="false"
+                />
+              </div>
+              <div v-else-if="generatedSql" class="generated-sql">
+                <pre><code>{{ generatedSql }}</code></pre>
+              </div>
+              <div v-else class="empty-sql">
+                <el-empty description="输入自然语言查询后点击生成按钮" />
+              </div>
+            </div>
+          </el-tab-pane>
+          
+          <el-tab-pane label="执行结果" name="result">
+            <div class="execution-result">
+              <div v-if="executionLoading" class="loading-result">
+                <el-skeleton :rows="15" animated />
+              </div>
+              <div v-else-if="executionError" class="error-message">
+                <el-alert
+                  title="执行失败"
+                  :description="executionError"
+                  type="error"
+                  show-icon
+                  :closable="false"
+                />
+              </div>
+              <div v-else-if="executionResult" class="result-data">
+                <div class="result-header">
+                  <div class="result-stats">
+                    <span class="stat-item">
+                      <el-icon><Document /></el-icon>
+                      行数: {{ executionResult.row_count || 0 }}
+                    </span>
+                    <span class="stat-item">
+                      <el-icon><Timer /></el-icon>
+                      执行时间: {{ executionResult.execution_time || 0 }}ms
+                    </span>
+                  </div>
+                  <el-button size="small" type="primary" @click="exportResult">
+                    <el-icon><Download /></el-icon>
+                    导出结果
+                  </el-button>
+                </div>
+                
+                <el-table :data="executionResult.rows || []" stripe style="width: 100%" max-height="500px">
+                  <el-table-column
+                    v-for="(col, index) in executionResult.columns || []"
+                    :key="index"
+                    :prop="col"
+                    :label="col"
+                    sortable
+                    show-overflow-tooltip
+                  />
+                </el-table>
+              </div>
+              <div v-else class="empty-result">
+                <el-empty description="执行SQL后显示结果" />
+              </div>
+            </div>
+          </el-tab-pane>
+        </el-tabs>
+      </div>
+    </div>
     
     <!-- 保存查询对话框 -->
     <el-dialog
@@ -236,7 +229,8 @@
         </el-table>
       </div>
     </el-card>
-  </div>
+
+  </BasePage>
 </template>
 
 <script setup>
@@ -725,12 +719,7 @@ watch(saveQueryDialogVisible, (newVal) => {
 
 <style scoped>
 /* 页面特定样式 */
-.page-container {
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  max-width: 100%; /* 新增：覆盖全局样式的 max-width: 1600px，确保铺满 */
-}
+
 .sql-generation-container {
   width: 100%;
   padding: 0;
@@ -746,10 +735,7 @@ watch(saveQueryDialogVisible, (newVal) => {
   align-items: center;
 }
 
-.header-actions {
-  display: flex;
-  gap: 10px;
-}
+
 
 .generation-content {
   margin-top: 20px;

@@ -1,12 +1,5 @@
 <template>
-  <div class="dashboard-container">
-      <el-card shadow="hover" class="page-card">
-      <template #header>
-        <div class="card-header page-header" style="margin-bottom: 0;">
-          <h2 class="page-title">数据看板</h2>
-        </div>
-      </template>
-    </el-card>
+  <BasePage title="数据看板">
     <!-- 数据概览 -->
     <div class="stats-section">
       <el-row :gutter="20">
@@ -206,9 +199,9 @@
         </el-col>
       </el-row>
     </div>
-  </div>
+    
+  </BasePage>
 </template>
-
 <script setup>
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
@@ -311,7 +304,7 @@ const formatRelativeTime = (dateString) => {
 
 // 导航到各功能页面
 const goToProjects = () => {
-  router.push('/ui-automation/projects')
+  router.push('/unified/projects')
 }
 
 const goToElements = () => {
@@ -335,7 +328,7 @@ const goToExecutions = () => {
 }
 
 const goToReports = () => {
-  router.push('/ui-automation/reports')
+  router.push('/unified/reports')
 }
 
 // 组件挂载时加载数据

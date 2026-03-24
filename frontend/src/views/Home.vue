@@ -79,7 +79,9 @@ import {
   Connection,
   DocumentChecked,
   Operation,
-  ArrowDown
+  ArrowDown,
+  Tools,
+  Folder
 } from '@element-plus/icons-vue'
 
 const router = useRouter()
@@ -93,9 +95,11 @@ const allCards = [
   { type: 'midscene', title: '自然语言测试', icon: Operation, iconClass: 'midscene-icon' },
   { type: 'security', title: '安全测试', icon: Cpu, iconClass: 'security-icon' },
   { type: 'knowledge', title: '知识图谱', icon: MagicStick, iconClass: 'knowledge-icon' },
+  { type: 'special', title: '专项测试', icon: Tools, iconClass: 'special-icon' },
   { type: 'data', title: '数据工厂', icon: DataLine, iconClass: 'data-icon' },
   { type: 'performance', title: '性能测试', icon: Cpu, iconClass: 'performance-icon' },
-  { type: 'config', title: '配置中心', icon: Setting, iconClass: 'config-icon' }
+  { type: 'config', title: '配置中心', icon: Setting, iconClass: 'config-icon' },
+  { type: 'unified', title: '统一管理', icon: Folder, iconClass: 'unified-icon' }
 ]
 
 const totalItems = allCards.length
@@ -135,9 +139,12 @@ const handleNavigate = (type) => {
     midscene: '/natural-language-testing/web-testing',
     security: '/strix-security/dashboard',
     knowledge: '/knowledge-graph/dashboard',
+    special: '/special-testing/dashboard',
+    cicd: '/configuration/cicd/pipelines',
     data: '/data-factory/dashboard',
     performance: '/performance-test/dashboard',
-    config: '/configuration/ai-model'
+    config: '/configuration/ai-model',
+    unified: '/unified/projects'
   }
 
   if (routes[type]) {
@@ -359,9 +366,12 @@ const handleNavigate = (type) => {
   &.midscene-icon { color: #818cf8; border-color: rgba(99, 102, 241, 0.3); }
   &.security-icon { color: #f97316; border-color: rgba(249, 115, 22, 0.3); }
   &.knowledge-icon { color: #22c55e; border-color: rgba(34, 197, 94, 0.3); }
+  &.special-icon { color: #f43f5e; border-color: rgba(244, 63, 94, 0.3); }
+  &.cicd-icon { color: #06b6d4; border-color: rgba(6, 182, 212, 0.3); }
   &.assistant-icon { color: #fb923c; border-color: rgba(249, 115, 22, 0.3); }
   &.config-icon { color: #94a3b8; border-color: rgba(100, 116, 139, 0.3); }
   &.system-icon { color: #cbd5e1; border-color: rgba(71, 85, 105, 0.3); }
+  &.unified-icon { color: #8b5cf6; border-color: rgba(139, 92, 246, 0.3); }
 }
 
 .planet-info {

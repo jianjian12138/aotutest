@@ -1,13 +1,14 @@
+from apps.notifications.models import NotificationConfig, NotificationLog
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 from .models import (
     ApiProject, ApiCollection, ApiRequest, Environment,
-    ApiTestCase, ApiTestCaseStep, ApiTestCaseExecution,
+    ApiTestCaseModule, ApiTestCase, ApiTestCaseStep, ApiTestCaseExecution,
     RequestHistory, TestSuite, TestExecution, TestSuiteRequest,
-    ScheduledTask, TaskExecutionLog, NotificationConfig, NotificationLog,
-    TaskNotificationSetting, OperationLog, ApiImportTask, TestSuiteTestCase
+    ScheduledTask, TaskExecutionLog, TaskNotificationSetting, OperationLog, ApiImportTask, TestSuiteTestCase
 )
+from django.db import models
 
 User = get_user_model()
 
@@ -265,6 +266,24 @@ class ApiTestCaseExecutionSerializer(serializers.ModelSerializer):
         read_only_fields = ['created_at']
 
 
+class ApiTestCaseModuleSerializer(serializers.ModelSerializer):
+    """API测试用例模块序列化器"""
+    children = serializers.SerializerMethodField()
+    test_case_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ApiTestCaseModule
+        fields = ['id', 'name', 'project', 'parent', 'order', 'children', 'test_case_count', 'created_at', 'updated_at']
+        read_only_fields = ['created_at', 'updated_at']
+
+    def get_children(self, obj):
+        children = obj.children.all()
+        return ApiTestCaseModuleSerializer(children, many=True).data
+
+    def get_test_case_count(self, obj):
+        return obj.test_cases.count()
+
+
 class ApiTestCaseStepSerializer(serializers.ModelSerializer):
     api_request = ApiRequestSerializer(read_only=True)
     api_request_id = serializers.PrimaryKeyRelatedField(
@@ -286,25 +305,67 @@ class ApiTestCaseStepSerializer(serializers.ModelSerializer):
             'created_at', 'updated_at'
         ]
         read_only_fields = ['created_at', 'updated_at']
+        extra_kwargs = {
+            'step_number': {
+                'validators': [] # Disable unique constraint validation here, handled in create()
+            }
+        }
+        validators = [] # Clear Model-level unique_together validators
+
+    def create(self, validated_data):
+        test_case = validated_data.get('test_case')
+        step_number = validated_data.get('step_number')
+        
+        # Check if the step_number already exists for this test_case
+        if ApiTestCaseStep.objects.filter(test_case=test_case, step_number=step_number).exists():
+            # Automatically assign the next available step number
+            max_step = ApiTestCaseStep.objects.filter(test_case=test_case).aggregate(
+                max_step=models.Max('step_number')
+            )['max_step']
+            validated_data['step_number'] = (max_step or 0) + 1
+            
+        return super().create(validated_data)
 
 
 class ApiTestCaseSerializer(serializers.ModelSerializer):
     created_by = UserSerializer(read_only=True)
     steps = ApiTestCaseStepSerializer(many=True, read_only=True)
     steps_count = serializers.IntegerField(read_only=True)
+    module_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
     
     class Meta:
         model = ApiTestCase
         fields = [
-            'id', 'project', 'name', 'description', 
+            'id', 'project', 'module', 'module_id', 'name', 'description', 
             'status', 'priority', 'steps', 'steps_count',
             'created_by', 'created_at', 'updated_at'
         ]
-        read_only_fields = ['created_at', 'updated_at']
+        read_only_fields = ['created_at', 'updated_at', 'module']
 
     def create(self, validated_data):
         validated_data['created_by'] = self.context['request'].user
+        
+        module_id = validated_data.pop('module_id', None)
+        if module_id:
+            try:
+                validated_data['module'] = ApiTestCaseModule.objects.get(id=module_id)
+            except ApiTestCaseModule.DoesNotExist:
+                pass
+                
         return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        module_id = validated_data.pop('module_id', None)
+        if module_id is not None:
+            if module_id:
+                try:
+                    validated_data['module'] = ApiTestCaseModule.objects.get(id=module_id)
+                except ApiTestCaseModule.DoesNotExist:
+                    pass
+            else:
+                validated_data['module'] = None
+                
+        return super().update(instance, validated_data)
 
 
 class RequestHistorySerializer(serializers.ModelSerializer):
@@ -557,7 +618,7 @@ class ScheduledTaskSerializer(serializers.ModelSerializer):
 
         # 更新通知设置
         if notification_type is not None:
-            from .models import TaskNotificationSetting, NotificationConfig
+            from .models import TaskNotificationSetting
             try:
                 # 根据通知类型选择合适的通知配置
                 notification_config = None

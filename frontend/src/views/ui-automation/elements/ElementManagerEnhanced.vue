@@ -1,8 +1,6 @@
 <template>
-  <div class="element-manager">
-    <div class="page-header">
-      <h1 class="page-title">UI元素管理</h1>
-      <div class="header-actions">
+  <BasePage title="UI元素管理">
+    <template #actions>
         <el-select v-model="selectedProject" placeholder="选择项目" style="width: 200px" @change="onProjectChange">
           <el-option
             v-for="project in projects"
@@ -11,9 +9,8 @@
             :value="project.id"
           />
         </el-select>
-      </div>
-    </div>
-
+    </template>
+    
     <div class="main-content">
       <!-- 左侧页面树 -->
       <div class="left-panel">
@@ -261,9 +258,9 @@
         <el-button type="primary" @click="updatePage">保存</el-button>
       </template>
     </el-dialog>
-  </div>
-</template>
 
+  </BasePage>
+</template>
 <script setup>
 import { ref, reactive, computed, onMounted, watch, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -1199,20 +1196,6 @@ const updatePage = async () => {
   height: 100vh;
   display: flex;
   flex-direction: column;
-}
-
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 15px 20px;
-  border-bottom: 1px solid #e6e6e6;
-  background: white;
-
-  .page-title {
-    margin: 0;
-    font-size: 24px;
-  }
 }
 
 .main-content {

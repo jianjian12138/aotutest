@@ -1,3 +1,4 @@
+# Trigger reload 1
 from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
@@ -18,27 +19,31 @@ urlpatterns = [
     path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
     path('api/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
 
-    path('api/auth/', include('apps.users.urls')),
-    path('api/projects/', include('apps.projects.urls')),
+    path('api/', include('apps.core_platform.urls')),
+
     path('api/testcases/', include('apps.testcases.urls')),
     path('api/testsuites/', include('apps.testsuites.urls')),
     path('api/executions/', include('apps.executions.urls')),
     path('api/reports/', include('apps.reports.urls')),
     path('api/reviews/', include('apps.reviews.urls')),
-    path('api/versions/', include('apps.versions.urls')),
+
     path('api/assistant/', include('apps.assistant.urls')),
-    path('api/users/', include('apps.users.urls')),
+
     path('api/requirement-analysis/', include('apps.requirement_analysis.urls')),
     path('api/ui-automation/', include('apps.ui_automation.urls')),
     path('api/', include('apps.api_testing.urls')),
     path('api/', include('apps.performance_test.urls')),
     path('api/', include('apps.data_factory.urls')),
-    path('api/', include('apps.midscene.urls')),
     path('api/', include('apps.strix_security.urls')),
-    path('api/cicd/', include('apps.cicd.urls')),
     path('api/scheduler/', include('apps.scheduler.urls')),
     path('api/knowledge-graph/', include('apps.knowledge_graph.urls')),
-    path('api/configuration/', include('apps.configuration.urls')),
+
+    path('api/special-testing/', include('apps.special_testing.urls')),
+    path('api/cicd/', include('apps.cicd.urls')),
+    path('api/notifications/', include('apps.notifications.urls')),
+    
+    # API 适配层 - 保持对旧 API 的兼容性
+    path('api/', include('apps.adapter.urls')),
 ]
 
 if settings.DEBUG:

@@ -1,22 +1,19 @@
 <template>
-  <div class="page-container">
-    <div class="page-header">
-      <h1 class="page-title">版本管理</h1>
-      <div class="header-actions">
-        <el-button 
-          v-if="selectedVersions.length > 0" 
-          type="danger" 
-          @click="batchDeleteVersions"
-          :disabled="isDeleting">
-          <el-icon><Delete /></el-icon>
-          批量删除 ({{ selectedVersions.length }})
-        </el-button>
-        <el-button type="primary" @click="createVersion">
-          <el-icon><Plus /></el-icon>
-          新建版本
-        </el-button>
-      </div>
-    </div>
+  <BasePage title="版本管理">
+    <template #actions>
+      <el-button 
+        v-if="selectedVersions.length > 0" 
+        type="danger" 
+        @click="batchDeleteVersions"
+        :disabled="isDeleting">
+        <el-icon><Delete /></el-icon>
+        批量删除 ({{ selectedVersions.length }})
+      </el-button>
+      <el-button type="primary" @click="createVersion">
+        <el-icon><Plus /></el-icon>
+        新建版本
+      </el-button>
+    </template>
     
     <div class="card-container">
       <div class="filter-bar">
@@ -165,9 +162,8 @@
         <el-button type="primary" @click="saveVersion" :loading="saving">保存</el-button>
       </template>
     </el-dialog>
-  </div>
+  </BasePage>
 </template>
-
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -404,58 +400,22 @@ onMounted(() => {
   margin-bottom: 20px;
 }
 /* 页面特定样式 */
-.page-container {
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  max-width: 100%; /* 新增：覆盖全局样式的 max-width: 1600px，确保铺满 */
-}
 
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 15px 20px;
-  border-bottom: 1px solid #e6e6e6;
-  background: white;
-  flex-shrink: 0;
-}
 
-.page-title {
-  margin: 0;
-  font-size: 24px;
-  font-weight: 600;
-  color: #303133;
-  position: relative;
-  padding-left: 16px;
-}
 
-.page-title::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 4px;
-  height: 20px;
-  background: var(--primary-color, #409eff);
-  border-radius: 2px;
-}
 
-.header-actions {
-  display: flex;
-  gap: 15px;
-}
+
+
+
+
+
 .pagination-container {
   margin-top: 20px;
   display: flex;
   justify-content: center;
 }
 
-.header-actions {
-  display: flex;
-  gap: 10px;
-}
+
 
 .version-name {
   display: flex;

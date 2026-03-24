@@ -7,7 +7,7 @@ from django.db.models import Q
 from .models import KnowledgeDocument, DocumentChunk, KnowledgeEntity, KnowledgeRelation, AliyunInterfaceLog
 from .connectors.wechat import WechatConnector
 from apps.requirement_analysis.models import AIModelConfig, BusinessRequirement
-from apps.projects.models import Project
+from apps.core_platform.models import Project
 
 logger = logging.getLogger(__name__)
 

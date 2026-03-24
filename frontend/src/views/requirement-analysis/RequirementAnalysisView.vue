@@ -1,39 +1,132 @@
 <template>
-  <div class="page-container">
-    <div class="page-header">
-      <div class="header-content">
-        <h1 class="page-title">智能用例生成</h1>
-      </div>
-    </div>
+  <BasePage title="智能用例生成">
 
     <div class="card-container main-content">
-      <!-- 手动输入需求描述 -->
+      <!-- 输入方式选择 + 手动输入需求描述 -->
       <div v-if="!isGenerating && !showResults" class="manual-input-card">
-        <h3>✍️ 手动输入需求描述</h3>
-        <div class="form-group">
-          <label>需求标题 <span class="required">*</span></label>
-          <el-input 
-            v-model="manualTitle" 
-            placeholder="请输入需求标题，如：用户登录功能需求"
-            :class="{ 'is-error': errors.title }"
-          />
-          <span v-if="errors.title" class="error-message">{{ errors.title }}</span>
-        </div>
+
+        <!-- 输入方式 Tab -->
+        <el-tabs v-model="inputMode" class="input-mode-tabs">
+          <el-tab-pane label="✍️ 手动输入需求" name="manual">
+            <div class="form-group" style="margin-top:16px">
+              <label>需求标题 <span class="required">*</span></label>
+              <el-input 
+                v-model="manualTitle" 
+                placeholder="请输入需求标题，如：用户登录功能需求"
+                :class="{ 'is-error': errors.title }"
+              />
+              <span v-if="errors.title" class="error-message">{{ errors.title }}</span>
+            </div>
+            
+            <div class="form-group">
+              <label>需求描述 <span class="required">*</span></label>
+              <el-input 
+                v-model="manualDescription" 
+                type="textarea"
+                :rows="10"
+                placeholder="请详细描述您的需求，包括功能描述、使用场景、业务流程等。"
+                :class="{ 'is-error': errors.description }"
+              />
+              <span v-if="errors.description" class="error-message">{{ errors.description }}</span>
+              <div class="char-count">{{ manualDescription.length }}/2000</div>
+            </div>
+          </el-tab-pane>
+
+          <el-tab-pane label="📋 从需求管理选择" name="from_requirement">
+            <div style="margin-top:16px">
+              <!-- 过滤条件 -->
+              <div class="req-filter-row">
+                <el-input
+                  v-model="reqSearchKeyword"
+                  placeholder="搜索需求名称或编号..."
+                  clearable
+                  style="width:260px"
+                  @input="onReqSearch"
+                >
+                  <template #prefix><el-icon><Search /></el-icon></template>
+                </el-input>
+                <el-select v-model="reqFilterProject" placeholder="按项目筛选" clearable style="width:200px" @change="fetchRequirements">
+                  <el-option v-for="p in projects" :key="p.id" :label="p.name" :value="p.id" />
+                </el-select>
+                <el-select v-model="reqFilterType" placeholder="按类型筛选" clearable style="width:160px" @change="fetchRequirements">
+                  <el-option label="功能需求" value="functional" />
+                  <el-option label="性能需求" value="performance" />
+                  <el-option label="安全需求" value="security" />
+                  <el-option label="接口需求" value="interface" />
+                  <el-option label="其他需求" value="other" />
+                </el-select>
+              </div>
+
+              <!-- 需求列表 -->
+              <el-table
+                v-loading="reqLoading"
+                :data="requirementList"
+                border
+                style="width:100%; margin-top:12px"
+                height="340"
+                @row-click="onReqRowClick"
+                :row-class-name="reqRowClassName"
+                highlight-current-row
+              >
+                <el-table-column width="44" align="center">
+                  <template #default="scope">
+                    <el-radio
+                      :model-value="selectedRequirementId"
+                      :label="scope.row.id"
+                      @change="selectRequirement(scope.row)"
+                    ></el-radio>
+                  </template>
+                </el-table-column>
+                <el-table-column prop="requirement_id" label="编号" width="110" />
+                <el-table-column prop="requirement_name" label="需求名称" min-width="200" show-overflow-tooltip />
+                <el-table-column prop="module" label="模块" width="120" show-overflow-tooltip />
+                <el-table-column label="类型" width="100">
+                  <template #default="scope">
+                    <el-tag size="small" type="info">{{ reqTypeLabel(scope.row.requirement_type) }}</el-tag>
+                  </template>
+                </el-table-column>
+                <el-table-column label="优先级" width="80" align="center">
+                  <template #default="scope">
+                    <el-tag size="small" :type="scope.row.requirement_level === 'high' ? 'danger' : scope.row.requirement_level === 'medium' ? 'warning' : 'success'">
+                      {{ scope.row.requirement_level === 'high' ? '高' : scope.row.requirement_level === 'medium' ? '中' : '低' }}
+                    </el-tag>
+                  </template>
+                </el-table-column>
+              </el-table>
+
+              <!-- 分页 -->
+              <div style="margin-top:10px; display:flex; justify-content:flex-end">
+                <el-pagination
+                  small
+                  layout="total, prev, pager, next"
+                  :total="reqTotal"
+                  :page-size="reqPageSize"
+                  :current-page="reqPage"
+                  @current-change="onReqPageChange"
+                />
+              </div>
+
+              <!-- 已选需求预览 -->
+              <div v-if="selectedRequirement" class="selected-req-preview">
+                <div class="preview-header">
+                  <el-icon style="color:#409eff"><CircleCheck /></el-icon>
+                  <span>已选需求：<strong>{{ selectedRequirement.requirement_id }} {{ selectedRequirement.requirement_name }}</strong></span>
+                </div>
+                <div class="preview-desc">
+                  <label>需求描述：</label>
+                  <p>{{ selectedRequirement.description }}</p>
+                </div>
+                <div v-if="selectedRequirement.acceptance_criteria" class="preview-desc">
+                  <label>验收标准：</label>
+                  <p>{{ selectedRequirement.acceptance_criteria }}</p>
+                </div>
+              </div>
+              <el-empty v-else description="请在上方列表选择一条需求" :image-size="60" style="padding:20px 0" />
+            </div>
+          </el-tab-pane>
+        </el-tabs>
         
-        <div class="form-group">
-          <label>需求描述 <span class="required">*</span></label>
-          <el-input 
-            v-model="manualDescription" 
-            type="textarea"
-            :rows="10"
-            placeholder="请详细描述您的需求，包括功能描述、使用场景、业务流程等。"
-            :class="{ 'is-error': errors.description }"
-          />
-          <span v-if="errors.description" class="error-message">{{ errors.description }}</span>
-          <div class="char-count">{{ manualDescription.length }}/2000</div>
-        </div>
-        
-        <div class="form-row">
+        <div class="form-row" style="margin-top:20px">
           <div class="form-group half">
             <label>关联项目 (可选)</label>
             <el-select v-model="selectedProject" placeholder="请选择项目" style="width: 100%" clearable>
@@ -178,12 +271,13 @@
         </div>
       </div>
     </div>
-  </div>
-</template>
 
+  </BasePage>
+</template>
 <script setup>
 import { ref, reactive, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage } from 'element-plus'
+import { Search, CircleCheck } from '@element-plus/icons-vue'
 import api from '@/utils/api'
 
 // State
@@ -194,6 +288,9 @@ const progressText = ref('')
 const currentTaskId = ref('')
 const generationResult = ref(null)
 const pollInterval = ref(null)
+
+// 输入方式：manual | from_requirement
+const inputMode = ref('manual')
 
 // Manual Input
 const manualTitle = ref('')
@@ -206,6 +303,19 @@ const errors = reactive({
   title: '',
   description: ''
 })
+
+// 从需求选择
+const reqLoading = ref(false)
+const requirementList = ref([])
+const reqTotal = ref(0)
+const reqPage = ref(1)
+const reqPageSize = ref(10)
+const reqSearchKeyword = ref('')
+const reqFilterProject = ref('')
+const reqFilterType = ref('')
+const selectedRequirementId = ref(null)
+const selectedRequirement = ref(null)
+let reqSearchTimer = null
 
 // Data Sources
 const projects = ref([])
@@ -220,6 +330,7 @@ onMounted(async () => {
   await fetchPromptConfigs()
   await fetchModelConfigs()
   await searchKnowledgeDocs('')
+  await fetchRequirements()
 })
 
 onBeforeUnmount(() => {
@@ -271,7 +382,6 @@ const searchKnowledgeDocs = async (query) => {
     const res = await api.get('/knowledge-graph/api/documents/', { 
       params: params
     })
-    console.log('Search response:', res.data) // Debug log
     knowledgeDocs.value = res.data.results || res.data
   } catch (err) {
     console.error('Failed to search knowledge docs', err)
@@ -281,11 +391,91 @@ const searchKnowledgeDocs = async (query) => {
   }
 }
 
+// 需求列表
+const fetchRequirements = async () => {
+  reqLoading.value = true
+  try {
+    const params = {
+      page: reqPage.value,
+      page_size: reqPageSize.value,
+    }
+    if (reqSearchKeyword.value) params.search = reqSearchKeyword.value
+    if (reqFilterProject.value) params.project = reqFilterProject.value
+    if (reqFilterType.value) params.requirement_type = reqFilterType.value
+    const res = await api.get('/requirement-analysis/api/requirements/', { params })
+    const data = res.data
+    requirementList.value = data.results || data
+    reqTotal.value = data.count || requirementList.value.length
+  } catch (err) {
+    console.error('Failed to fetch requirements', err)
+    ElMessage.error('获取需求列表失败')
+  } finally {
+    reqLoading.value = false
+  }
+}
+
+const onReqSearch = () => {
+  clearTimeout(reqSearchTimer)
+  reqSearchTimer = setTimeout(() => {
+    reqPage.value = 1
+    fetchRequirements()
+  }, 400)
+}
+
+const onReqPageChange = (page) => {
+  reqPage.value = page
+  fetchRequirements()
+}
+
+const selectRequirement = (row) => {
+  selectedRequirementId.value = row.id
+  selectedRequirement.value = row
+}
+
+const onReqRowClick = (row) => {
+  selectRequirement(row)
+}
+
+const reqRowClassName = ({ row }) => {
+  return row.id === selectedRequirementId.value ? 'selected-row' : ''
+}
+
+const reqTypeLabel = (type) => {
+  const map = {
+    functional: '功能需求',
+    performance: '性能需求',
+    security: '安全需求',
+    usability: '可用性需求',
+    interface: '接口需求',
+    other: '其他需求',
+  }
+  return map[type] || type
+}
+
 // Actions
 const startGeneration = async () => {
-  errors.title = !manualTitle.value ? '请输入需求标题' : ''
-  errors.description = !manualDescription.value ? '请输入需求描述' : ''
-  if (errors.title || errors.description) return
+  let title = ''
+  let description = ''
+
+  if (inputMode.value === 'manual') {
+    errors.title = !manualTitle.value ? '请输入需求标题' : ''
+    errors.description = !manualDescription.value ? '请输入需求描述' : ''
+    if (errors.title || errors.description) return
+    title = manualTitle.value
+    description = manualDescription.value
+  } else {
+    if (!selectedRequirement.value) {
+      ElMessage.warning('请在需求列表中选择一条需求')
+      return
+    }
+    title = selectedRequirement.value.requirement_name
+    description = [
+      selectedRequirement.value.description,
+      selectedRequirement.value.acceptance_criteria
+        ? `验收标准：${selectedRequirement.value.acceptance_criteria}`
+        : ''
+    ].filter(Boolean).join('\n\n')
+  }
 
   isGenerating.value = true
   showResults.value = false
@@ -294,8 +484,8 @@ const startGeneration = async () => {
 
   try {
     const payload = {
-      title: manualTitle.value,
-      requirement_text: manualDescription.value,
+      title,
+      requirement_text: description,
       project: selectedProject.value || null,
       prompt_config_id: selectedPromptConfig.value || null,
       knowledge_base_ids: selectedKnowledgeDocs.value,
@@ -361,6 +551,8 @@ const resetGeneration = () => {
   selectedProject.value = ''
   selectedPromptConfig.value = ''
   selectedKnowledgeDocs.value = []
+  selectedRequirement.value = null
+  selectedRequirementId.value = null
 }
 
 const downloadTestCases = () => {
@@ -396,9 +588,7 @@ const formatFileSize = (bytes) => {
 </script>
 
 <style scoped>
-.page-container {
-  padding: 20px;
-}
+
 .manual-input-card {
   background: white;
   padding: 30px;
@@ -480,6 +670,8 @@ const formatFileSize = (bytes) => {
   margin-bottom: 20px;
   color: #606266;
 }
+
+
 .summary-item {
   margin-right: 20px;
 }
@@ -495,5 +687,58 @@ const formatFileSize = (bytes) => {
   padding: 15px;
   border-radius: 8px;
   color: #f56c6c;
+}
+
+.input-mode-tabs {
+  margin-bottom: 0;
+}
+
+.req-filter-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.selected-req-preview {
+  margin-top: 16px;
+  background: #f0f7ff;
+  border: 1px solid #b3d8ff;
+  border-radius: 8px;
+  padding: 14px 18px;
+}
+
+.preview-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  margin-bottom: 10px;
+}
+
+.preview-desc {
+  margin-bottom: 8px;
+  font-size: 13px;
+  color: #606266;
+}
+
+.preview-desc label {
+  font-weight: 600;
+  color: #303133;
+  display: inline;
+}
+
+.preview-desc p {
+  margin: 4px 0 0 0;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+:deep(.el-table .selected-row) {
+  background: #ecf5ff !important;
+}
+
+:deep(.el-table tr) {
+  cursor: pointer;
 }
 </style>

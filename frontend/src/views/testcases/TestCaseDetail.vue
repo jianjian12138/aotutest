@@ -1,12 +1,8 @@
 <template>
-  <div class="page-container">
-    <div class="page-header">
-      <h1 class="page-title">用例详情</h1>
-      <div>
-        <el-button @click="$router.back()">返回</el-button>
-        <el-button type="primary" @click="editTestCase">编辑</el-button>
-      </div>
-    </div>
+  <BasePage title="用例详情">
+    
+    
+  
     
     <div class="card-container" v-if="testcase">
       <el-descriptions :column="2" border>
@@ -47,9 +43,12 @@
         </el-descriptions-item>
       </el-descriptions>
     </div>
-  </div>
-</template>
 
+  
+
+
+  </BasePage>
+</template>
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -125,49 +124,15 @@ onMounted(() => {
 
 <style lang="scss" scoped>
 /* 页面特定样式 */
-.page-container {
-  padding: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  max-width: 100%; /* 新增：覆盖全局样式的 max-width: 1600px，确保铺满 */
-}
 
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 15px 20px;
-  border-bottom: 1px solid #e6e6e6;
-  background: white;
-  flex-shrink: 0;
-}
 
-.page-title {
-  margin: 0;
-  font-size: 24px;
-  font-weight: 600;
-  color: #303133;
-  position: relative;
-  padding-left: 16px;
-}
 
-.page-title::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 4px;
-  height: 20px;
-  background: var(--primary-color, #409eff);
-  border-radius: 2px;
-}
 
-.header-actions {
-  display: flex;
-  gap: 15px;
-}
+
+
+
+
+
 .priority-tag {
   &.low { color: #67c23a; }
   &.medium { color: #e6a23c; }

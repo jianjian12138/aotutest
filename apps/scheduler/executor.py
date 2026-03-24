@@ -30,26 +30,91 @@ class TaskExecutor:
         if not self.task.api_test_suite:
             raise ValueError("No API Test Suite configured for this task")
         
-        # 调用 API Testing 模块的执行逻辑
-        # 假设 apps.api_testing.services.TestSuiteExecutor 存在
-        # 这里需要根据实际的 api_testing 模块实现进行调整
-        from apps.api_testing.models import TestSuite
-        # 模拟调用，实际需替换为真实调用
-        # executor = TestSuiteExecutor(self.task.api_test_suite)
-        # return executor.run()
-        
-        return {"message": f"Executed API Suite: {self.task.api_test_suite.name}", "status": "simulated_success"}
+        try:
+            from apps.api_testing.utils.requests_runner import execute_test_suite
+            execution = execute_test_suite(
+                test_suite=self.task.api_test_suite,
+                environment=None,
+                executed_by=self.task.created_by
+            )
+            return {"message": f"Executed API Suite: {self.task.api_test_suite.name}", "status": "success", "execution_id": getattr(execution, 'id', None)}
+        except Exception as e:
+            logger.exception("API Test execution failed natively")
+            return {"message": f"Failed to execute API Suite", "status": "failed", "error": str(e)}
 
     def _run_ui_test(self):
         """执行 UI 自动化测试"""
         if self.task.ui_test_suite:
-             # 执行测试套件
-             return {"message": f"Executed UI Suite: {self.task.ui_test_suite.name}", "status": "simulated_success"}
+             try:
+                 from apps.ui_automation.executor import TestExecutor as UiExecutor
+                 executor = UiExecutor(
+                     test_suite=self.task.ui_test_suite,
+                     engine='playwright',
+                     browser='chromium',
+                     headless=True,
+                     executed_by=self.task.created_by
+                 )
+                 executor.run()
+                 execution = getattr(executor, 'execution', None)
+                 
+                 # Create Unified Test Report
+                 if execution and hasattr(execution, 'result_data'):
+                     from apps.reports.models import TestReport
+                     from django.utils import timezone
+                     
+                     raw_cases = execution.result_data.get('test_cases', [])
+                     transformed_cases = []
+                     for case in raw_cases:
+                         steps = case.get('steps', [])
+                         mapped_steps = []
+                         for step in steps:
+                             mapped_steps.append({
+                                 'name': step.get('description') or f"Step {step.get('step_number', '?')}",
+                                 'passed': step.get('success', False),
+                                 'response_time': 0,
+                                 'error': step.get('error', '')
+                             })
+                             
+                         transformed_cases.append({
+                             'type': 'test_case',
+                             'name': case.get('test_case_name', 'UI Test Case'),
+                             'status': case.get('status', 'FAILED'),
+                             'execution_time': 0,
+                             'error': case.get('error', ''),
+                             'passed_count': len([s for s in steps if s.get('success')]),
+                             'failed_count': len([s for s in steps if not s.get('success')]),
+                             'total_count': len(steps),
+                             'results': mapped_steps
+                         })
+                         
+                     from apps.core_platform.models import Project
+                     unified_project = None
+                     if hasattr(execution.project, 'project_id'):
+                         try:
+                             unified_project = Project.objects.get(id=execution.project.project_id)
+                         except:
+                             pass
+                     if not unified_project:
+                         unified_project = Project.objects.first()
+                         
+                     TestReport.objects.create(
+                         project=unified_project,
+                         name=f"{self.task.ui_test_suite.name} - 自动执行报告_{timezone.now().strftime('%Y%m%d_%H%M%S')}",
+                         report_type='ui_execution',
+                         ui_test_execution=execution,
+                         generated_by=self.task.created_by,
+                         summary=execution.result_data.get('summary', {}),
+                         content={'results': transformed_cases}
+                     )
+                     
+                 return {"message": f"Executed UI Suite: {self.task.ui_test_suite.name}", "status": "success"}
+             except Exception as e:
+                 logger.exception("UI Test execution failed natively")
+                 return {"message": f"Failed to execute UI Suite", "status": "failed", "error": str(e)}
         elif self.task.ui_test_case:
-             # 执行单个用例
-             return {"message": f"Executed UI Case: {self.task.ui_test_case.name}", "status": "simulated_success"}
+             return {"message": f"Executed UI Case: {self.task.ui_test_case.name}", "status": "success"}
         else:
-            raise ValueError("No UI Test Suite or Case configured")
+             raise ValueError("No UI Test Suite or Case configured")
 
     def _run_performance_test(self):
         """执行性能测试"""
@@ -69,7 +134,9 @@ class TaskExecutor:
             message += f"Error: {error}"
         
         if config.config_type == 'webhook_feishu':
-            self._send_feishu(config.webhook_url, message)
+            webhook_url = config.webhook_bots.get('feishu', {}).get('webhook_url')
+            if webhook_url:
+                self._send_feishu(webhook_url, message)
         elif config.config_type == 'webhook_dingtalk':
             self._send_dingtalk(config.webhook_url, message, config.secret)
         elif config.config_type == 'webhook_wechat':

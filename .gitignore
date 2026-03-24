@@ -7,6 +7,7 @@ env/
 .claude/
 .vscode/
 .trae/
+.qoder/
 __pycache__/
 .DS_Store
 .pytest_cache
@@ -16,6 +17,20 @@ __pycache__/
 llm_debug.txt
 logs/*
 !logs/.gitkeep
+
+# Python 编译文件
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# 临时文件
+*.tmp
+*.temp
+*.bak
+*.swp
+*.swo
+*~
 
 # 忽略所有 app/*/migrations/ 目录下的所有内容 (包括文件和子目录)
 apps/*/migrations/*
@@ -32,11 +47,22 @@ media/ai_recording/*
 !media/ai_recording/.gitkeep
 media/knowledge_docs/*
 
+# 测试缓存
+.pytest_cache/
+.coverage
+htmlcov/
+
+# IDE 配置补充
+*.swp
+*.swo
+
 # 忽略前端文件
 frontend/node_modules/
 frontend/.DS_Store
 frontend/*.log
 frontend/dist/
+frontend/.vite/
+frontend/build/
 
 # User specific exclusions
 scripts/
@@ -45,3 +71,12 @@ recorded_script.py
 temp/
 insert_sample_data.py
 debug_sync.py
+
+# Allure 测试报告工具
+allure/bin/
+allure/lib/
+allure/plugins/
+!allure/.gitkeep
+
+# ChromaDB 向量数据库
+chroma_db/*

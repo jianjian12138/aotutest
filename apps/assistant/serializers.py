@@ -7,7 +7,9 @@ from .models import (
     KnowledgeDocument,
     KnowledgeEntity,
     KnowledgeRelationship,
-    AIWorkflowConfig
+    AIWorkflowConfig,
+    AgentSkill,
+    AgentProfile
 )
 
 
@@ -74,3 +76,18 @@ class KnowledgeRelationshipSerializer(serializers.ModelSerializer):
     class Meta:
         model = KnowledgeRelationship
         fields = '__all__'
+
+
+class AgentSkillSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AgentSkill
+        fields = '__all__'
+
+
+class AgentProfileSerializer(serializers.ModelSerializer):
+    skills_data = AgentSkillSerializer(many=True, read_only=True, source='skills')
+    
+    class Meta:
+        model = AgentProfile
+        fields = '__all__'
+

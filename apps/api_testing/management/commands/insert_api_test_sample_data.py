@@ -1,6 +1,6 @@
 from django.core.management.base import BaseCommand
 from django.utils import timezone
-from apps.users.models import User
+from apps.core_platform.models import User
 from apps.api_testing.models import (
     ApiProject, TestSuite, TestSuiteRequest, ApiCollection, ApiRequest,
     TestExecution, Environment

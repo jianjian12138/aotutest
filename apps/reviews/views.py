@@ -11,7 +11,7 @@ from .serializers import (
     ReviewTemplateSerializer, ReviewTemplateCreateSerializer
 )
 from apps.testcases.models import TestCase
-from apps.users.models import User
+from apps.core_platform.models import User
 
 
 class TestCaseReviewViewSet(viewsets.ModelViewSet):

@@ -1,10 +1,12 @@
 <template>
-  <div class="parameter-management">
-    <div class="header">
-      <h2>参数管理</h2>
-      <el-button type="primary" @click="handleCreate">新增参数</el-button>
-    </div>
-
+  <BasePage title="参数管理">
+    <template #actions>
+      <el-button type="primary" @click="handleCreate">
+        <el-icon><Plus /></el-icon> 新增参数
+      </el-button>
+    </template>
+    
+    
     <div class="filter-container">
       <el-input
         v-model="searchQuery"
@@ -76,13 +78,13 @@
         </span>
       </template>
     </el-dialog>
-  </div>
-</template>
 
+  </BasePage>
+</template>
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search } from '@element-plus/icons-vue'
+import { Search, Plus } from '@element-plus/icons-vue'
 import request from '@/utils/request.js'
 
 const loading = ref(false)
@@ -215,15 +217,14 @@ onMounted(() => {
 .parameter-management {
   padding: 20px;
 }
-.header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-}
+/* 页面特定样式 */
+
+
 .filter-container {
   margin-bottom: 20px;
 }
+
+
 .pagination-container {
   margin-top: 20px;
   display: flex;

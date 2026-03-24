@@ -249,3 +249,52 @@ class StagehandService:
         except Exception as e:
             logger.error(f"Vision Act Error: {e}")
             return False, f"Vision Act Failed: {str(e)}"
+
+    async def auto_heal(self, failed_selector, error_msg, target_desc=""):
+        """
+        AI-driven Self-Healing: Analyzes page to find a new selector for a failed one.
+        Returns: (success, new_selector, reason)
+        """
+        if not self.llm:
+            return False, None, "LLM not initialized"
+
+        context = await self._get_page_context()
+        
+        prompt = f"""
+        You are an expert Test Automation Engineer.
+        A Playwright test script failed to interact with an element.
+        
+        Failed Selector: "{failed_selector}"
+        Element Description/Name: "{target_desc}"
+        Error Message: "{error_msg}"
+        
+        Current page interactive elements (simplified):
+        {context[:15000]}
+        
+        Analyze the DOM and provide a robust, resilient Playwright selector that will locate this element successfully.
+        PREFER 'text=' or 'placeholder=' or accessible 'role='. Avoid complex CSS paths if possible.
+        
+        Return a JSON object with:
+        - "selector": The corrected Playwright selector.
+        - "reason": Brief explanation of why the original failed and why this one works.
+        
+        ONLY return the JSON object.
+        """
+        
+        try:
+            response = await self.llm.ainvoke([HumanMessage(content=prompt)])
+            content = response.content.replace('```json', '').replace('```', '').strip()
+            
+            plan = json.loads(content)
+            new_selector = plan.get('selector')
+            reason = plan.get('reason')
+            
+            if not new_selector:
+                return False, None, "AI failed to generate a new selector"
+                
+            return True, new_selector, reason
+            
+        except Exception as e:
+            logger.error(f"Stagehand Auto-Heal Error: {e}")
+            return False, None, f"Auto-Heal Failed: {str(e)}"
+

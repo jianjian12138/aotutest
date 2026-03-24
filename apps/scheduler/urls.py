@@ -1,3 +1,4 @@
+from apps.notifications.models import NotificationConfig, NotificationLog
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import ScheduledTaskViewSet, NotificationConfigViewSet, TaskExecutionLogViewSet

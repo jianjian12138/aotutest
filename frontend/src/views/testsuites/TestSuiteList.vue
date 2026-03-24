@@ -1,12 +1,6 @@
 <template>
-  <div class="page-container">
-    <div class="page-header">
-      <h1 class="page-title">测试套件</h1>
-      <el-button type="primary" @click="handleCreateTestSuite">
-        <el-icon><Plus /></el-icon>
-        新建套件
-      </el-button>
-    </div>
+  <BasePage title="测试套件">
+    
     
     <div class="card-container">
       <el-card shadow="hover">
@@ -72,9 +66,8 @@
         </div>
       </el-card>
     </div>
-  </div>
+  </BasePage>
 </template>
-
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
@@ -172,15 +165,8 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.page-container {
-  padding: 20px;
-}
-.page-header {
-  margin-bottom: 20px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
+
+
 .search-filter {
   margin-bottom: 20px;
   display: flex;

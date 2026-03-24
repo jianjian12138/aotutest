@@ -1,3 +1,4 @@
+from apps.notifications.models import NotificationConfig
 from django.db import models
 from django.contrib.auth import get_user_model
 from django.utils import timezone
@@ -140,6 +141,25 @@ class Environment(models.Model):
         return f"{self.name} ({self.get_scope_display()})"
 
 
+class ApiTestCaseModule(models.Model):
+    """API测试用例模块模型"""
+    project = models.ForeignKey(ApiProject, on_delete=models.CASCADE, related_name='test_case_modules', verbose_name='所属项目')
+    name = models.CharField(max_length=200, verbose_name='模块名称')
+    parent = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True, related_name='children', verbose_name='父模块')
+    order = models.IntegerField(default=0, verbose_name='排序')
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='创建时间')
+    updated_at = models.DateTimeField(auto_now=True, verbose_name='更新时间')
+
+    class Meta:
+        db_table = 'api_test_case_modules'
+        verbose_name = 'API测试用例模块'
+        verbose_name_plural = 'API测试用例模块'
+        ordering = ['order', 'created_at']
+
+    def __str__(self):
+        return self.name
+
+
 class ApiTestCase(models.Model):
     """API测试用例模型"""
     STATUS_CHOICES = [
@@ -157,6 +177,7 @@ class ApiTestCase(models.Model):
     ]
 
     project = models.ForeignKey(ApiProject, on_delete=models.CASCADE, related_name='test_cases', verbose_name='所属项目')
+    module = models.ForeignKey(ApiTestCaseModule, on_delete=models.SET_NULL, null=True, blank=True, related_name='test_cases', verbose_name='所属模块')
     name = models.CharField(max_length=200, verbose_name='用例名称')
     description = models.TextField(blank=True, verbose_name='用例描述')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft', verbose_name='状态')
@@ -506,145 +527,6 @@ class TaskExecutionLog(models.Model):
 
 # ================ 通知管理相关模型 ================
 
-class NotificationConfig(models.Model):
-    """通知配置模型"""
-
-    CONFIG_TYPE_CHOICES = [
-        ('webhook_feishu', '飞书机器人'),
-        ('webhook_wechat', '企业微信机器人'),
-        ('webhook_dingtalk', '钉钉机器人'),
-    ]
-
-    name = models.CharField(max_length=100, verbose_name='配置名称', help_text='用于标识该通知配置的名称')
-    config_type = models.CharField(max_length=20, choices=CONFIG_TYPE_CHOICES, default='webhook_feishu',
-                                   verbose_name='配置类型')
-    webhook_bots = models.JSONField(default=dict, blank=True, null=True, verbose_name='Webhook机器人配置',
-                                    help_text='飞书、企业微信、钉钉机器人配置')
-    is_default = models.BooleanField(default=False, verbose_name='是否默认配置')
-    is_active = models.BooleanField(default=True, verbose_name='是否启用')
-
-    # 业务类型启用开关
-    enable_ui_automation = models.BooleanField(default=True, verbose_name='启用UI自动化通知')
-    enable_api_testing = models.BooleanField(default=True, verbose_name='启用接口测试通知')
-    created_at = models.DateTimeField(auto_now_add=True, verbose_name='创建时间')
-    updated_at = models.DateTimeField(auto_now=True, verbose_name='更新时间')
-    created_by = models.ForeignKey(User, on_delete=models.CASCADE, verbose_name='创建者')
-
-    class Meta:
-        db_table = 'api_notification_configs'
-        verbose_name = '通知配置'
-        verbose_name_plural = '通知配置'
-        ordering = ['-created_at']
-        indexes = [
-            models.Index(fields=['config_type']),
-            models.Index(fields=['is_default']),
-            models.Index(fields=['created_by']),
-        ]
-
-    # def __str__(self):
-    #     return f"{self.name} - {self.sender_name}"
-
-    def get_webhook_bots(self):
-        """获取配置的所有webhook机器人"""
-        bots = []
-        if self.webhook_bots:
-            for bot_type, bot_config in self.webhook_bots.items():
-                bot_data = {
-                    'type': bot_type,
-                    'name': bot_config.get('name', f'{bot_type}机器人'),
-                    'webhook_url': bot_config.get('webhook_url'),
-                    'enabled': bot_config.get('enabled', True)
-                }
-                # 钉钉机器人需要额外包含secret字段
-                if bot_type == 'dingtalk' and bot_config.get('secret'):
-                    bot_data['secret'] = bot_config.get('secret')
-                bots.append(bot_data)
-        return bots
-
-
-class NotificationLog(models.Model):
-    """通知日志模型"""
-    NOTIFICATION_TYPES = [
-        ('task_execution', '定时任务执行'),
-        ('test_suite_execution', '测试套件执行'),
-        ('api_request_execution', 'API请求执行'),
-        ('system_alert', '系统警告'),
-        ('manual', '手动通知'),
-    ]
-
-    STATUS_CHOICES = [
-        ('pending', '待发送'),
-        ('sending', '发送中'),
-        ('success', '发送成功'),
-        ('failed', '发送失败'),
-        ('cancelled', '已取消'),
-    ]
-
-    task = models.ForeignKey(ScheduledTask, on_delete=models.SET_NULL, null=True, blank=True, verbose_name='关联任务')
-    task_name = models.CharField(max_length=200, verbose_name='任务名称', help_text='相关任务的名称')
-    notification_type = models.CharField(max_length=50, choices=NOTIFICATION_TYPES, verbose_name='通知类型')
-    sender_name = models.CharField(max_length=100, verbose_name='发件人姓名')
-    sender_email = models.EmailField(verbose_name='发件人邮箱')
-    recipient_info = models.JSONField(verbose_name='收件人信息', help_text='接收通知的用户信息')
-    webhook_bot_info = models.JSONField(default=dict, blank=True, null=True, verbose_name='Webhook机器人信息')
-    notification_content = models.TextField(verbose_name='通知内容', help_text='发送的通知内容')
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending', verbose_name='发送状态')
-    error_message = models.TextField(blank=True, null=True, verbose_name='错误信息', help_text='发送失败时的错误信息')
-    response_info = models.JSONField(default=dict, blank=True, null=True, verbose_name='响应信息',
-                                     help_text='接收方返回的响应信息')
-    created_at = models.DateTimeField(auto_now_add=True, verbose_name='创建时间')
-    sent_at = models.DateTimeField(null=True, blank=True, verbose_name='发送时间')
-    retry_count = models.IntegerField(default=0, verbose_name='重试次数', help_text='已重试的次数')
-    is_retried = models.BooleanField(default=False, verbose_name='是否已重试')
-
-    class Meta:
-        db_table = 'api_notification_logs'
-        verbose_name = '通知日志'
-        verbose_name_plural = '通知日志'
-        ordering = ['-created_at']
-        indexes = [
-            models.Index(fields=['status']),
-            models.Index(fields=['notification_type']),
-            models.Index(fields=['created_at']),
-        ]
-
-    def __str__(self):
-        task_name = self.task.name if self.task else self.task_name
-        return f"{task_name} - {self.get_notification_type_display()} - {self.status}"
-
-    def get_recipient_names(self):
-        """获取收件人姓名列表"""
-        if self.recipient_info:
-            if isinstance(self.recipient_info, list):
-                recipient_list = []
-                for rec in self.recipient_info:
-                    email = rec.get('email', '')
-                    name = rec.get('name', '')
-                    if name and email:
-                        recipient_list.append(f"{name}（{email}）")
-                    elif email:
-                        recipient_list.append(email)
-                    else:
-                        recipient_list.append('未知用户')
-                return ', '.join(recipient_list)
-            elif isinstance(self.recipient_info, dict):
-                email = self.recipient_info.get('email', '')
-                name = self.recipient_info.get('name', '')
-                if name and email:
-                    return f"{name}（{email}）"
-                elif email:
-                    return email
-                else:
-                    return '未知用户'
-        return "未知收件人"
-
-    def get_retry_status(self):
-        """获取重试状态"""
-        if self.is_retried:
-            return f"已重试 {self.retry_count} 次"
-        return "未重试"
-
-
 class TaskNotificationSetting(models.Model):
     """定时任务通知设置模型"""
     NOTIFICATION_TYPES = [
@@ -658,7 +540,7 @@ class TaskNotificationSetting(models.Model):
     notification_type = models.CharField(max_length=20, choices=NOTIFICATION_TYPES, default='both',
                                          verbose_name='通知类型')
     notification_config = models.ForeignKey(NotificationConfig, on_delete=models.SET_NULL, null=True, blank=True,
-                                            related_name='notification_config', verbose_name='通知配置')
+                                            related_name='api_testing_notification_config', verbose_name='通知配置')
     is_enabled = models.BooleanField(default=False, verbose_name='是否启用通知')
     notify_on_success = models.BooleanField(default=True, verbose_name='成功时通知')
     notify_on_failure = models.BooleanField(default=True, verbose_name='失败时通知')

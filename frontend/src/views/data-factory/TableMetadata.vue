@@ -1,136 +1,130 @@
 <template>
-  <div class="table-metadata-container">
-    <el-card shadow="hover" class="page-card">
-      <template #header>
-        <div class="card-header page-header" style="margin-bottom: 0;">
-          <h2 class="page-title">表元数据管理</h2>
-          <el-button type="primary" @click="handleRefreshMetadata" :loading="refreshing">
-            <el-icon><Refresh /></el-icon>
-            {{ refreshing ? '刷新中...' : '刷新元数据' }}
-          </el-button>
-        </div>
-      </template>
-      
-      <div class="content">
-        <!-- 搜索和筛选 -->
-        <div class="search-filter">
-          <el-input
-            v-model="searchKeyword"
-            placeholder="搜索表名或描述"
-            clearable
-            class="search-input"
-          >
-            <template #prefix>
-              <el-icon><Search /></el-icon>
-            </template>
-          </el-input>
-          
-          <el-select
-            v-model="databaseFilter"
-            placeholder="筛选数据库"
-            clearable
-            class="filter-select"
-          >
-            <el-option label="全部" value="" />
-            <el-option
-              v-for="db in databases"
-              :key="db"
-              :label="db"
-              :value="db"
-            />
-          </el-select>
-        </div>
-        
-        <!-- 表列表 -->
-        <el-table
-          v-loading="loading"
-          :data="filteredTables"
-          style="width: 100%"
-          border
-          stripe
-          :default-sort="{ prop: 'table_name', order: 'ascending' }"
+  <BasePage title="表元数据管理">
+    <template #actions>
+      <el-button type="primary" size="small" @click="handleRefreshMetadata" :loading="refreshing">
+        <el-icon><Refresh /></el-icon>
+        刷新元数据
+      </el-button>
+    </template>
+    
+    <div class="content">
+      <!-- 搜索和筛选 -->
+      <div class="search-filter">
+        <el-input
+          v-model="searchKeyword"
+          placeholder="搜索表名或描述"
+          clearable
+          class="search-input"
         >
-          <el-table-column prop="table_name" label="表名" min-width="180" />
-          <el-table-column prop="description" label="表描述" min-width="250" show-overflow-tooltip />
-          <el-table-column prop="database" label="数据库" width="150" />
-          <el-table-column prop="schema" label="Schema" width="120" />
-          <el-table-column prop="column_count" label="列数" width="100" align="center" />
-          <el-table-column prop="created_at" label="创建时间" width="180" />
-          <el-table-column prop="updated_at" label="更新时间" width="180" />
-          <el-table-column label="操作" width="180" fixed="right">
-            <template #default="scope">
-              <el-button
-                type="primary"
-                size="small"
-                @click="handleViewTableDetails(scope.row)"
-              >
-                查看详情
-              </el-button>
-              <el-button
-                size="small"
-                @click="handleViewColumns(scope.row)"
-              >
-                查看列
-              </el-button>
-            </template>
-          </el-table-column>
-        </el-table>
+          <template #prefix>
+            <el-icon><Search /></el-icon>
+          </template>
+        </el-input>
         
-        <!-- 分页 -->
-        <div class="pagination-container">
-          <el-pagination
-            v-model:current-page="currentPage"
-            v-model:page-size="pageSize"
-            :page-sizes="[10, 20, 50, 100]"
-            layout="total, sizes, prev, pager, next, jumper"
-            :total="filteredTables.length"
-            @size-change="handleSizeChange"
-            @current-change="handleCurrentChange"
+        <el-select
+          v-model="databaseFilter"
+          placeholder="筛选数据库"
+          clearable
+          class="filter-select"
+        >
+          <el-option label="全部" value="" />
+          <el-option
+            v-for="db in databases"
+            :key="db"
+            :label="db"
+            :value="db"
           />
-        </div>
-        
-        <!-- 表详情对话框 -->
-        <el-dialog
-          v-model="showTableDetails"
-          :title="selectedTable?.table_name || '表详情'"
-          width="70%"
-        >
-          <div v-if="selectedTable" class="table-details">
-            <el-descriptions :column="2" border>
-              <el-descriptions-item label="表名">{{ selectedTable.table_name }}</el-descriptions-item>
-              <el-descriptions-item label="数据库">{{ selectedTable.database }}</el-descriptions-item>
-              <el-descriptions-item label="Schema">{{ selectedTable.schema }}</el-descriptions-item>
-              <el-descriptions-item label="列数">{{ selectedTable.column_count }}</el-descriptions-item>
-              <el-descriptions-item label="描述" :span="2">{{ selectedTable.description }}</el-descriptions-item>
-              <el-descriptions-item label="创建时间">{{ selectedTable.created_at }}</el-descriptions-item>
-              <el-descriptions-item label="更新时间">{{ selectedTable.updated_at }}</el-descriptions-item>
-            </el-descriptions>
-            
-            <h3 class="section-title">表列信息</h3>
-            <el-table
-              :data="selectedTable.columns"
-              style="width: 100%"
-              border
-              size="small"
-            >
-              <el-table-column prop="name" label="列名" min-width="150" />
-              <el-table-column prop="type" label="数据类型" width="150" />
-              <el-table-column prop="nullable" label="可空" width="80" align="center">
-                <template #default="scope">
-                  <el-icon v-if="scope.row.nullable" color="#67c23a"><Check /></el-icon>
-                  <el-icon v-else color="#f56c6c"><Close /></el-icon>
-                </template>
-              </el-table-column>
-              <el-table-column prop="default_value" label="默认值" width="120" />
-              <el-table-column prop="description" label="描述" min-width="200" show-overflow-tooltip />
-            </el-table>
-          </div>
-        </el-dialog>
+        </el-select>
       </div>
-    </el-card>
-  </div>
+      
+      <!-- 表列表 -->
+      <el-table
+        v-loading="loading"
+        :data="filteredTables"
+        style="width: 100%"
+        border
+        stripe
+        :default-sort="{ prop: 'table_name', order: 'ascending' }"
+      >
+        <el-table-column prop="table_name" label="表名" min-width="180" />
+        <el-table-column prop="description" label="表描述" min-width="250" show-overflow-tooltip />
+        <el-table-column prop="database" label="数据库" width="150" />
+        <el-table-column prop="schema" label="Schema" width="120" />
+        <el-table-column prop="column_count" label="列数" width="100" align="center" />
+        <el-table-column prop="created_at" label="创建时间" width="180" />
+        <el-table-column prop="updated_at" label="更新时间" width="180" />
+        <el-table-column label="操作" width="180" fixed="right">
+          <template #default="scope">
+            <el-button
+              type="primary"
+              size="small"
+              @click="handleViewTableDetails(scope.row)"
+            >
+              查看详情
+            </el-button>
+            <el-button
+              size="small"
+              @click="handleViewColumns(scope.row)"
+            >
+              查看列
+            </el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+      
+      <!-- 分页 -->
+      <div class="pagination-container">
+        <el-pagination
+          v-model:current-page="currentPage"
+          v-model:page-size="pageSize"
+          :page-sizes="[10, 20, 50, 100]"
+          layout="total, sizes, prev, pager, next, jumper"
+          :total="filteredTables.length"
+          @size-change="handleSizeChange"
+          @current-change="handleCurrentChange"
+        />
+      </div>
+      
+      <!-- 表详情对话框 -->
+      <el-dialog
+        v-model="showTableDetails"
+        :title="selectedTable?.table_name || '表详情'"
+        width="70%"
+      >
+        <div v-if="selectedTable" class="table-details">
+          <el-descriptions :column="2" border>
+            <el-descriptions-item label="表名">{{ selectedTable.table_name }}</el-descriptions-item>
+            <el-descriptions-item label="数据库">{{ selectedTable.database }}</el-descriptions-item>
+            <el-descriptions-item label="Schema">{{ selectedTable.schema }}</el-descriptions-item>
+            <el-descriptions-item label="列数">{{ selectedTable.column_count }}</el-descriptions-item>
+            <el-descriptions-item label="描述" :span="2">{{ selectedTable.description }}</el-descriptions-item>
+            <el-descriptions-item label="创建时间">{{ selectedTable.created_at }}</el-descriptions-item>
+            <el-descriptions-item label="更新时间">{{ selectedTable.updated_at }}</el-descriptions-item>
+          </el-descriptions>
+          
+          <h3 class="section-title">表列信息</h3>
+          <el-table
+            :data="selectedTable.columns"
+            style="width: 100%"
+            border
+            size="small"
+          >
+            <el-table-column prop="name" label="列名" min-width="150" />
+            <el-table-column prop="type" label="数据类型" width="150" />
+            <el-table-column prop="nullable" label="可空" width="80" align="center">
+              <template #default="scope">
+                <el-icon v-if="scope.row.nullable" color="#67c23a"><Check /></el-icon>
+                <el-icon v-else color="#f56c6c"><Close /></el-icon>
+              </template>
+            </el-table-column>
+            <el-table-column prop="default_value" label="默认值" width="120" />
+            <el-table-column prop="description" label="描述" min-width="200" show-overflow-tooltip />
+          </el-table>
+        </div>
+      </el-dialog>
+    </div>
+  </BasePage>
 </template>
-
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
@@ -357,11 +351,7 @@ onMounted(() => {
   align-items: center;
 }
 
-.page-title {
-  margin: 0;
-  font-size: 24px;
-  font-weight: 600;
-}
+
 
 .content {
   padding: 20px 0;

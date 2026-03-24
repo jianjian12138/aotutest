@@ -1,26 +1,21 @@
 <template>
-  <div class="page-container">
-    <div class="page-header">
-      <h3 class="page-title">项目管理</h3>
-      <div class="header-actions">
-        <el-button type="primary" @click="showCreateDialog = true">
-          <el-icon><Plus /></el-icon>
-          新建项目
-        </el-button>
-      </div>
-    </div>
+  <BasePage title="项目管理">
+    <template #actions>
+      <el-button type="primary" @click="showCreateDialog = true">
+        <el-icon><Plus /></el-icon>
+        新建项目
+      </el-button>
+    </template>
     
-    <div class="main-content">
-      <div class="card-container">
-        <!-- 项目列表 -->
-        <el-table 
-          :data="projects" 
-          v-loading="loading" 
-          style="width: 100%; flex: 1;"
-          height="100%"
-          border
-          stripe
-        >
+    <!-- 项目列表 -->
+    <el-table 
+      :data="projects" 
+      v-loading="loading" 
+      style="width: 100%; flex: 1;"
+      height="100%"
+      border
+      stripe
+    >
           <el-table-column prop="name" label="项目名称" min-width="200" />
           <el-table-column prop="project_type" label="项目类型" width="120">
             <template #default="scope">
@@ -77,18 +72,16 @@
         </el-table>
 
         <!-- 分页 -->
-        <div class="pagination-container">
-          <el-pagination
-            v-model:current-page="currentPage"
-            v-model:page-size="pageSize"
-            :page-sizes="[10, 20, 50, 100]"
-            :total="total"
-            layout="total, sizes, prev, pager, next, jumper"
-            @size-change="handleSizeChange"
-            @current-change="handleCurrentChange"
-          />
-        </div>
-      </div>
+    <div class="pagination-container">
+      <el-pagination
+        v-model:current-page="currentPage"
+        v-model:page-size="pageSize"
+        :page-sizes="[10, 20, 50, 100]"
+        :total="total"
+        layout="total, sizes, prev, pager, next, jumper"
+        @size-change="handleSizeChange"
+        @current-change="handleCurrentChange"
+      />
     </div>
 
     <!-- 新建/编辑项目对话框 -->
@@ -230,9 +223,9 @@
         <el-button type="primary" @click="editProject(viewedProject)">编辑</el-button>
       </template>
     </el-dialog>
-  </div>
-</template>
 
+  </BasePage>
+</template>
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox, ElDescriptions, ElDescriptionsItem } from 'element-plus'
@@ -471,68 +464,6 @@ onMounted(async () => {
 
 <style scoped>
 /* 页面特定样式 */
-.page-container {
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-
-  max-width: 100%; /* 新增：覆盖全局样式的 max-width: 1600px，确保铺满 */
-}
-
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 15px 20px;
-  border-bottom: 1px solid #e6e6e6;
-  background: white;
-  flex-shrink: 0;
-}
-
-.page-title {
-  margin: 0;
-  font-size: 24px;
-  font-weight: 600;
-  color: #303133;
-  position: relative;
-  padding-left: 16px;
-}
-
-.page-title::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 4px;
-  height: 20px;
-  background: var(--primary-color, #409eff);
-  border-radius: 2px;
-}
-
-.header-actions {
-  display: flex;
-  align-items: center;
-  gap: 15px;
-}
-
-.main-content {
-  flex: 1;
-  overflow: hidden;
-  padding: 0;
-  display: flex;
-}
-
-.card-container {
-  flex: 1;
-  width: 100%;
-  background-color: #fff;
-  padding: 20px;
-  box-shadow: 0 1px 4px rgba(0, 21, 41, 0.08);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
 
 .pagination-container {
   margin-top: 20px;

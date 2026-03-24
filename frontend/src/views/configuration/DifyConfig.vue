@@ -1,13 +1,10 @@
 <template>
-  <div class="page-container">
-    <div class="page-header">
-      <h3 class="page-title">工作流配置</h3>
-      <div class="header-actions">
-        <el-button type="primary" @click="prepareAddConfig">
-          <el-icon><Plus /></el-icon> 新增配置
-        </el-button>
-      </div>
-    </div>
+  <BasePage title="工作流配置">
+    <template #actions>
+      <el-button type="primary" @click="prepareAddConfig">
+        <el-icon><Plus /></el-icon> 新增配置
+      </el-button>
+    </template>
 
     <div class="main-content">
       <div class="card-container">
@@ -19,7 +16,7 @@
           <el-table-column prop="provider" label="提供商" width="120">
              <template #default="scope">
                <el-tag>{{ scope.row.provider }}</el-tag>
-             </template>
+            </template>              
           </el-table-column>
           <el-table-column prop="api_url" label="API URL" min-width="200" show-overflow-tooltip />
           <el-table-column prop="is_active" label="状态" width="100">
@@ -103,9 +100,10 @@
         </span>
       </template>
     </el-dialog>
-  </div>
-</template>
+  
 
+  </BasePage>
+</template>
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -313,47 +311,15 @@ onMounted(() => {
 </script>
 
 <style scoped lang="scss">
-.page-container {
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
-  padding: 0;
-  background-color: var(--el-bg-color-page);
-  max-width: 100%; /* 新增：覆盖全局样式的 max-width: 1600px，确保铺满 */
-}
 
-.page-header {
-  flex-shrink: 0;
-  padding: 16px 24px;
-  background: #fff;
-  border-bottom: 1px solid var(--el-border-color-light);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
 
-.page-title {
-  font-size: 24px;
-  font-weight: 600;
-  color: var(--el-text-color-primary);
-  display: flex;
-  align-items: center;
-  margin: 0;
-}
 
-.page-title::before {
-  content: '';
-  width: 4px;
-  height: 16px;
-  background-color: var(--el-color-primary);
-  margin-right: 8px;
-  border-radius: 2px;
-}
 
-.header-actions {
-  display: flex;
-  gap: 12px;
-}
+
+
+
+
+
 
 .main-content {
   flex: 1;

@@ -37,7 +37,7 @@ api.interceptors.request.use(
     const userStore = useUserStore()
 
     // 检查是否是刷新token的请求
-    if (config.url === '/auth/token/refresh/') {
+    if (config.url === '/users/token/refresh/') {
       return config
     }
 
@@ -73,7 +73,7 @@ api.interceptors.request.use(
           }).then(token => {
             // 更新当前请求的token
             config.headers.Authorization = `Bearer ${token}`
-            return api(config)
+            return config
           }).catch(err => {
             return Promise.reject(err)
           })
@@ -105,7 +105,7 @@ api.interceptors.response.use(
     // 如果是401错误且不是刷新token的请求
     if (error.response?.status === 401 && !originalRequest._retry) {
       // 如果是logout请求失败，直接清除本地状态不再重试logout，防止死循环
-      if (originalRequest.url === '/auth/logout/') {
+      if (originalRequest.url === '/users/logout/') {
         console.error('Logout请求401，直接清除本地状态')
         userStore.$patch((state) => {
           state.accessToken = ''
@@ -115,14 +115,15 @@ api.interceptors.response.use(
         })
         localStorage.removeItem('access_token')
         localStorage.removeItem('refresh_token')
-        localStorage.removeItem('token_expires_at')
-        localStorage.removeItem('user')
-        window.location.href = '/login'
+        // 如果没有refresh token或刷新失败，跳转登录
+        await userStore.logout()
+        // 删除以下强制跳转，让store去处理
+        // window.location.href = '/login'
         return Promise.reject(error)
       }
 
       // 如果是刷新token的请求失败
-      if (originalRequest.url === '/auth/token/refresh/') {
+      if (originalRequest.url === '/users/token/refresh/') {
         console.error('Refresh token失败，跳转登录页')
         await userStore.logout()
         return Promise.reject(error)
@@ -161,15 +162,49 @@ api.interceptors.response.use(
       return Promise.reject(error)
     }
 
-    // 其他错误处理
-    if (error.response?.status === 401) {
+    // 其他错误处理 (Global Error Handler for non-401s)
+    if (error.response && error.response.status !== 401) {
+      let errorMsg = '请求失败，请稍后重试'
+      if (error.response.status >= 500) {
+        errorMsg = '服务器错误，请联系管理员或稍后重试'
+      } else if (error.response.data) {
+        const data = error.response.data
+        if (typeof data.error === 'string') {
+          errorMsg = data.error
+        } else if (typeof data.detail === 'string') {
+          errorMsg = data.detail
+        } else if (typeof data.message === 'string') {
+          errorMsg = data.message
+        } else if (typeof data === 'string' && data.length < 100) {
+          errorMsg = data
+        } else if (typeof data === 'object') {
+          // Parse typical DRF field validation errors mapping
+          const msgs = []
+          for (const key in data) {
+            if (Array.isArray(data[key])) {
+              msgs.push(`${key}: ${data[key].join(', ')}`)
+            }
+          }
+          if (msgs.length > 0) errorMsg = msgs.join(' | ')
+        }
+      }
+      
+      ElMessage({
+        message: errorMsg,
+        type: 'error',
+        duration: 5000,
+        showClose: true
+      })
+    } else if (error.response?.status === 401 && !originalRequest._retry) {
       ElMessage.error('登录已过期，请重新登录')
-    } else if (error.response?.status >= 500) {
-      ElMessage.error('服务器错误，请稍后重试')
-    } else if (error.response?.data?.error) {
-      ElMessage.error(error.response.data.error)
-    } else if (error.response?.data?.detail) {
-      ElMessage.error(error.response.data.detail)
+    } else if (!error.response) {
+      // Network error or timeout
+      ElMessage({
+        message: '网络异常或服务器无响应，请检查网络连接',
+        type: 'error',
+        duration: 5000,
+        showClose: true
+      })
     }
 
     return Promise.reject(error)

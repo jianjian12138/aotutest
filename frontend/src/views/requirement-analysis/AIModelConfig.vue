@@ -1,13 +1,13 @@
 <template>
-  <div class="page-container">
-    <div class="page-header">
-      <h1 class="page-title">AI模型配置</h1>
-      <el-button type="primary" @click="openAddModal">
-        <el-icon><Plus /></el-icon>
-        添加配置
-      </el-button>
-    </div>
-
+  <BasePage title="AI模型配置">
+    <template #actions>
+      <button 
+        class="add-first-config-btn" 
+        style="margin-top: 0; padding: 10px 20px; font-size: 14px;" 
+        @click="openAddModal">
+        ➕ 添加配置
+      </button>
+    </template>
     <div class="card-container">
       <p class="description-text">配置用于测试用例生成和评审的AI模型</p>
       
@@ -70,6 +70,7 @@
               </div>
             </div>
           </template>
+  
         </div>
 
         <div v-if="configs.length === 0" class="empty-state">
@@ -285,9 +286,8 @@
         </div>
       </div>
     </div>
-  </div>
+  </BasePage>
 </template>
-
 <script>
 import api from '@/utils/api'
 import { ElMessage } from 'element-plus'
@@ -785,65 +785,10 @@ export default {
 
 <style scoped>
 /* 页面特定样式 */
-.page-container {
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  max-width: 100%; /* 新增：覆盖全局样式的 max-width: 1600px，确保铺满 */
-}
-
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 15px 20px;
-  border-bottom: 1px solid #e6e6e6;
-  background: white;
-  flex-shrink: 0;
-}
-
-.page-title {
-  margin: 0;
-  font-size: 24px;
-  font-weight: 600;
-  color: #303133;
-  position: relative;
-  padding-left: 16px;
-}
-
-.page-title::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 4px;
-  height: 20px;
-  background: var(--primary-color, #409eff);
-  border-radius: 2px;
-}
-
-.header-actions {
-  display: flex;
-  gap: 15px;
-}
-
 .description-text {
   color: #666;
   font-size: 1.1rem;
   margin-bottom: 20px;
-}
-
-/* Removed .page-header custom styles to use global styles */
-
-/* .section-header removed as buttons moved to page-header */
-
-/* .add-config-btn removed */
-
-.configs-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(500px, 1fr));
-  gap: 20px;
 }
 
 .config-card {

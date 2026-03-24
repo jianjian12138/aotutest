@@ -19,16 +19,20 @@ logger = logging.getLogger(__name__)
 class PlaywrightTestEngine:
     """Playwright测试执行引擎"""
 
-    def __init__(self, browser_type='chromium', headless=True):
+    def __init__(self, browser_type='chromium', headless=True, environment_id=None, device_name=None):
         """
         初始化测试引擎
 
         Args:
             browser_type: 浏览器类型 (chromium, firefox, webkit)
             headless: 是否无头模式
+            environment_id: 环境配置ID，用于读取设备或视口信息
+            device_name: h5模拟设备名称
         """
         self.browser_type = browser_type
         self.headless = headless
+        self.environment_id = environment_id
+        self.device_name = device_name
         self.playwright = None
         self.browser: Optional[Browser] = None
         self.context: Optional[BrowserContext] = None
@@ -96,12 +100,48 @@ class PlaywrightTestEngine:
 
             # 创建浏览器上下文
             # viewport=None 是必须的，配合 --start-maximized 使用，否则窗口会被裁剪
-            self.context = await self.browser.new_context(
-                viewport=None, 
-                user_agent='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36'
-            )
+            context_options = {
+                'viewport': None,
+                'user_agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36'
+            }
+
+            if self.device_name:
+                if self.device_name in self.playwright.devices:
+                    device_config = self.playwright.devices[self.device_name]
+                    context_options.update(device_config)
+                    logger.info(f"📱 启用移动设备模拟: {self.device_name}")
+                else:
+                    logger.warning(f"⚠️ Playwright不支持设备 '{self.device_name}'")
+            elif self.environment_id:
+                try:
+                    # 使用 sync_to_async 来查询数据库
+                    from asgiref.sync import sync_to_async
+                    from .models import TestEnvironment
+                    
+                    @sync_to_async
+                    def get_env():
+                        return TestEnvironment.objects.get(id=self.environment_id)
+                        
+                    env = await get_env()
+                    if getattr(env, 'device_name', None) and env.device_type in ['MOBILE', 'MINI_PROGRAM']:
+                        if env.device_name in self.playwright.devices:
+                            device_config = self.playwright.devices[env.device_name]
+                            context_options.update(device_config)
+                            logger.info(f"📱 启用移动设备模拟: {env.device_name}")
+                        else:
+                            logger.warning(f"⚠️ Playwright不支持设备 '{env.device_name}'")
+                    elif getattr(env, 'resolution', None):
+                        try:
+                            w, h = env.resolution.lower().split('x')
+                            context_options['viewport'] = {'width': int(w.strip()), 'height': int(h.strip())}
+                        except Exception:
+                            pass
+                except Exception as e:
+                    logger.warning(f"⚠ 读取测试环境配置失败: {e}")
+
+            self.context = await self.browser.new_context(**context_options)
             
-            logger.info("浏览器上下文已创建 (Viewport=None, 最大化模式)")
+            logger.info("浏览器上下文已创建")
 
             # 创建页面
             self.page = await self.context.new_page()
@@ -322,6 +362,40 @@ class PlaywrightTestEngine:
                 log += f"  - 页面标题: {await self.page.title()}\n"
                 log += f"  - 执行时间: {execution_time}秒"
                 # 步骤后采集
+                debug_data['after'] = await self._capture_debug_data(step, project_config, timing='after')
+                return True, log, None, debug_data
+
+            elif action_type == 'urlJump':
+                target_url = resolved_input_value
+                if not target_url:
+                    return False, "✗ URL跳转失败: URL 不能为空", None, debug_data
+                    
+                # Support relative paths based on project base_url
+                if target_url.startswith('/') and project_config and 'base_url' in project_config:
+                    base_url = project_config['base_url'].rstrip('/')
+                    target_url = f"{base_url}{target_url}"
+                elif not target_url.startswith('http'):
+                    target_url = f"http://{target_url}"
+                    
+                await self.page.goto(target_url, timeout=30000, wait_until='networkidle')
+                execution_time = round(time.time() - start_time, 2)
+                log = f"✓ URL跳转成功\n"
+                log += f"  - 目标地址: {target_url}\n"
+                log += f"  - 执行时间: {execution_time}秒"
+                debug_data['after'] = await self._capture_debug_data(step, project_config, timing='after')
+                return True, log, None, debug_data
+
+            elif action_type == 'urlExtract':
+                current_url = self.page.url
+                execution_time = round(time.time() - start_time, 2)
+                log = f"✓ URL提取成功\n"
+                log += f"  - 当前地址: {current_url}\n"
+                
+                # 如果用户在期望值里写了变量名，可以保存起来(后续可通过环境变量机制传递，此处先打印)
+                var_name = resolved_assert_value or "ExtractedURL"
+                log += f"  - 提取为变量: {var_name} (待关联变量管理器)\n"
+                log += f"  - 执行时间: {execution_time}秒"
+                
                 debug_data['after'] = await self._capture_debug_data(step, project_config, timing='after')
                 return True, log, None, debug_data
 
@@ -775,6 +849,26 @@ class PlaywrightTestEngine:
                                                 pass
                                 
                                 if not heuristic_success:
+                                    # 启动 AI Agent 自愈 (Self-Healing)
+                                    logger.info("启发式搜索失败，尝试启动 AI Agent 自愈 (Self-Healing)...")
+                                    try:
+                                        from .services.stagehand_service import StagehandService
+                                        service = StagehandService(self.page)
+                                        heal_success, healed_selector, heal_reason = await service.auto_heal(
+                                            failed_selector=locator_value,
+                                            error_msg=error_msg,
+                                            target_desc=element_name
+                                        )
+                                        if heal_success and healed_selector:
+                                            logger.info(f"AI 自愈成功! 新选择器: {healed_selector}. 原因: {heal_reason}")
+                                            click_method_note += f"  - ⚡ AI自愈: 原选择器失效，动态修正为 '{healed_selector}' (原因: {heal_reason})\n"
+                                            healed_locator = self.page.locator(healed_selector).first
+                                            await healed_locator.click(timeout=timeout_ms)
+                                            heuristic_success = True
+                                    except Exception as heal_e:
+                                        logger.warning(f"AI 自愈失败: {heal_e}")
+
+                                if not heuristic_success:
                                     try:
                                         # 尝试先 scroll into view
                                         try:
@@ -846,7 +940,28 @@ class PlaywrightTestEngine:
                     return True, log, None, debug_data
 
             elif action_type == 'fill':
-                await locator.fill(resolved_input_value, timeout=timeout_ms, force=force_action)
+                try:
+                    await locator.fill(resolved_input_value, timeout=timeout_ms, force=force_action)
+                except Exception as e:
+                    logger.warning(f"Playwright fill 失败 ({e})，尝试启动 AI Agent 自愈...")
+                    try:
+                        from .services.stagehand_service import StagehandService
+                        service = StagehandService(self.page)
+                        heal_success, healed_selector, heal_reason = await service.auto_heal(
+                            failed_selector=locator_value,
+                            error_msg=str(e),
+                            target_desc=element_name
+                        )
+                        if heal_success and healed_selector:
+                            logger.info(f"AI 自愈成功! 新选择器: {healed_selector}")
+                            healed_locator = self.page.locator(healed_selector).first
+                            await healed_locator.fill(resolved_input_value, timeout=timeout_ms, force=force_action)
+                            locator_strategy = 'AI-Healed'
+                            locator_value = healed_selector
+                        else:
+                            raise e
+                    except Exception as heal_e:
+                        raise e
                 execution_time = round(time.time() - start_time, 2)
 
                 # 输入成功后短暂等待，确保表单验证生效
@@ -1006,6 +1121,38 @@ class PlaywrightTestEngine:
                 debug_data['after'] = await self._capture_debug_data(step, project_config, timing='after')
                 return True, log, None, debug_data
 
+            elif action_type in ['dragAndDrop', 'DRAG_AND_DROP']:
+                target_selector = ''
+                if hasattr(step, 'action_params') and step.action_params:
+                    if isinstance(step.action_params, dict):
+                        target_selector = step.action_params.get('target_selector', '')
+                    elif isinstance(step.action_params, str):
+                        try:
+                            import json
+                            params_dict = json.loads(step.action_params)
+                            target_selector = params_dict.get('target_selector', '')
+                        except:
+                            pass
+                            
+                if not target_selector:
+                    log = "✕ 拖拽失败: 未配置目标选择器(target_selector，需在操作参数中配置)"
+                    screenshot = await self.page.screenshot()
+                    return False, log, screenshot, debug_data
+                    
+                try:
+                    target_locator = self.page.locator(target_selector).first
+                    await locator.drag_to(target_locator, timeout=timeout_ms)
+                    execution_time = round(time.time() - start_time, 2)
+                    log = f"✓ 拖拽成功 (目标: {target_selector})\n"
+                    log += f"  - 源元素: {locator_strategy}={locator_value}\n"
+                    log += f"  - 执行时间: {execution_time}秒"
+                    debug_data['after'] = await self._capture_debug_data(step, project_config, timing='after')
+                    return True, log, None, debug_data
+                except Exception as e:
+                    log = f"✕ 拖拽失败: {str(e)}"
+                    screenshot = await self.page.screenshot()
+                    return False, log, screenshot, debug_data
+
             elif action_type == 'assert':
                 # 根据断言类型执行不同的断言
                 if step.assert_type == 'textContains':
@@ -1074,6 +1221,59 @@ class PlaywrightTestEngine:
                         screenshot_base64 = f"data:image/png;base64,{base64.b64encode(screenshot).decode()}"
                         return False, log, screenshot_base64, debug_data
 
+                elif step.assert_type == 'isHidden':
+                    is_hidden = await locator.is_hidden()
+                    if is_hidden:
+                        log = f"✓ 断言通过: 元素 '{element_name}' 不可见"
+                        debug_data['after'] = await self._capture_debug_data(step, project_config, timing='after')
+                        return True, log, None, debug_data
+                    else:
+                        log = f"✗ 断言失败: 元素 '{element_name}' 仍可见"
+                        screenshot = await self.page.screenshot()
+                        screenshot_base64 = f"data:image/png;base64,{base64.b64encode(screenshot).decode()}"
+                        return False, log, screenshot_base64, debug_data
+
+                elif step.assert_type == 'valueEquals':
+                    value = await locator.input_value(timeout=timeout_ms)
+                    if value == resolved_assert_value:
+                        log = f"✓ 断言通过: 元素值等于 '{resolved_assert_value}'"
+                        debug_data['after'] = await self._capture_debug_data(step, project_config, timing='after')
+                        return True, log, None, debug_data
+                    else:
+                        log = f"✗ 断言失败: 元素值不等于 '{resolved_assert_value}'\n  - 期望: '{resolved_assert_value}'\n  - 实际: '{value}'"
+                        screenshot = await self.page.screenshot()
+                        screenshot_base64 = f"data:image/png;base64,{base64.b64encode(screenshot).decode()}"
+                        return False, log, screenshot_base64, debug_data
+
+                elif step.assert_type == 'isEnabled':
+                    is_enabled = await locator.is_enabled(timeout=timeout_ms)
+                    if is_enabled:
+                        log = f"✓ 断言通过: 元素 '{element_name}' 可用/启用"
+                        debug_data['after'] = await self._capture_debug_data(step, project_config, timing='after')
+                        return True, log, None, debug_data
+                    else:
+                        log = f"✗ 断言失败: 元素 '{element_name}' 被禁用"
+                        screenshot = await self.page.screenshot()
+                        screenshot_base64 = f"data:image/png;base64,{base64.b64encode(screenshot).decode()}"
+                        return False, log, screenshot_base64, debug_data
+
+                elif step.assert_type == 'aiAssert':
+                    from .services.stagehand_service import StagehandService
+                    service = StagehandService(self.page)
+                    instruction = step.assert_value or "Check if the page state matches expectations."
+                    success, data = await service.extract(instruction, '{"is_passed": "boolean", "reason": "string"}')
+                    
+                    if success and data.get('is_passed', False):
+                        log = f"✓ AI智能断言通过: {data.get('reason', '状态符合预期')}"
+                        debug_data['after'] = await self._capture_debug_data(step, project_config, timing='after')
+                        return True, log, None, debug_data
+                    else:
+                        reason = data.get('reason', '状态不符合预期') if success else "AI分析异常"
+                        log = f"✗ AI智能断言失败: {reason}"
+                        screenshot = await self.page.screenshot()
+                        screenshot_base64 = f"data:image/png;base64,{base64.b64encode(screenshot).decode()}"
+                        return False, log, screenshot_base64, debug_data
+
 
 
             else:
@@ -1107,14 +1307,35 @@ class PlaywrightTestEngine:
             except Exception as diag_e:
                 log += f"  - 诊断失败: {diag_e}\n"
 
-            # 捕获失败截图
+            # 捕获失败截图与 AI 自愈合
             try:
                 screenshot = await self.page.screenshot()
                 screenshot_base64 = f"data:image/png;base64,{base64.b64encode(screenshot).decode()}"
-            except:
-                pass
+                
+                from .services.stagehand_service import StagehandService
+                service = StagehandService(self.page)
+                
+                # 开始 AI 智能自愈合 (用例修复)
+                if action_type in ['click', 'input']:
+                    log += "\n  - [AI 自愈合] 尝试启动智能元素定位自愈合..."
+                    heal_instruction = f"Attempting to perform action '{action_type}' on target: {element_name}"
+                    success, msg = await service.vision_act(heal_instruction)
+                    
+                    if success:
+                        log += f"\n  - [AI 自愈合] 修复成功: 利用视觉多模态大模型找到了变化后的元素 '{element_name}' 并完成了自动操作。\n  - 建议: 测试继续执行，但请更新测试用例库中该元素的定位器 (Locator)。"
+                        return True, log, None, debug_data
+                    else:
+                        log += f"\n  - [AI 自愈合] 修复失败: AI也无法在当前页面视觉化找到该元素或完成操作。"
+                
+                # 如果依然失败，进入智能失败分析
+                analysis_prompt = f"UI automation failed with error: {str(e)}. Locate element {element_name} using {locator_strategy}={locator_value}. Please analyze the attached screenshot and error message to determine the root cause. Explain briefly in Chinese."
+                success, analysis = await service.extract(analysis_prompt, '{"root_cause": "string", "suggestion": "string"}')
+                if success:
+                    log += f"\n  - AI 失败诊断: {analysis.get('root_cause', '未知')}\n  - 建议修复: {analysis.get('suggestion', '请检查选择器')}"
+            except Exception as ai_e:
+                log += f"\n  - AI 诊断异常/截图失败: {str(ai_e)}"
 
-            return False, log, screenshot_base64, debug_data
+            return False, log, getattr(locals(), 'screenshot_base64', None), debug_data
 
         except Exception as e:
             execution_time = round(time.time() - start_time, 2)
@@ -1128,10 +1349,18 @@ class PlaywrightTestEngine:
             try:
                 screenshot = await self.page.screenshot()
                 screenshot_base64 = f"data:image/png;base64,{base64.b64encode(screenshot).decode()}"
-            except:
-                pass
+                
+                # AI 智能失败分析
+                from .services.stagehand_service import StagehandService
+                service = StagehandService(self.page)
+                analysis_prompt = f"UI automation failed with error: {str(e)}. Element: {element_name}. Please analyze the screen state."
+                success, analysis = await service.extract(analysis_prompt, '{"root_cause": "string", "suggestion": "string"}')
+                if success:
+                    log += f"\n  - AI 失败诊断: {analysis.get('root_cause', '未知')}\n  - 建议修复: {analysis.get('suggestion', '请检查操作流程')}"
+            except Exception as ai_e:
+                log += f"\n  - AI 诊断异常/截图失败: {str(ai_e)}"
 
-            return False, log, screenshot_base64, debug_data
+            return False, log, getattr(locals(), 'screenshot_base64', None), debug_data
 
     async def navigate(self, url: str) -> Tuple[bool, str]:
         """

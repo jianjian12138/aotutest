@@ -527,11 +527,17 @@ class PerformanceDashboardViewSet(viewsets.ViewSet):
         
         # 计算统计数据
         total_projects = projects.count()
+        total_collections = PerformanceCollection.objects.filter(
+            project__in=projects
+        ).count()
         total_requests = PerformanceRequest.objects.filter(
             collection__project__in=projects
         ).count()
         total_test_suites = PerformanceTestSuite.objects.filter(
             project__in=projects
+        ).count()
+        total_executions = PerformanceTestExecution.objects.filter(
+            test_suite__project__in=projects
         ).count()
         
         # 获取最近的执行记录
@@ -541,7 +547,9 @@ class PerformanceDashboardViewSet(viewsets.ViewSet):
         
         return Response({
             'total_projects': total_projects,
+            'total_collections': total_collections,
             'total_requests': total_requests,
             'total_test_suites': total_test_suites,
+            'total_executions': total_executions,
             'recent_executions': PerformanceTestExecutionSerializer(recent_executions, many=True).data
         })

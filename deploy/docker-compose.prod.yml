@@ -1,0 +1,158 @@
+version: '3.8'
+
+services:
+  # 数据库服务
+  postgres:
+    image: postgres:14-alpine
+    container_name: test_platform_postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+    networks:
+      - test_platform_network
+
+  # Redis服务（用于Celery）
+  redis:
+    image: redis:7-alpine
+    container_name: test_platform_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    networks:
+      - test_platform_network
+
+  # Django后端服务
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.prod
+    container_name: test_platform_backend
+    command: gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 4
+    volumes:
+      - ./backend:/app
+      - media_volume:/app/media
+      - static_volume:/app/staticfiles
+    environment:
+      - DEBUG=False
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      - REDIS_URL=redis://redis:6379/0
+      - SECRET_KEY=${SECRET_KEY}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS}
+      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS}
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    ports:
+      - "8000:8000"
+    depends_on:
+      - postgres
+      - redis
+    restart: unless-stopped
+    networks:
+      - test_platform_network
+
+  # Celery Worker
+  celery_worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.prod
+    container_name: test_platform_celery_worker
+    command: celery -A config worker -l info
+    volumes:
+      - ./backend:/app
+    environment:
+      - DEBUG=False
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      - REDIS_URL=redis://redis:6379/0
+      - SECRET_KEY=${SECRET_KEY}
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      - postgres
+      - redis
+      - backend
+    restart: unless-stopped
+    networks:
+      - test_platform_network
+
+  # Celery Beat（定时任务调度）
+  celery_beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.prod
+    container_name: test_platform_celery_beat
+    command: celery -A config beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+    volumes:
+      - ./backend:/app
+    environment:
+      - DEBUG=False
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      - REDIS_URL=redis://redis:6379/0
+      - SECRET_KEY=${SECRET_KEY}
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      - postgres
+      - redis
+      - backend
+    restart: unless-stopped
+    networks:
+      - test_platform_network
+
+  # Celery Flower（监控）
+  celery_flower:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.prod
+    container_name: test_platform_celery_flower
+    command: celery -A config flower --port=5555
+    volumes:
+      - ./backend:/app
+    environment:
+      - DEBUG=False
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    ports:
+      - "5555:5555"
+    depends_on:
+      - redis
+    restart: unless-stopped
+    networks:
+      - test_platform_network
+
+  # Nginx（前端和反向代理）
+  nginx:
+    image: nginx:alpine
+    container_name: test_platform_nginx
+    volumes:
+      - ./deploy/nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./deploy/nginx/conf.d:/etc/nginx/conf.d
+      - static_volume:/var/www/static
+      - media_volume:/var/www/media
+      - ./frontend/dist:/var/www/html
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - test_platform_network
+
+volumes:
+  postgres_data:
+  redis_data:
+  media_volume:
+  static_volume:
+
+networks:
+  test_platform_network:
+    driver: bridge

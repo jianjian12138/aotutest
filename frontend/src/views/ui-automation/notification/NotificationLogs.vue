@@ -1,10 +1,11 @@
 <template>
-  <div class="notification-logs-container">
-    <div class="page-header">
-      <h3 class="page-title">通知列表</h3>
-      <div class="actions">
-      </div>
-    </div>
+  <BasePage title="通知列表">
+    <template #actions>
+      <el-button @click="handleClear" :disabled="!hasLogs">
+        <el-icon><Delete /></el-icon>
+        清空日志
+      </el-button>
+    </template>
     
     <div class="content">
         <!-- 页面操作栏 -->
@@ -22,7 +23,7 @@
                   <el-icon>
                     <Search/>
                   </el-icon>
-                </template>
+  
               </el-input>
             </el-col>
             <el-col :span="6">
@@ -163,7 +164,6 @@
                 @current-change="handleCurrentChange"
             />
           </div>
-        </div>
     </div>
 
     <!-- 详情弹窗 -->
@@ -261,8 +261,9 @@
         </span>
       </template>
     </el-dialog>
-</template>
 
+  </BasePage>
+</template>
 <script>
 import {Search, Document} from '@element-plus/icons-vue'
 import {ref, reactive, onMounted, computed} from 'vue'
@@ -553,42 +554,13 @@ export default {
   overflow: hidden;
 }
 
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 15px 20px;
-  border-bottom: 1px solid #e6e6e6;
-  background: white;
-  flex-shrink: 0;
-}
 
-.page-title {
-  margin: 0;
-  font-size: 24px;
-  font-weight: 600;
-  color: #303133;
-  position: relative;
-  padding-left: 16px;
-}
 
-.page-title::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 4px;
-  height: 20px;
-  background: var(--primary-color, #409eff);
-  border-radius: 2px;
-}
 
-.header-actions {
-  display: flex;
-  align-items: center;
-  gap: 15px;
-}
+
+
+
+
 
 .main-content {
   flex: 1;

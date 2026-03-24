@@ -1,14 +1,7 @@
 <template>
-  <div class="knowledge-base-container">
-    <el-card shadow="hover" class="page-card">
-      <template #header>
-        <div class="card-header page-header" style="margin-bottom: 0;">
-          <h2 class="page-title"> 知识库管理</h2>
-        </div>
-      </template>
+  <BasePage title="知识库管理">
         <p class="subtitle">管理您的文档资产，支持 PDF, Markdown, Word 等格式</p>
-    </el-card>
-
+    
     <div class="toolbar" style="padding: 0 20px; margin-top: 20px; display: flex; gap: 10px; flex-wrap: wrap;">
       <el-select v-model="currentProject" placeholder="选择项目过滤" clearable @change="fetchDocuments" style="width: 200px;">
         <el-option v-for="p in projects" :key="p.id" :label="p.name" :value="p.id" />
@@ -139,9 +132,26 @@
           <el-form-item label="文档名称" required v-if="sourceType !== 'wechat'">
             <el-input v-model="externalName" placeholder="请输入文档名称"></el-input>
           </el-form-item>
-          <el-form-item :label="sourceType === 'aliyun' ? '项目/文档链接' : (sourceType === 'wechat' ? '公众号文章链接' : '笔记链接')" required>
+          <el-form-item :label="sourceType === 'aliyun' ? '用例集链接' : (sourceType === 'wechat' ? '公众号文章链接' : '笔记链接')" required>
             <el-input v-model="externalUrl" placeholder="请输入链接地址"></el-input>
           </el-form-item>
+          <!-- 阿里云效需要 AccessKey 认证 -->
+          <template v-if="sourceType === 'aliyun'">
+            <el-alert type="info" :closable="false" style="margin-bottom:12px">
+              Testhub API 需要 AccessKey 认证。请前往
+              <a href="https://ram.console.aliyun.com/manage/ak" target="_blank">阿里云 AccessKey 管理</a>
+              创建 AccessKeyId 和 AccessKeySecret。
+            </el-alert>
+            <el-form-item label="AccessKeyId" required>
+              <el-input v-model="aliyunAkId" placeholder="请输入 AccessKeyId"></el-input>
+            </el-form-item>
+            <el-form-item label="AccessKeySecret" required>
+              <el-input v-model="aliyunAkSecret" type="password" show-password placeholder="请输入 AccessKeySecret"></el-input>
+            </el-form-item>
+            <el-form-item label="组织ID">
+              <el-input v-model="aliyunOrgId" placeholder="可选，留空则自动获取（需要组织管理员权限）"></el-input>
+            </el-form-item>
+          </template>
         </template>
       </el-form>
       <template #footer>
@@ -234,9 +244,9 @@
         <pre class="result-box">{{ retrievalResult.context_text }}</pre>
       </div>
     </el-dialog>
-  </div>
+  
+  </BasePage>
 </template>
-
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -260,6 +270,10 @@ const fileList = ref([])
 const sourceType = ref('file')
 const externalUrl = ref('')
 const externalName = ref('')
+const aliyunToken = ref('')
+const aliyunAkId = ref('')
+const aliyunAkSecret = ref('')
+const aliyunOrgId = ref('')
 
 const documents = ref([])
 const loading = ref(false)
@@ -416,12 +430,22 @@ const handleUpload = async () => {
         uploading.value = false
         return
       }
-      
-      await api.post('/knowledge-graph/api/documents/', {
+      if (sourceType.value === 'aliyun' && (!aliyunAkId.value || !aliyunAkSecret.value)) {
+        ElMessage.warning('请填写阿里云效 AccessKeyId 和 AccessKeySecret')
+        uploading.value = false
+        return
+      }
+      const payload = {
         name: sourceType.value === 'wechat' ? '微信文章' : externalName.value,
         external_url: externalUrl.value,
-        source_type: sourceType.value
-      })
+        source_type: sourceType.value,
+      }
+      if (sourceType.value === 'aliyun') {
+        payload.aliyun_access_key_id = aliyunAkId.value
+        payload.aliyun_access_key_secret = aliyunAkSecret.value
+        if (aliyunOrgId.value) payload.aliyun_org_id = aliyunOrgId.value
+      }
+      await api.post('/knowledge-graph/api/documents/', payload)
       
       ElMessage.success('连接成功，开始抓取内容')
     }
@@ -434,6 +458,10 @@ const handleUpload = async () => {
     fileList.value = []
     externalUrl.value = ''
     externalName.value = ''
+    aliyunToken.value = ''
+    aliyunAkId.value = ''
+    aliyunAkSecret.value = ''
+    aliyunOrgId.value = ''
     sourceType.value = 'file'
     
   } catch (err) {

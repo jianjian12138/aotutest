@@ -1,8 +1,6 @@
 <template>
-  <div class="page-container">
-    <div class="page-header">
-      <h1 class="page-title">编辑测试用例</h1>
-    </div>
+  <BasePage title="编辑测试用例">
+    
     
     <div class="card-container" v-if="!loading">
       <el-form ref="formRef" :model="form" :rules="rules" label-width="100px">
@@ -20,7 +18,7 @@
         </el-form-item>
         
         <el-row :gutter="20">
-          <el-col :span="8">
+          <el-col :span="6">
             <el-form-item label="归属项目" prop="project_id">
               <el-select 
                 v-model="form.project_id" 
@@ -38,7 +36,22 @@
               </el-select>
             </el-form-item>
           </el-col>
-          <el-col :span="8">
+          <el-col :span="6">
+            <el-form-item label="所属模块" prop="module_id">
+              <el-tree-select
+                v-model="form.module_id"
+                :data="moduleTreeData"
+                :props="{ children: 'children', label: 'name' }"
+                node-key="id"
+                value-key="id"
+                placeholder="请选择模块"
+                check-strictly
+                clearable
+                style="width: 100%"
+              />
+            </el-form-item>
+          </el-col>
+          <el-col :span="6">
             <el-form-item label="优先级" prop="priority">
               <el-select v-model="form.priority" placeholder="请选择优先级">
                 <el-option label="低" value="low" />
@@ -48,7 +61,7 @@
               </el-select>
             </el-form-item>
           </el-col>
-          <el-col :span="8">
+          <el-col :span="6">
             <el-form-item label="测试类型" prop="test_type">
               <el-select v-model="form.test_type" placeholder="请选择测试类型">
                 <el-option label="功能测试" value="functional" />
@@ -133,9 +146,8 @@
     <div class="card-container" v-else>
       <el-skeleton :rows="10" animated />
     </div>
-  </div>
+  </BasePage>
 </template>
-
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -149,11 +161,13 @@ const loading = ref(true)
 const submitting = ref(false)
 const projects = ref([])
 const projectVersions = ref([])
+const moduleTreeData = ref([])
 
 const form = reactive({
   title: '',
   description: '',
   project_id: null,
+  module_id: null,
   priority: 'medium',
   test_type: 'functional',
   status: 'draft',
@@ -213,10 +227,25 @@ const fetchProjectVersions = async (projectId) => {
   }
 }
 
+const fetchModuleTree = async (projectId) => {
+  if (!projectId) {
+    moduleTreeData.value = []
+    return
+  }
+  try {
+    const res = await api.get('/testcases/modules/tree/', { params: { project: projectId } })
+    moduleTreeData.value = res.data?.results || res.data || []
+  } catch(error) {
+    console.error('获取模块树失败:', error)
+  }
+}
+
 const onProjectChange = (projectId) => {
   // 当项目改变时，清空版本选择并重新获取版本列表
   form.version_ids = []
+  form.module_id = null
   fetchProjectVersions(projectId)
+  fetchModuleTree(projectId)
 }
 
 const onVersionChange = () => {
@@ -232,6 +261,7 @@ const fetchTestCase = async () => {
     form.title = testcase.title
     form.description = testcase.description
     form.project_id = testcase.project?.id || null
+    form.module_id = testcase.module?.id || testcase.module_id || null
     form.priority = testcase.priority
     form.test_type = testcase.test_type
     form.status = testcase.status
@@ -247,6 +277,7 @@ const fetchTestCase = async () => {
     // 如果有项目，获取该项目的版本列表
     if (form.project_id) {
       await fetchProjectVersions(form.project_id)
+      await fetchModuleTree(form.project_id)
     }
     
     loading.value = false

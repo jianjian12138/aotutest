@@ -1,12 +1,14 @@
 <template>
-  <div class="debug-file-manager">
-    <div class="page-header">
-      <h2>调试文件管理</h2>
-      <el-button type="primary" @click="refreshList">刷新列表</el-button>
-    </div>
-    
-    <el-card class="box-card">
-      <el-table :data="fileList" style="width: 100%" v-loading="loading">
+  <BasePage title="调试文件">
+    <template #actions>
+      <el-button type="primary" @click="refreshList">
+        <el-icon><Refresh /></el-icon>
+        刷新
+      </el-button>
+    </template>
+    <div class="main-content">
+      <div class="card-container">
+      <el-table :data="fileList" style="width: 100%" v-loading="loading" class="data-table">
         <el-table-column prop="project_name" label="项目" width="180" />
         <el-table-column prop="case_name" label="用例" width="220" />
         <el-table-column prop="step_info" label="步骤" width="150" />
@@ -35,7 +37,8 @@
           </template>
         </el-table-column>
       </el-table>
-    </el-card>
+      </div>
+    </div>
 
     <!-- 预览对话框 -->
     <el-dialog
@@ -54,14 +57,14 @@
         <el-empty v-else description="不支持预览" />
       </div>
     </el-dialog>
-  </div>
+  </BasePage>
 </template>
-
 <script setup>
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getDebugFiles, getDebugFileContent } from '@/api/ui_automation'
 import dayjs from 'dayjs'
+import { Refresh } from '@element-plus/icons-vue'
 
 const fileList = ref([])
 const loading = ref(false)
@@ -121,12 +124,28 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.page-header {
+.main-content {
+  flex: 1;
+  overflow: hidden;
+  padding: 0;
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
 }
+
+.card-container {
+  flex: 1;
+  width: 100%;
+  background-color: #fff;
+  padding: 20px;
+  box-shadow: 0 1px 4px rgba(0, 21, 41, 0.08);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.data-table {
+  flex: 1;
+}
+
 .preview-container {
   min-height: 200px;
   max-height: 600px;

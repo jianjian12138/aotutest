@@ -1,14 +1,11 @@
 <template>
-  <div class="page-container">
-    <div class="page-header">
-      <h1 class="page-title">评审模板</h1>
-      <div class="header-actions">
-        <el-button type="primary" @click="createTemplate">
-          <el-icon><Plus /></el-icon>
-          创建模板
-        </el-button>
-      </div>
-    </div>
+  <BasePage title="评审模板">
+    <template #actions>
+      <el-button type="primary" @click="createTemplate">
+        <el-icon><Plus /></el-icon>
+        创建模板
+      </el-button>
+    </template>
 
     <div class="card-container">
       <div class="filter-bar">
@@ -199,9 +196,9 @@
         <el-button type="primary" @click="saveTemplate" :loading="saving">保存</el-button>
       </template>
     </el-dialog>
-  </div>
-</template>
 
+  </BasePage>
+</template>
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
@@ -276,7 +273,7 @@ const fetchProjects = async () => {
 
 const fetchProjectUsers = async () => {
   try {
-    const response = await api.get('/auth/users/')
+    const response = await api.get('/users/list/')
     projectUsers.value = response.data.results || response.data || []
   } catch (error) {
     console.error('获取用户列表失败:', error)
@@ -403,57 +400,20 @@ onMounted(() => {
 
 <style scoped>
 /* 页面特定样式 */
-.page-container {
-  padding: 0;
-  display: flex;
-  flex-direction: column;
 
-  max-width: 100%; /* 新增：覆盖全局样式的 max-width: 1600px，确保铺满 */
-}
 
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 15px 20px;
-  border-bottom: 1px solid #e6e6e6;
-  background: white;
-  flex-shrink: 0;
-}
 
-.page-title {
-  margin: 0;
-  font-size: 24px;
-  font-weight: 600;
-  color: #303133;
-  position: relative;
-  padding-left: 16px;
-}
 
-.page-title::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 4px;
-  height: 20px;
-  background: var(--primary-color, #409eff);
-  border-radius: 2px;
-}
 
-.header-actions {
-  display: flex;
-  gap: 15px;
-}
+
+
+
+
 .review-template-list {
   padding: 20px;
 }
 
-.header-actions {
-  display: flex;
-  gap: 10px;
-}
+
 
 .filter-bar {
   margin-bottom: 20px;

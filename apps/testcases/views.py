@@ -1,22 +1,75 @@
-from rest_framework import generics, permissions, status
+from rest_framework import generics, permissions, status, viewsets
 from rest_framework.views import APIView
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, action
 from rest_framework.response import Response
 from django.http import HttpResponse
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters
 from django.db import models
-from .models import TestCase, TestCaseStep, TestCaseAttachment, TestCaseComment
+from .models import TestCaseModule, TestCase, TestCaseStep, TestCaseAttachment, TestCaseComment
 from .serializers import (
-    TestCaseSerializer, TestCaseCreateSerializer, TestCaseUpdateSerializer
+    TestCaseModuleSerializer, TestCaseSerializer, TestCaseCreateSerializer, TestCaseUpdateSerializer
 )
-from apps.projects.models import Project
+from apps.core_platform.models import Project
+
+class TestCaseModuleViewSet(viewsets.ModelViewSet):
+    """测试用例模块视图集"""
+    queryset = TestCaseModule.objects.all()
+    serializer_class = TestCaseModuleSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ['name']
+    ordering_fields = ['order', 'created_at']
+    ordering = ['order', 'created_at']
+    filterset_fields = ['project', 'parent']
+    
+    def get_queryset(self):
+        user = self.request.user
+        accessible_projects = Project.objects.filter(
+            models.Q(owner=user) | models.Q(members=user)
+        ).distinct()
+        queryset = TestCaseModule.objects.filter(project__in=accessible_projects)
+        
+        # 默认只返回顶级模块（如果没有显式请求特定父模块）
+        parent_id = self.request.query_params.get('parent')
+        get_all = self.request.query_params.get('get_all')
+        if parent_id is None and not get_all:
+            return queryset.filter(parent__isnull=True)
+        return queryset
+        
+    @action(detail=False, methods=['get'])
+    def tree(self, request):
+        """获取模块树"""
+        queryset = self.get_queryset()
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['post'])
+    def batch_update_order(self, request):
+        """批量更新模块排序"""
+        items = request.data.get('items', [])
+        if not items:
+            return Response({'error': '未提供排序数据'}, status=status.HTTP_400_BAD_REQUEST)
+
+        updated_modules = []
+        for index, item_id in enumerate(items):
+            try:
+                module = TestCaseModule.objects.get(id=item_id)
+                module.order = index
+                module.save()
+                updated_modules.append(module)
+            except TestCaseModule.DoesNotExist:
+                continue
+
+        serializer = self.get_serializer(updated_modules, many=True)
+        return Response(serializer.data)
+
 
 class TestCaseListCreateView(generics.ListCreateAPIView):
     queryset = TestCase.objects.all()
     permission_classes = [permissions.IsAuthenticated]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    filterset_fields = ['priority', 'status', 'test_type', 'project']
+    filterset_fields = ['priority', 'status', 'test_type', 'project', 'module']
     search_fields = ['title', 'description']
     ordering_fields = ['created_at', 'updated_at', 'priority']
     ordering = ['-created_at']
@@ -32,7 +85,11 @@ class TestCaseListCreateView(generics.ListCreateAPIView):
         accessible_projects = Project.objects.filter(
             models.Q(owner=user) | models.Q(members=user)
         ).distinct()
-        return TestCase.objects.filter(project__in=accessible_projects)
+        return TestCase.objects.select_related(
+            'author', 'assignee', 'project', 'module'
+        ).prefetch_related(
+            'versions', 'step_details', 'attachments', 'comments'
+        ).filter(project__in=accessible_projects)
     
     def get_user_accessible_projects(self, user):
         """获取用户有权限访问的项目"""
@@ -88,7 +145,11 @@ class TestCaseDetailView(generics.RetrieveUpdateDestroyAPIView):
         accessible_projects = Project.objects.filter(
             models.Q(owner=user) | models.Q(members=user)
         ).distinct()
-        return TestCase.objects.filter(project__in=accessible_projects)
+        return TestCase.objects.select_related(
+            'author', 'assignee', 'project', 'module'
+        ).prefetch_related(
+            'versions', 'step_details', 'attachments', 'comments'
+        ).filter(project__in=accessible_projects)
     
     def get_user_accessible_projects(self, user):
         """获取用户有权限访问的项目"""

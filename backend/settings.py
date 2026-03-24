@@ -1,20 +1,19 @@
-# https://newpanjing.github.io/simpleui_docs/config.html#%E5%9B%BE%E6%A0%87%E8%AF%B4%E6%98%8E
-
 from pathlib import Path
-from decouple import config
+from decouple import config as decouple_config
+from backend.utils.config import get_config
 import os
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = config('SECRET_KEY', default='django-insecure-your-secret-key-here')
+SECRET_KEY = get_config('server.secret_key', 'django-insecure-your-secret-key-here')
 
-DEBUG = config('DEBUG', default=True, cast=bool)
+DEBUG = get_config('server.debug', True)
 
 # 根据DEBUG模式设置ALLOWED_HOSTS，生产环境不应使用通配符
 if DEBUG:
     ALLOWED_HOSTS = ['*']
 else:
-    ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1',
+    ALLOWED_HOSTS = decouple_config('ALLOWED_HOSTS', default='localhost,127.0.0.1',
                            cast=lambda v: [s.strip() for s in v.split(',')])
 
 DJANGO_APPS = [
@@ -35,30 +34,31 @@ THIRD_PARTY_APPS = [
     'corsheaders',
     'django_filters',
     'drf_spectacular',
-    'django_celery_results',  # Celery结果存储
+    'django_q',  # Django-Q2 Task Queue
 ]
 
 LOCAL_APPS = [
-    'apps.users',
-    'apps.projects',
+    'apps.core_platform',
+
     'apps.testcases',
     'apps.testsuites',
     'apps.executions',
     'apps.reports',
     'apps.reviews',
-    'apps.versions',
+
     'apps.assistant',
     'apps.requirement_analysis',
     'apps.api_testing',
     'apps.ui_automation.apps.UiAutomationConfig',
     'apps.data_factory',
     'apps.performance_test',
-    'apps.midscene',
-    'apps.strix_security',
-    'apps.cicd',
     'apps.knowledge_graph',
     'apps.scheduler',
-    'apps.configuration',
+
+    'apps.special_testing',
+    'apps.cicd',
+    'apps.strix_security',
+    'apps.notifications',
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -95,10 +95,17 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'backend.wsgi.application'
 
+db_engine = get_config('database.engine', 'django.db.backends.sqlite3')
+db_name = get_config('database.name', 'db.sqlite3')
+
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': db_engine,
+        'NAME': BASE_DIR / db_name if db_engine == 'django.db.backends.sqlite3' else db_name,
+        'USER': get_config('database.user', ''),
+        'PASSWORD': get_config('database.password', ''),
+        'HOST': get_config('database.host', ''),
+        'PORT': get_config('database.port', ''),
     }
 }
 
@@ -131,7 +138,7 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Custom User Model
-AUTH_USER_MODEL = 'users.User'
+AUTH_USER_MODEL = 'core_platform.User'
 
 # DRF Settings
 REST_FRAMEWORK = {
@@ -218,7 +225,7 @@ if DEBUG:
     ]
     CORS_ALLOW_CREDENTIALS = True
 else:
-    CORS_ALLOWED_ORIGINS = config('CORS_ALLOWED_ORIGINS', default='http://localhost:3000',
+    CORS_ALLOWED_ORIGINS = decouple_config('CORS_ALLOWED_ORIGINS', default='http://localhost:3000',
                                   cast=lambda v: [s.strip() for s in v.split(',')])
 
 # CSRF Settings
@@ -241,35 +248,21 @@ SPECTACULAR_SETTINGS = {
     'SERVE_INCLUDE_SCHEMA': False,
 }
 
-# Celery Configuration
-# 使用内存broker和Django数据库作为result backend
-CELERY_BROKER_URL = 'memory://'
-CELERY_RESULT_BACKEND = 'django-db://'
-
-# Celery 6.0+ 启动时重试连接
-CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
-
-# Celery时区设置
-CELERY_TIMEZONE = TIME_ZONE
-CELERY_ENABLE_UTC = True
-
-# Celery任务结果配置
-CELERY_RESULT_EXTENDED = True
-CELERY_RESULT_EXPIRES = 3600  # 结果过期时间(秒)
-
-# Celery任务序列化
-CELERY_TASK_SERIALIZER = 'json'
-CELERY_RESULT_SERIALIZER = 'json'
-CELERY_ACCEPT_CONTENT = ['json']
-
-# Celery任务配置
-CELERY_TASK_TRACK_STARTED = True  # 追踪任务开始状态
-CELERY_TASK_TIME_LIMIT = 30 * 60  # 任务超时时间(秒) - 30分钟
-CELERY_TASK_SOFT_TIME_LIMIT = 25 * 60  # 软超时时间(秒) - 25分钟
-
-# Celery Worker配置
-CELERY_WORKER_PREFETCH_MULTIPLIER = 1  # Worker预取任务数量
-CELERY_WORKER_MAX_TASKS_PER_CHILD = 1000  # Worker执行多少任务后重启
+# ==========================================
+# Task Queue Settings (Django-Q2)
+# ==========================================
+Q_CLUSTER = {
+    'name': 'TestHub_Q_Cluster',
+    'workers': 4,
+    'recycle': 500,
+    'timeout': 1800,  # 30 minutes to match previous CELERY_TASK_TIME_LIMIT
+    'retry': 1860,    # Must be larger than timeout
+    'save_limit': 250,
+    'queue_limit': 500,
+    'cpu_affinity': 1,
+    'label': 'Django Q',
+    'orm': 'default',  # Default to Django ORM to simplify deployment
+}
 
 # 邮件配置（可选）
 EMAIL_BACKEND = 'apps.api_testing.custom_email_backend.CustomEmailBackend'
@@ -280,19 +273,13 @@ EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
 EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
 DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', EMAIL_HOST_USER)
 
-# Celery Configuration
-CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', 'redis://localhost:6379/0')
-CELERY_RESULT_BACKEND = os.getenv('CELERY_RESULT_BACKEND', 'redis://localhost:6379/0')
-CELERY_ACCEPT_CONTENT = ['json']
-CELERY_TASK_SERIALIZER = 'json'
-CELERY_RESULT_SERIALIZER = 'json'
-CELERY_TIMEZONE = TIME_ZONE
+
 
 # 确保日志目录存在
 log_dir = os.path.join(BASE_DIR, 'logs')
 os.makedirs(log_dir, exist_ok=True)
 
-# Logging Configuration
+# Logging Configuration with Rotation
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
@@ -305,9 +292,12 @@ LOGGING = {
     'handlers': {
         'file': {
             'level': 'INFO',
-            'class': 'logging.FileHandler',
+            'class': 'logging.handlers.RotatingFileHandler',
             'filename': os.path.join(BASE_DIR, 'logs', 'django.log'),
+            'maxBytes': 1024 * 1024 * 10,  # 10MB
+            'backupCount': 5,  # 保留5个备份
             'formatter': 'verbose',
+            'encoding': 'utf-8',
         },
         'console': {
             'level': 'DEBUG',

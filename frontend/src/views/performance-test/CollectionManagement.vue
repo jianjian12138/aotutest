@@ -1,17 +1,13 @@
 <template>
-  <div class="collection-management">
-    <el-card shadow="hover">
-      <template #header>
-        <div class="card-header page-header" style="margin-bottom: 0;">
-          <h2 class="page-title">集合管理</h2>
-          <el-button type="primary" @click="handleCreateCollection">
-            <el-icon><Plus /></el-icon>
-            新建集合
-          </el-button>
-        </div>
-      </template>
-      
-      <!-- 搜索和筛选 -->
+  <BasePage title="集合管理">
+    <template #actions>
+      <el-button type="primary" @click="handleCreateCollection">
+        <el-icon><Plus /></el-icon>
+        新建集合
+      </el-button>
+    </template>
+
+    <div class="content">
       <div class="search-filter">
         <el-row :gutter="20">
           <el-col :span="8">
@@ -56,13 +52,17 @@
         <el-table-column prop="id" label="集合ID" width="100" />
         <el-table-column prop="name" label="集合名称" />
         <el-table-column prop="description" label="集合描述" show-overflow-tooltip />
-        <el-table-column prop="project_name" label="所属项目" width="150">
+        <el-table-column prop="project" label="所属项目" width="200">
           <template #default="scope">
-            {{ projects.find(p => p.id === scope.row.project)?.name || scope.row.project }}
+            {{ typeof scope.row.project === 'object' && scope.row.project ? scope.row.project.name : (projects.find(p => p.id === scope.row.project)?.name || scope.row.project) }}
           </template>
         </el-table-column>
         <el-table-column prop="request_count" label="请求数量" width="120" />
-        <el-table-column prop="created_by" label="创建人" width="120" />
+        <el-table-column prop="created_by" label="创建人" width="120">
+          <template #default="scope">
+            {{ typeof scope.row.created_by === 'object' && scope.row.created_by ? scope.row.created_by.username : scope.row.created_by }}
+          </template>
+        </el-table-column>
         <el-table-column prop="created_at" label="创建时间" width="180" />
         <el-table-column prop="updated_at" label="更新时间" width="180" />
         <el-table-column label="操作" width="180" fixed="right">
@@ -95,7 +95,6 @@
           @current-change="handleCurrentChange"
         />
       </div>
-    </el-card>
     
     <!-- 新建集合对话框 -->
     <el-dialog
@@ -134,8 +133,8 @@
       </template>
     </el-dialog>
   </div>
+  </BasePage>
 </template>
-
 <script setup>
 import { ref, onMounted, reactive } from 'vue'
 import { useRouter } from 'vue-router'
@@ -224,7 +223,8 @@ const handleEditCollection = (row) => {
   dialogType.value = 'edit'
   form.id = row.id
   form.name = row.name
-  form.project_id = row.project
+  // Fix nested object bindings for editing
+  form.project_id = typeof row.project === 'object' && row.project ? row.project.id : row.project
   form.description = row.description
   dialogVisible.value = true
 }
@@ -304,13 +304,7 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.page-container {
-  padding: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  max-width: 100%; /* 新增：覆盖全局样式的 max-width: 1600px，确保铺满 */
-}
+
 .request-management {
   padding: 0;
 }

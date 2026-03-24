@@ -1,17 +1,11 @@
 <template>
-  <div class="page-container">
-    <!-- 页面头部 -->
-    <div class="page-header">
-      <h1 class="page-title">{{ testPlan.name }}</h1>
-      <div class="header-actions">
-        <el-button @click="$router.back()">返回</el-button>
+  <BasePage :title=" testPlan.name ">
+    <template #header-actions><el-button @click="$router.back()">返回</el-button>
         <el-tag v-if="testPlan.version" type="primary" size="large" class="version-tag">
           <el-icon><Stamp /></el-icon>
           {{ testPlan.version }}
-        </el-tag>
-      </div>
-    </div>
-
+        </el-tag></template>
+    
     <div class="card-container">
       <!-- 项目信息 -->
       <div class="project-info" style="margin-bottom: 20px; color: #606266;">
@@ -190,9 +184,8 @@
         </el-table-column>
       </el-table>
     </el-dialog>
-  </div>
+  </BasePage>
 </template>
-
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
@@ -402,49 +395,15 @@ onMounted(() => {
 
 <style scoped>
 /* 页面特定样式 */
-.page-container {
-  padding: 0;
-  display: flex;
-  flex-direction: column;
 
-  max-width: 100%; /* 新增：覆盖全局样式的 max-width: 1600px，确保铺满 */
-}
 
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 15px 20px;
-  border-bottom: 1px solid #e6e6e6;
-  background: white;
-  flex-shrink: 0;
-}
 
-.page-title {
-  margin: 0;
-  font-size: 24px;
-  font-weight: 600;
-  color: #303133;
-  position: relative;
-  padding-left: 16px;
-}
 
-.page-title::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 4px;
-  height: 20px;
-  background: var(--primary-color, #409eff);
-  border-radius: 2px;
-}
 
-.header-actions {
-  display: flex;
-  gap: 15px;
-}
+
+
+
+
 /* 测试运行卡片 */
 .test-run-card {
   background: white;
@@ -579,9 +538,5 @@ onMounted(() => {
   justify-content: center;
 }
 
-.header-actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
+
 </style>

@@ -1,0 +1,31 @@
+# 服务配置
+server:
+  frontend_port: 5656
+  backend_port: 4545
+  backend_host: "127.0.0.1"
+  frontend_url: "http://localhost:5656"
+  debug: true
+  secret_key: "django-insecure-your-secret-key-here"
+
+# 数据库配置 (SQLite / MySQL)
+database:
+  engine: "django.db.backends.sqlite3"
+  name: "db.sqlite3"
+  user: ""
+  password: ""
+  host: ""
+  port: ""
+
+# Redis 配置 (Celery/Cache)
+redis:
+  url: "redis://localhost:6379/0"
+
+# JWT 配置
+jwt:
+  access_token_lifetime: 60
+  refresh_token_lifetime: 7
+
+# Celery
+celery:
+  broker_url: "memory://"
+  result_backend: "django-db://"

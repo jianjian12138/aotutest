@@ -1,7 +1,7 @@
 from django.db import models
 from django.utils import timezone
-from apps.users.models import User
-from apps.projects.models import Project
+from apps.core_platform.models import User
+from apps.core_platform.models import Project
 from apps.testcases.models import TestCase
 
 

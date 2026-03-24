@@ -1,9 +1,6 @@
 <template>
-  <div class="page-container">
-    <div class="page-header">
-      <h1 class="page-title">任务详情 - {{ task.title }}</h1>
-      <div class="header-actions">
-        <button 
+  <BasePage :title="'详情 - ' + (task.title || '')">
+    <template #actions><button 
           class="regenerate-btn" 
           @click="handleRegenerate">
           <span>🔄 重新生成</span>
@@ -15,10 +12,8 @@
           :disabled="isExporting">
           <span v-if="isExporting">💾 导出中...</span>
           <span v-else>💾 导出Excel</span>
-        </button>
-      </div>
-    </div>
-
+        </button></template>
+    
     <div class="card-container">
       <div class="task-info-bar" style="margin-bottom: 20px; display: flex; gap: 20px; align-items: center;">
         <span class="task-id" style="color: #606266;">任务ID: {{ taskId }}</span>
@@ -36,6 +31,7 @@
                 <span class="title-hint">（点击展开查看完整内容）</span>
               </div>
             </template>
+
             <div class="requirement-content">
               <div class="requirement-text">
                 {{ task.requirement_text }}
@@ -278,9 +274,8 @@
         </div>
       </div>
     </div>
-  </div>
+  </BasePage>
 </template>
-
 <script>
 import api from '@/utils/api'
 import { ElMessage } from 'element-plus'
@@ -912,49 +907,15 @@ export default {
 
 <style scoped>
 /* 页面特定样式 */
-.page-container {
-  padding: 0;
-  display: flex;
-  flex-direction: column;
 
-  max-width: 100%; /* 新增：覆盖全局样式的 max-width: 1600px，确保铺满 */
-}
 
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 15px 20px;
-  border-bottom: 1px solid #e6e6e6;
-  background: white;
-  flex-shrink: 0;
-}
 
-.page-title {
-  margin: 0;
-  font-size: 24px;
-  font-weight: 600;
-  color: #303133;
-  position: relative;
-  padding-left: 16px;
-}
 
-.page-title::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 4px;
-  height: 20px;
-  background: var(--primary-color, #409eff);
-  border-radius: 2px;
-}
 
-.header-actions {
-  display: flex;
-  gap: 15px;
-}
+
+
+
+
 /* 需求描述折叠卡片 */
 .requirement-description-card {
   margin-bottom: 20px;
@@ -1049,10 +1010,7 @@ export default {
   color: #388e3c;
 }
 
-.header-actions {
-  display: flex;
-  gap: 10px;
-}
+
 
 .regenerate-btn {
   background: #e6a23c;

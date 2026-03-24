@@ -1,6 +1,6 @@
 from django.test import TestCase
 from django.contrib.auth import get_user_model
-from apps.projects.models import Project
+from apps.core_platform.models import Project
 from .models import RequirementDocument, RequirementAnalysis, BusinessRequirement, GeneratedTestCase
 
 User = get_user_model()

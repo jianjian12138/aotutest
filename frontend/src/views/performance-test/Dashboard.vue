@@ -1,12 +1,5 @@
 <template>
-  <div class="dashboard-container">
-        <el-card shadow="hover" class="page-card">
-      <template #header>
-        <div class="card-header page-header" style="margin-bottom: 0;">
-          <h2 class="page-title">数据看板</h2>
-        </div>
-      </template>
-    </el-card>
+  <BasePage title="数据看板" type="dashboard">
     <!-- 数据概览 -->
     <div class="stats-section">
       <el-row :gutter="20">
@@ -204,9 +197,8 @@
         </el-col>
       </el-row>
     </div>
-  </div>
+  </BasePage>
 </template>
-
 <script setup>
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
@@ -251,72 +243,24 @@ const loadDashboardData = async () => {
     // 更新最近执行记录
     recentExecutions.value = executionsRes.data?.results || executionsRes.results || []
     
-    // 如果没有执行记录，添加模拟记录
+    // 如果没有执行记录，不使用模拟记录，直接显示空
     if (recentExecutions.value.length === 0) {
-      recentExecutions.value = [
-        {
-          id: 1,
-          test_suite: { name: '用户登录性能测试' },
-          status: 'COMPLETED',
-          response_time_avg: 123,
-          total_requests: 10000,
-          concurrency: 100,
-          start_time: new Date().toISOString()
-        },
-        {
-          id: 2,
-          test_suite: { name: '商品列表性能测试' },
-          status: 'COMPLETED',
-          response_time_avg: 256,
-          total_requests: 5000,
-          concurrency: 50,
-          start_time: new Date(Date.now() - 3600000).toISOString()
-        },
-        {
-          id: 3,
-          test_suite: { name: '订单提交性能测试' },
-          status: 'FAILED',
-          response_time_avg: 456,
-          total_requests: 2000,
-          concurrency: 30,
-          start_time: new Date(Date.now() - 7200000).toISOString()
-        }
-      ]
-      ElMessage.info('使用模拟执行记录')
+      // 保持为空
     } else {
       ElMessage.success('数据加载成功')
     }
 
   } catch (error) {
     console.error('加载仪表板数据失败:', error)
-    // 使用模拟数据
-    projectCount.value = 5
-    collectionCount.value = 12
-    requestCount.value = 89
-    executionCount.value = 23
+    // 出错时也不使用模拟数据，保持为0
+    projectCount.value = 0
+    collectionCount.value = 0
+    requestCount.value = 0
+    executionCount.value = 0
     
-    recentExecutions.value = [
-      {
-        id: 1,
-        test_suite: { name: '用户登录性能测试' },
-        status: 'COMPLETED',
-        response_time_avg: 123,
-        total_requests: 10000,
-        concurrency: 100,
-        start_time: new Date().toISOString()
-      },
-      {
-        id: 2,
-        test_suite: { name: '商品列表性能测试' },
-        status: 'COMPLETED',
-        response_time_avg: 256,
-        total_requests: 5000,
-        concurrency: 50,
-        start_time: new Date(Date.now() - 3600000).toISOString()
-      }
-    ]
+    recentExecutions.value = []
     
-    ElMessage.info('加载数据失败，使用模拟数据')
+    ElMessage.error('加载数据失败')
   } finally {
     loading.value = false
   }
@@ -324,7 +268,7 @@ const loadDashboardData = async () => {
 
 // 导航到各功能页面
 const goToProjects = () => {
-  router.push('/performance-test/projects')
+  router.push('/unified/projects')
 }
 
 const goToCollections = () => {
@@ -387,12 +331,7 @@ onMounted(() => {
 
 <style scoped>
 /* 页面特定样式 */
-.page-container {
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  max-width: 100%; /* 新增：覆盖全局样式的 max-width: 1600px，确保铺满 */
-}
+
 .dashboard-container {
   width: 100%;
 }

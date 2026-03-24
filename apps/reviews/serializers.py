@@ -118,7 +118,7 @@ class TestCaseReviewCreateSerializer(serializers.ModelSerializer):
         
         # 添加评审人员
         if reviewers_ids:
-            from apps.users.models import User
+            from apps.core_platform.models import User
             for reviewer_id in reviewers_ids:
                 try:
                     reviewer = User.objects.get(id=reviewer_id)

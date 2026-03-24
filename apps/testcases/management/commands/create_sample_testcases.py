@@ -1,6 +1,6 @@
 from django.core.management.base import BaseCommand
-from apps.users.models import User
-from apps.projects.models import Project, ProjectMember
+from apps.core_platform.models import User
+from apps.core_platform.models import Project, ProjectMember
 from apps.testcases.models import TestCase
 
 class Command(BaseCommand):

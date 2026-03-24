@@ -58,6 +58,13 @@ class DifyConfigViewSet(viewsets.ModelViewSet):
         """部分更新配置"""
         return self.update(request, pk=pk, partial=True)
     
+    @action(detail=False, methods=['get'])
+    def all_configs(self, request):
+        """获取所有的配置项无视激活状态 (给管理界面下拉表使用)"""
+        queryset = self.get_queryset()
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+    
     @action(detail=False, methods=['post'])
     def test_connection(self, request):
         """测试Dify API连接"""

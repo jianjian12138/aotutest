@@ -1,12 +1,7 @@
 <template>
-  <div class="page-container">
-    <div class="page-header">
-      <h1 class="page-title">AI 用例管理</h1>
-      <el-select v-model="projectId" placeholder="选择项目" style="width: 200px; margin-right: 15px" @change="onProjectChange">
-        <el-option v-for="project in projects" :key="project.id" :label="project.name" :value="project.id" />
-      </el-select>
-    </div>
-
+  <BasePage title="AI 用例管理">
+    
+    
     <div class="card-container">
       <div class="filter-bar">
         <el-input
@@ -96,9 +91,9 @@
         </span>
       </template>
     </el-dialog>
-  </div>
-</template>
 
+  </BasePage>
+</template>
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -279,22 +274,6 @@ onMounted(() => {
 </script>
 
 <style lang="scss" scoped>
-.page-container {
-  padding: 20px;
-}
-
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-  
-  .page-title {
-    font-size: 20px;
-    font-weight: 600;
-    margin: 0;
-  }
-}
 
 .card-container {
   background-color: #fff;

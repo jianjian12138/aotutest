@@ -1,13 +1,10 @@
 <template>
-  <div class="page-container">
-    <div class="page-header">
-      <h3 class="page-title">通知配置管理</h3>
-      <div class="header-actions">
-        <el-button type="primary" @click="handleAdd">
-          <el-icon><Plus /></el-icon> 新增配置
-        </el-button>
-      </div>
-    </div>
+  <BasePage title="通知配置管理">
+    <template #actions>
+      <el-button type="primary" @click="handleAdd">
+        <el-icon><Plus /></el-icon> 新增配置
+      </el-button>
+    </template>
 
     <div class="main-content">
       <div class="card-container">
@@ -19,13 +16,7 @@
           </template>
         </el-table-column>
         <el-table-column prop="webhook_url" label="Webhook URL" min-width="200" show-overflow-tooltip />
-        <el-table-column label="关联项目" width="150">
-          <template #default="{ row }">
-            <el-tag v-if="row.api_project_name" type="success">API: {{ row.api_project_name }}</el-tag>
-            <el-tag v-else-if="row.project_name" type="info">通用: {{ row.project_name }}</el-tag>
-            <span v-else>全局配置</span>
-          </template>
-        </el-table-column>
+
         <el-table-column prop="is_active" label="状态" width="100">
           <template #default="{ row }">
             <el-tag :type="row.is_active ? 'success' : 'info'">{{ row.is_active ? '启用' : '禁用' }}</el-tag>
@@ -127,26 +118,7 @@
           </el-form-item>
         </template>
         
-        <el-form-item label="关联项目" prop="project_id_combined">
-          <el-select v-model="form.project_id_combined" placeholder="全局配置(可选)" clearable style="width: 100%" @change="handleProjectChange">
-            <el-option-group label="接口测试项目">
-              <el-option
-                v-for="item in apiProjects"
-                :key="'api_' + item.id"
-                :label="item.name"
-                :value="'api_' + item.id"
-              />
-            </el-option-group>
-            <el-option-group label="通用项目">
-              <el-option
-                v-for="item in projects"
-                :key="'gen_' + item.id"
-                :label="item.name"
-                :value="'gen_' + item.id"
-              />
-            </el-option-group>
-          </el-select>
-        </el-form-item>
+
         
         <el-form-item label="是否启用" prop="is_active">
           <el-switch v-model="form.is_active" />
@@ -163,9 +135,9 @@
         </span>
       </template>
     </el-dialog>
-  </div>
-</template>
 
+  </BasePage>
+</template>
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -175,8 +147,6 @@ import api from '@/utils/api'
 
 const loading = ref(false)
 const configs = ref([])
-const projects = ref([])
-const apiProjects = ref([])
 const dialogVisible = ref(false)
 const submitting = ref(false)
 const isEdit = ref(false)
@@ -197,9 +167,6 @@ const form = reactive({
   use_tls: false,
   encryption: 'ssl',
   email_recipients: [],
-  project: null,
-  api_project: null,
-  project_id_combined: '',
   is_active: true,
   description: ''
 })
@@ -222,35 +189,7 @@ const loadData = async () => {
   }
 }
 
-const loadProjects = async () => {
-  try {
-    // 加载通用项目
-    const res = await api.get('/projects/')
-    projects.value = res.data.results || res.data
-    
-    // 加载接口测试项目
-    const apiRes = await api.get('/api-testing/projects/')
-    apiProjects.value = apiRes.data.results || apiRes.data
-  } catch (error) {
-    console.error('加载项目失败:', error)
-  }
-}
 
-const handleProjectChange = (val) => {
-  if (!val) {
-    form.project = null
-    form.api_project = null
-    return
-  }
-  
-  if (val.startsWith('api_')) {
-    form.api_project = parseInt(val.replace('api_', ''))
-    form.project = null
-  } else if (val.startsWith('gen_')) {
-    form.project = parseInt(val.replace('gen_', ''))
-    form.api_project = null
-  }
-}
 
 const getConfigTypeLabel = (type) => {
   const map = {
@@ -276,9 +215,6 @@ const handleAdd = () => {
   form.email_from = ''
   form.encryption = 'ssl'
   form.email_recipients = []
-  form.project = null
-  form.api_project = null
-  form.project_id_combined = ''
   form.description = ''
   form.is_active = true
   dialogVisible.value = true
@@ -291,15 +227,7 @@ const handleEdit = (row) => {
   if (!Array.isArray(form.email_recipients)) {
     form.email_recipients = []
   }
-  
-  // 设置组合项目 ID
-  if (row.api_project) {
-    form.project_id_combined = 'api_' + row.api_project
-  } else if (row.project) {
-    form.project_id_combined = 'gen_' + row.project
-  } else {
-    form.project_id_combined = ''
-  }
+
 
   // 设置加密方式显示
   if (row.use_ssl) form.encryption = 'ssl'
@@ -333,7 +261,6 @@ const handleSubmit = async () => {
         submitData.use_ssl = form.encryption === 'ssl'
         submitData.use_tls = form.encryption === 'tls'
         delete submitData.encryption
-        delete submitData.project_id_combined
         
         if (isEdit.value) {
           await schedulerApi.updateNotificationConfig(form.id, submitData)
@@ -373,52 +300,19 @@ const formatDateTime = (dateStr) => {
 
 onMounted(() => {
   loadData()
-  loadProjects()
 })
 </script>
 
 <style scoped>
-.page-container {
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
-  padding: 0;
-  background-color: var(--el-bg-color-page);
-  max-width: 100%; /* 新增：覆盖全局样式的 max-width: 1600px，确保铺满 */
-}
 
-.page-header {
-  flex-shrink: 0;
-  padding: 16px 24px;
-  background: #fff;
-  border-bottom: 1px solid var(--el-border-color-light);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
 
-.page-title {
-  font-size: 24px;
-  font-weight: 600;
-  color: var(--el-text-color-primary);
-  display: flex;
-  align-items: center;
-  margin: 0;
-}
 
-.page-title::before {
-  content: '';
-  width: 4px;
-  height: 16px;
-  background-color: var(--el-color-primary);
-  margin-right: 8px;
-  border-radius: 2px;
-}
 
-.header-actions {
-  display: flex;
-  gap: 12px;
-}
+
+
+
+
+
 
 .main-content {
   flex: 1;

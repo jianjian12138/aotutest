@@ -1,12 +1,29 @@
 <template>
-  <div class="page-container">
-    <div class="page-header">
-      <h1 class="page-title">智能元素侦测 (Smart Inspector)</h1>
-    </div>
-
+  <BasePage title="智能元素侦测 (Smart Inspector)">
+    
+    
     <div class="card-container">
         <el-row :gutter="20">
             <el-col :span="24">
+            <div class="section-title">侦测配置</div>
+            <div style="margin-bottom: 20px;">
+                <el-form label-position="left" label-width="100px">
+                    <el-form-item label="AI 模型配置">
+                        <el-select v-model="selectedModelConfigId" placeholder="选择 AI 模型 (建议使用多模态模型)" style="width: 100%">
+                            <el-option
+                                v-for="config in modelConfigs"
+                                :key="config.id"
+                                :label="`${config.name} (${config.model_name})`"
+                                :value="config.id"
+                            >
+                                <span style="float: left">{{ config.name }}</span>
+                                <span style="float: right; color: #8492a6; font-size: 13px">{{ config.model_name }}</span>
+                            </el-option>
+                        </el-select>
+                    </el-form-item>
+                </el-form>
+            </div>
+
             <div class="section-title">目标源</div>
             <div style="margin-bottom: 20px;">
                 <el-radio-group v-model="inspectMode">
@@ -129,9 +146,9 @@
             </el-col>
         </el-row>
     </div>
-  </div>
-</template>
 
+  </BasePage>
+</template>
 <script setup>
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
@@ -150,6 +167,36 @@ const devices = ref([])
 const selectedDeviceId = ref('')
 const refreshingDevices = ref(false)
 const deviceScreenshot = ref(null)
+
+// AI Model Configs
+const modelConfigs = ref([])
+const selectedModelConfigId = ref(null)
+
+const loadModelConfigs = async () => {
+    try {
+        const response = await request.get('/requirement-analysis/api/ai-models/')
+        let results = []
+        if (response.data && Array.isArray(response.data.results)) {
+            results = response.data.results
+        } else if (Array.isArray(response.data)) {
+            results = response.data
+        }
+        
+        modelConfigs.value = results.filter(c => c.is_active)
+        
+        // 自动选择一个推荐的模型
+        if (modelConfigs.value.length > 0) {
+            const match = modelConfigs.value.find(c => 
+                c.role === 'mobile_agent' || 
+                c.name.toLowerCase().includes('vision') || 
+                c.model_name.toLowerCase().includes('gpt-4o')
+            )
+            selectedModelConfigId.value = match ? match.id : modelConfigs.value[0].id
+        }
+    } catch (error) {
+        console.error('Failed to load model configs:', error)
+    }
+}
 
 const loadDevices = async () => {
     try {
@@ -208,11 +255,13 @@ const handleInspect = async () => {
         let response;
         if (inspectMode.value === 'url') {
             response = await request.post('/ui-automation/ai-execution-records/inspect_page/', {
-                url: inspectorUrl.value
+                url: inspectorUrl.value,
+                model_config_id: selectedModelConfigId.value
             })
         } else if (inspectMode.value === 'image') {
             const formData = new FormData()
             formData.append('image', inspectorImage.value)
+            formData.append('model_config_id', selectedModelConfigId.value || '')
             // Axios automatically sets Content-Type to multipart/form-data when data is FormData
             // However, our request wrapper might be interfering. Let's ensure headers are set if needed,
             // or just rely on standard behavior.
@@ -227,7 +276,8 @@ const handleInspect = async () => {
             })
         } else if (inspectMode.value === 'device') {
             response = await request.post('/ui-automation/ai-execution-records/inspect_page/', {
-                device_id: selectedDeviceId.value
+                device_id: selectedDeviceId.value,
+                model_config_id: selectedModelConfigId.value
             })
         }
         
@@ -243,23 +293,11 @@ const handleInspect = async () => {
 
 onMounted(() => {
     loadDevices()
+    loadModelConfigs()
 })
 </script>
 
 <style lang="scss" scoped>
-.page-container {
-  padding: 20px;
-}
-
-.page-header {
-  margin-bottom: 20px;
-  
-  .page-title {
-    font-size: 20px;
-    font-weight: 600;
-    margin: 0;
-  }
-}
 
 .card-container {
   background-color: #fff;

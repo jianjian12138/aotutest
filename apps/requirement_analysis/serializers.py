@@ -95,7 +95,7 @@ class DocumentUploadSerializer(serializers.ModelSerializer):
             validated_data['uploaded_by'] = user
         else:
             # 如果是匿名用户，使用第一个超级用户作为默认用户
-            from apps.users.models import User
+            from apps.core_platform.models import User
             default_user = User.objects.filter(is_superuser=True).first()
             if not default_user:
                 default_user = User.objects.first()
@@ -196,7 +196,7 @@ class AIModelConfigSerializer(serializers.ModelSerializer):
             validated_data['created_by'] = user
         else:
             # 如果是匿名用户，使用第一个超级用户作为默认用户
-            from apps.users.models import User
+            from apps.core_platform.models import User
             default_user = User.objects.filter(is_superuser=True).first()
             if not default_user:
                 default_user = User.objects.first()
@@ -223,7 +223,7 @@ class PromptConfigSerializer(serializers.ModelSerializer):
             validated_data['created_by'] = user
         else:
             # 如果是匿名用户，使用第一个超级用户作为默认用户
-            from apps.users.models import User
+            from apps.core_platform.models import User
             default_user = User.objects.filter(is_superuser=True).first()
             if not default_user:
                 default_user = User.objects.first()
@@ -261,7 +261,7 @@ class TestCaseGenerationTaskSerializer(serializers.ModelSerializer):
         if user.is_authenticated:
             validated_data['created_by'] = user
         else:
-            from apps.users.models import User
+            from apps.core_platform.models import User
             default_user = User.objects.filter(is_superuser=True).first()
             if not default_user:
                 default_user = User.objects.first()

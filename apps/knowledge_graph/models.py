@@ -1,6 +1,6 @@
 from django.db import models
 import uuid
-from apps.projects.models import Project
+from apps.core_platform.models import Project
 
 class KnowledgeDocument(models.Model):
     SOURCE_TYPES = (

@@ -1,85 +1,87 @@
 <template>
-  <div class="project-management-container">
-    <div class="page-header">
-      <h1 class="page-title">UI项目管理</h1>
-      <div class="header-actions">
-        <el-button type="primary" @click="showCreateDialog = true">
-          <el-icon><Plus /></el-icon>
-          新建项目
+  <base-page title="UI项目管理">
+    <template #actions>
+      <el-button type="primary" @click="goToUnifiedProjects">
+        <el-icon><View /></el-icon>
+        跳转到统一管理
+      </el-button>
+    </template>
+    
+    <el-alert
+      title="提示"
+      type="info"
+      :closable="false"
+      style="margin-bottom: 20px"
+    >
+      UI自动化项目管理已整合到【统一管理】模块，请点击上方按钮跳转查看所有项目。
+    </el-alert>
+    
+    <div class="projects-header">
+      <h4>UI项目管理</h4>
+      <div class="search-filter">
+        <el-input
+          v-model="searchText"
+          placeholder="搜索项目名称"
+          clearable
+          style="width: 300px; margin-right: 15px"
+          @input="handleSearch"
+        >
+          <template #prefix>
+            <el-icon><Search /></el-icon>
+          </template>
+        </el-input>
+        <el-button type="primary" @click="goToUnifiedProjects">
+          <el-icon><View /></el-icon>
+          查看统一项目管理
         </el-button>
       </div>
     </div>
     
-    <div class="main-content">
-      <div class="content-wrapper">
-        <div class="projects-header">
-          <h4>项目列表</h4>
-        <div class="search-filter">
-          <el-input
-            v-model="searchText"
-            placeholder="搜索项目名称"
-            clearable
-            style="width: 300px; margin-right: 15px"
-            @input="handleSearch"
-          >
-            <template #prefix>
-              <el-icon><Search /></el-icon>
-            </template>
-          </el-input>
-          <el-button type="primary" @click="handleSearch">
-            <el-icon><Search /></el-icon>
-            查询
-          </el-button>
-        </div>
-      </div>
-      
-      <div class="projects-list">
-        <div
-          v-for="project in projects"
-          :key="project.id"
-          class="project-item"
-          @click="goToProjectDetail(project.id)"
-        >
-          <div class="project-header">
-            <div class="project-info">
-              <h4 class="project-name">{{ project.name }}</h4>
-              <p class="project-description">{{ project.description || '暂无描述' }}</p>
-            </div>
-            <div class="project-actions">
-              <el-button size="small" type="primary" text @click.stop="editProject(project)">
-                <el-icon><Edit /></el-icon>
-                编辑
-              </el-button>
-              <el-button size="small" type="danger" text @click.stop="deleteProject(project.id)">
-                <el-icon><Delete /></el-icon>
-                删除
-              </el-button>
-            </div>
+    <div class="projects-list">
+      <div
+        v-for="project in projects"
+        :key="project.id"
+        class="project-item"
+        @click="goToProjectDetail(project.id)"
+      >
+        <div class="project-header">
+          <div class="project-info">
+            <h4 class="project-name">{{ project.name }}</h4>
+            <p class="project-description">{{ project.description || '暂无描述' }}</p>
           </div>
-          <div class="project-meta">
-            <el-tag :type="getStatusType(project.status)" size="small">
-              {{ getStatusText(project.status) }}
-            </el-tag>
-            <span class="update-time">{{ formatDate(null, null, project.updated_at) }}</span>
+          <div class="project-actions">
+            <el-button size="small" type="primary" text @click.stop="editProject(project)">
+              <el-icon><Edit /></el-icon>
+              编辑
+            </el-button>
+            <el-button size="small" type="danger" text @click.stop="deleteProject(project.id)">
+              <el-icon><Delete /></el-icon>
+              删除
+            </el-button>
           </div>
         </div>
-      </div>
-      
-      <!-- 分页 -->
-      <div class="pagination-container">
-        <el-pagination
-          v-model:current-page="pagination.currentPage"
-          v-model:page-size="pagination.pageSize"
-          :page-sizes="[10, 20, 50, 100]"
-          layout="total, sizes, prev, pager, next, jumper"
-          :total="total"
-          @size-change="handleSizeChange"
-          @current-change="handleCurrentChange"
-        />
-      </div>
+        <div class="project-meta">
+          <el-tag :type="getStatusType(project.status)" size="small">
+            {{ getStatusText(project.status) }}
+          </el-tag>
+          <span class="update-time">{{ formatDate(null, null, project.updated_at) }}</span>
+        </div>
       </div>
     </div>
     
+    <!-- 分页 -->
+    <div class="pagination-container">
+      <el-pagination
+        v-model:current-page="pagination.currentPage"
+        v-model:page-size="pagination.pageSize"
+        :page-sizes="[10, 20, 50, 100]"
+        layout="total, sizes, prev, pager, next, jumper"
+        :total="total"
+        @size-change="handleSizeChange"
+        @current-change="handleCurrentChange"
+      />
+    </div>
+
     <!-- 创建项目对话框 -->
     <el-dialog v-model="showCreateDialog" title="新建UI自动化项目" width="500px">
       <el-form ref="createFormRef" :model="createForm" :rules="formRules" label-width="80px">
@@ -176,14 +178,22 @@
         </span>
       </template>
     </el-dialog>
-  </div>
+  </base-page>
 </template>
 
 <script setup>
 import { ref, reactive, onMounted, nextTick } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Search, View, Edit, Delete } from '@element-plus/icons-vue'
 import { getUiProjects, createUiProject, updateUiProject, deleteUiProject } from '@/api/ui_automation'
+
+const router = useRouter()
+
+// 跳转到统一管理项目页面
+const goToUnifiedProjects = () => {
+  router.push('/unified/projects')
+}
 
 // 项目数据
 const projects = ref([])
@@ -453,53 +463,7 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.project-management-container {
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
-  background: #f5f7fa;
-  overflow: hidden;
-}
-
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 15px 20px;
-  border-bottom: 1px solid #e6e6e6;
-  background: white;
-  flex-shrink: 0;
-}
-
-.page-title {
-  margin: 0;
-  font-size: 24px;
-  font-weight: 600;
-  color: #303133;
-}
-
-.header-actions {
-  display: flex;
-  align-items: center;
-}
-
-.main-content {
-  flex: 1;
-  overflow: hidden;
-  padding: 0;
-  display: flex;
-}
-
-.content-wrapper {
-  flex: 1;
-  width: 100%;
-  background: white;
-  padding: 20px;
-  height: 100%;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-}
+/* .project-management-container, .page-header, .page-title, .header-actions, .main-content, .content-wrapper 已被 BasePage 替代 */
 
 .projects-header {
   display: flex;

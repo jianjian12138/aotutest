@@ -13,8 +13,8 @@ from apps.ui_automation.models import (
     UiProject, PageObject, Element, PageObjectElement, 
     TestCase, TestCaseStep, LocatorStrategy, ElementGroup
 )
-from apps.configuration.models import GlobalParameter, CommonMethod
-from apps.projects.models import Project
+from apps.core_platform.models import GlobalParameter, CommonMethod
+from apps.core_platform.models import Project
 
 User = get_user_model()
 

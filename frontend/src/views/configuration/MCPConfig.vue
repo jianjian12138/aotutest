@@ -1,13 +1,10 @@
 <template>
-  <div class="page-container">
-    <div class="page-header">
-      <h3 class="page-title">MCP 管理平台</h3>
-      <div class="header-actions">
-        <el-button type="primary" @click="prepareAddConfig">
-          <el-icon><Plus /></el-icon> 新增 MCP 服务器
-        </el-button>
-      </div>
-    </div>
+  <BasePage title="MCP 管理平台">
+    <template #actions>
+      <el-button type="primary" @click="prepareAddConfig">
+        <el-icon><Plus /></el-icon> 新增 MCP 服务器
+      </el-button>
+    </template>
 
     <div class="main-content">
       <div class="card-container">
@@ -152,9 +149,11 @@
         </div>
       </div>
     </el-dialog>
-  </div>
-</template>
+  
 
+
+  </BasePage>
+</template>
 <script setup>
 import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -359,17 +358,8 @@ onMounted(loadConfigs)
 </script>
 
 <style scoped lang="scss">
-.page-container {
-  padding: 24px;
-  background-color: #f5f7fa;
-  min-height: 100vh;
-}
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 24px;
-}
+
+
 
 .debug-container {
   .tool-info {

@@ -1,9 +1,6 @@
 <template>
-  <div class="page-container">
-    <div class="page-header">
-      <h1 class="page-title">AI 执行记录</h1>
-      <div class="header-actions">
-        <el-button 
+  <BasePage title="AI 执行记录">
+    <template #actions><el-button 
           type="danger" 
           :disabled="selectedRecords.length === 0" 
           @click="batchDeleteRecords"
@@ -14,10 +11,8 @@
         </el-button>
         <el-select v-model="projectId" placeholder="选择项目" style="width: 200px; margin-left: 15px" @change="onProjectChange">
           <el-option v-for="project in projects" :key="project.id" :label="project.name" :value="project.id" />
-        </el-select>
-      </div>
-    </div>
-
+        </el-select></template>
+    
     <div class="card-container">
       <el-table 
         :data="records" 
@@ -126,9 +121,9 @@
       v-model="showReportDialog"
       :record-id="reportRecordId"
     />
-  </div>
-</template>
 
+  </BasePage>
+</template>
 <script setup>
 import { ref, reactive, onMounted, onUnmounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -346,28 +341,6 @@ onUnmounted(() => {
 </script>
 
 <style lang="scss" scoped>
-.page-container {
-  padding: 20px;
-}
-
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-  
-  .page-title {
-    font-size: 20px;
-    font-weight: 600;
-    margin: 0;
-  }
-  
-  .header-actions {
-    display: flex;
-    align-items: center;
-  }
-}
-
 .card-container {
   background-color: #fff;
   border-radius: 4px;

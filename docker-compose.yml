@@ -1,0 +1,159 @@
+version: '3.8'
+
+services:
+  # Redis服务
+  redis:
+    image: redis:7-alpine
+    container_name: testing-platform-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    networks:
+      - testing-network
+
+  # PostgreSQL数据库（可选，替代SQLite）
+  postgres:
+    image: postgres:15-alpine
+    container_name: testing-platform-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: testing_platform
+      POSTGRES_USER: testing_user
+      POSTGRES_PASSWORD: testing_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - testing-network
+
+  # Django后端服务
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: testing-platform-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - DEBUG=False
+      - SECRET_KEY=${SECRET_KEY:-django-insecure-change-me-in-production}
+      - ALLOWED_HOSTS=localhost,127.0.0.1
+      - DB_ENGINE=django.db.backends.postgresql
+      - DB_NAME=testing_platform
+      - DB_USER=testing_user
+      - DB_PASSWORD=testing_password
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    volumes:
+      - ./backend:/app
+      - backend_static:/app/static
+      - backend_media:/app/media
+      - backend_logs:/app/logs
+    depends_on:
+      - redis
+      - postgres
+    networks:
+      - testing-network
+    command: >
+      sh -c "python manage.py migrate --noinput &&
+             python manage.py collectstatic --noinput &&
+             gunicorn backend.wsgi:application --bind 0.0.0.0:8000 --workers 4 --timeout 120"
+
+  # Celery Worker
+  celery_worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: testing-platform-celery-worker
+    restart: unless-stopped
+    environment:
+      - DEBUG=False
+      - SECRET_KEY=${SECRET_KEY:-django-insecure-change-me-in-production}
+      - DB_ENGINE=django.db.backends.postgresql
+      - DB_NAME=testing_platform
+      - DB_USER=testing_user
+      - DB_PASSWORD=testing_password
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    volumes:
+      - ./backend:/app
+      - backend_media:/app/media
+      - backend_logs:/app/logs
+    depends_on:
+      - redis
+      - postgres
+    networks:
+      - testing-network
+    command: celery -A backend worker -l info --loglevel=info
+
+  # Celery Beat（定时任务）
+  celery_beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: testing-platform-celery-beat
+    restart: unless-stopped
+    environment:
+      - DEBUG=False
+      - SECRET_KEY=${SECRET_KEY:-django-insecure-change-me-in-production}
+      - DB_ENGINE=django.db.backends.postgresql
+      - DB_NAME=testing_platform
+      - DB_USER=testing_user
+      - DB_PASSWORD=testing_password
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    volumes:
+      - ./backend:/app
+    depends_on:
+      - redis
+      - postgres
+    networks:
+      - testing-network
+    command: celery -A backend beat -l info --loglevel=info
+
+  # Vue前端服务
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: testing-platform-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - testing-network
+
+networks:
+  testing-network:
+    driver: bridge
+
+volumes:
+  redis_data:
+    driver: local
+  postgres_data:
+    driver: local
+  backend_static:
+    driver: local
+  backend_media:
+    driver: local
+  backend_logs:
+    driver: local

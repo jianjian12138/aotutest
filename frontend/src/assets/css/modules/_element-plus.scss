@@ -1,0 +1,68 @@
+/* ================= Element Plus Premium Overrides ================= */
+@use "tokens" as *;
+
+/* Buttons */
+.el-button {
+    border-radius: var(--radius-sm) !important;
+    font-weight: 500 !important;
+    font-family: var(--font-main) !important;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.el-button--primary:not(.is-plain):not(.is-text) {
+    background: linear-gradient(135deg, var(--primary), var(--accent)) !important;
+    border: none !important;
+    color: white !important;
+
+    &:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 16px var(--primary-glow) !important;
+    }
+}
+
+/* Cards */
+.el-card {
+    border: 1px solid var(--border-light) !important;
+    border-radius: var(--radius-lg) !important;
+    box-shadow: var(--shadow-sm) !important;
+    background: var(--bg-surface) !important;
+    transition: all 0.3s ease;
+
+    &:hover {
+        transform: translateY(-4px);
+        box-shadow: var(--shadow-lg) !important;
+        border-color: var(--border-glow) !important;
+    }
+}
+
+/* Tables */
+.el-table {
+    border-radius: var(--radius-md) !important;
+    overflow: hidden;
+    --el-table-header-bg-color: var(--slate-50) !important;
+    --el-table-header-text-color: var(--slate-500) !important;
+
+    th.el-table__cell {
+        font-weight: 600 !important;
+        font-size: 13px;
+        height: 52px !important;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+}
+
+/* Inputs */
+.el-input__wrapper,
+.el-textarea__inner {
+    border-radius: var(--radius-sm) !important;
+    box-shadow: 0 0 0 1px var(--border-light) inset !important;
+    transition: all 0.2s ease !important;
+
+    &:hover {
+        box-shadow: 0 0 0 1px var(--primary-light) inset !important;
+    }
+
+    &.is-focus {
+        box-shadow: 0 0 0 2px var(--primary) inset !important;
+    }
+}

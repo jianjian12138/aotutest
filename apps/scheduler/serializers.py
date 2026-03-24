@@ -1,10 +1,10 @@
+from apps.notifications.models import NotificationConfig, NotificationLog
 from rest_framework import serializers
-from .models import ScheduledTask, NotificationConfig, TaskExecutionLog
-from apps.projects.models import Project
+from .models import ScheduledTask, TaskExecutionLog
+from apps.core_platform.models import Project
 
 class NotificationConfigSerializer(serializers.ModelSerializer):
     created_by_name = serializers.CharField(source='created_by.username', read_only=True)
-    api_project_name = serializers.CharField(source='api_project.name', read_only=True, allow_null=True)
     
     class Meta:
         model = NotificationConfig

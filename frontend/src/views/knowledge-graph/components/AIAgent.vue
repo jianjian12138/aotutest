@@ -1,12 +1,5 @@
 <template>
-  <div class="ai-agent-container">
-    <el-card shadow="hover" class="page-card">
-      <template #header>
-        <div class="card-header page-header" style="margin-bottom: 0;">
-          <h1 class="page-title">AI助手</h1>
-        </div>
-      </template>
-    </el-card>
+  <BasePage title="AI助手">
     
     <div class="content-wrapper">
       <!-- Sidebar for Chat History -->
@@ -157,9 +150,9 @@
         </div>
       </div>
     </div>
-  </div>
+  
+  </BasePage>
 </template>
-
 <script setup>
 import { ref, computed, onMounted, nextTick } from 'vue'
 import { ElMessage } from 'element-plus'

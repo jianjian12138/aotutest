@@ -10,6 +10,9 @@ import { useUserStore } from '@/stores/user'
 import App from './App.vue'
 import router from './router'
 import './assets/css/global.scss'
+import BasePage from '@/components/BasePage/index.vue'
+import PremiumCard from '@/components/Premium/PremiumCard.vue'
+import PremiumButton from '@/components/Premium/PremiumButton.vue'
 
 // Axios 基础配置
 axios.defaults.xsrfCookieName = 'csrftoken';
@@ -38,6 +41,11 @@ async function init() {
   app.use(ElementPlus, {
     locale: zhCn,
   })
+
+  // 注册全局通用布局组件
+  app.component('BasePage', BasePage)
+  app.component('PremiumCard', PremiumCard)
+  app.component('PremiumButton', PremiumButton)
 
   app.mount('#app')
 }

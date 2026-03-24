@@ -1,6 +1,29 @@
 <template>
-  <div class="interface-manage-page">
-    <div class="interface-layout">
+  <BasePage title="接口管理">
+    <template #actions>
+      <el-select v-model="selectedProject" placeholder="选择项目" @change="onProjectChange" style="width: 200px; margin-right: 8px;">
+        <el-option
+          v-for="project in projects"
+          :key="project.id"
+          :label="project.name"
+          :value="project.id"
+        />
+      </el-select>
+      <el-button type="primary" @click="createEmptyRequest">
+        <el-icon><DocumentAdd /></el-icon>
+        新建接口
+      </el-button>
+      <el-button @click="showCreateCollectionDialog = true">
+        <el-icon><FolderAdd /></el-icon>
+        新建分组
+      </el-button>
+      <el-button @click="showImportDialog = true">
+        <el-icon><Download /></el-icon>
+        导入接口
+      </el-button>
+    </template>
+    <div class="interface-manage-page">
+      <div class="interface-layout">
       <!-- 左侧集合树 -->
       <div class="sidebar">
               <div class="sidebar-header">
@@ -497,6 +520,7 @@
       </template>
     </el-dialog>
   </div>
+  </BasePage>
 </template>
 
 <script setup>

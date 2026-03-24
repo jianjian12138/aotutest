@@ -1,13 +1,10 @@
 <template>
-  <div class="page-container">
-    <div class="page-header">
-      <h3 class="page-title">Skills 技能管理</h3>
-      <div class="header-actions">
-        <el-button type="primary" @click="prepareAddConfig">
-          <el-icon><Plus /></el-icon> 新增测试技能
-        </el-button>
-      </div>
-    </div>
+  <BasePage title="Skills 技能管理">
+    <template #actions>
+      <el-button type="primary" @click="prepareAddConfig">
+        <el-icon><Plus /></el-icon> 新增测试技能
+      </el-button>
+    </template>
 
     <div class="main-content">
       <div class="card-container">
@@ -18,7 +15,7 @@
           <el-table-column prop="description" label="描述" min-width="200" show-overflow-tooltip>
              <template #default="scope">
                {{ scope.row.additional_config?.description || '暂无描述' }}
-             </template>
+             </template>              
           </el-table-column>
           <el-table-column prop="is_active" label="状态" width="100">
             <template #default="scope">
@@ -108,9 +105,10 @@
         </div>
       </div>
     </el-dialog>
-  </div>
-</template>
+  
 
+  </BasePage>
+</template>
 <script setup>
 import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -242,17 +240,8 @@ onMounted(loadConfigs)
 </script>
 
 <style scoped lang="scss">
-.page-container {
-  padding: 24px;
-  background-color: #f5f7fa;
-  min-height: 100vh;
-}
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 24px;
-}
+
+
 .card-container {
   background: #fff;
   padding: 24px;

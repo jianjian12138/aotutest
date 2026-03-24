@@ -1,124 +1,111 @@
 <template>
-  <div class="query-history-container">
-    <el-card shadow="hover" class="page-card">
-      <template #header>
-        <div class="card-header page-header" style="margin-bottom: 0;">
-          <h2 class="page-title">查询历史记录</h2>
-          <el-button type="primary" @click="handleClearHistory">
-            <el-icon><Delete /></el-icon>
-            清空历史
-          </el-button>
-        </div>
-      </template>
-      
-      <div class="content">
-        <!-- 搜索和筛选 -->
-        <div class="search-filter">
-          <el-input
-            v-model="searchKeyword"
-            placeholder="搜索自然语言或SQL语句"
-            clearable
-            class="search-input"
-          >
-            <template #prefix>
-              <el-icon><Search /></el-icon>
-            </template>
-          </el-input>
-          
-          <el-select
-            v-model="statusFilter"
-            placeholder="筛选执行状态"
-            clearable
-            class="filter-select"
-          >
-            <el-option label="全部" value="" />
-            <el-option label="成功" value="SUCCESS" />
-            <el-option label="失败" value="FAILED" />
-            <el-option label="运行中" value="RUNNING" />
-          </el-select>
-        </div>
-        
-        <!-- 历史记录列表 -->
-        <el-table
-          v-loading="loading"
-          :data="filteredHistory"
-          style="width: 100%"
-          border
-          stripe
-          :default-sort="{ prop: 'created_at', order: 'descending' }"
+  <BasePage title="查询历史记录">
+    <div class="content">
+      <!-- 搜索和筛选 -->
+      <div class="search-filter">
+        <el-input
+          v-model="searchKeyword"
+          placeholder="搜索自然语言或SQL语句"
+          clearable
+          class="search-input"
         >
-          <el-table-column label="自然语言" min-width="250" show-overflow-tooltip>
-            <template #default="scope">
-              {{ scope.row.sql_generation?.natural_language || '' }}
-            </template>
-          </el-table-column>
-          <el-table-column label="SQL语句" min-width="250">
-            <template #default="scope">
-              <el-tooltip placement="top" :content="scope.row.sql_generation?.generated_sql || ''">
-                <span class="sql-preview">{{ (scope.row.sql_generation?.generated_sql || '').substring(0, 50) }}{{ (scope.row.sql_generation?.generated_sql || '').length > 50 ? '...' : '' }}</span>
-              </el-tooltip>
-            </template>
-          </el-table-column>
-          <el-table-column label="执行状态" width="120">
-            <template #default="scope">
-              <el-tag
-                :type="scope.row.sql_generation?.execution_status === 'SUCCESS' ? 'success' : (scope.row.sql_generation?.execution_status === 'FAILED' ? 'danger' : 'primary')"
-              >
-                {{ scope.row.sql_generation?.execution_status === 'SUCCESS' ? '成功' : (scope.row.sql_generation?.execution_status === 'FAILED' ? '失败' : '运行中') }}
-              </el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column prop="execution_time" label="执行时间(ms)" width="120" align="center">
-            <template #default="scope">
-              <span :class="scope.row.execution_time > 1000 ? 'slow-execution' : ''">{{ scope.row.execution_time ? Math.round(scope.row.execution_time * 1000) : '-' }}</span>
-            </template>
-          </el-table-column>
-          <el-table-column prop="row_count" label="结果行数" width="100" align="center" />
-          <el-table-column prop="created_by.username" label="执行用户" width="120" />
-          <el-table-column prop="created_at" label="执行时间" width="180" />
-          <el-table-column label="操作" width="200" fixed="right">
-            <template #default="scope">
-              <el-button
-                type="primary"
-                size="small"
-                @click="handleViewResult(scope.row)"
-              >
-                查看结果
-              </el-button>
-              <el-button
-                size="small"
-                @click="handleReuseQuery(scope.row)"
-              >
-                复用查询
-              </el-button>
-              <el-button
-                size="small"
-                type="danger"
-                @click="handleDeleteRecord(scope.row)"
-              >
-                删除
-              </el-button>
-            </template>
-          </el-table-column>
-        </el-table>
+          <template #prefix>
+            <el-icon><Search /></el-icon>
+          </template>
+        </el-input>
         
-        <!-- 分页 -->
-        <div class="pagination-container">
-          <el-pagination
-            v-model:current-page="currentPage"
-            v-model:page-size="pageSize"
-            :page-sizes="[10, 20, 50, 100]"
-            layout="total, sizes, prev, pager, next, jumper"
-            :total="filteredHistory.length"
-            @size-change="handleSizeChange"
-            @current-change="handleCurrentChange"
-          />
-        </div>
+        <el-select
+          v-model="statusFilter"
+          placeholder="筛选执行状态"
+          clearable
+          class="filter-select"
+        >
+          <el-option label="全部" value="" />
+          <el-option label="成功" value="SUCCESS" />
+          <el-option label="失败" value="FAILED" />
+          <el-option label="运行中" value="RUNNING" />
+        </el-select>
       </div>
-    </el-card>
-  </div>
+      
+      <!-- 历史记录列表 -->
+      <el-table
+        v-loading="loading"
+        :data="filteredHistory"
+        style="width: 100%"
+        border
+        stripe
+        :default-sort="{ prop: 'created_at', order: 'descending' }"
+      >
+        <el-table-column label="自然语言" min-width="250" show-overflow-tooltip>
+          <template #default="scope">
+            {{ scope.row.sql_generation?.natural_language || '' }}
+          </template>
+        </el-table-column>
+        <el-table-column label="SQL语句" min-width="250">
+          <template #default="scope">
+            <el-tooltip placement="top" :content="scope.row.sql_generation?.generated_sql || ''">
+              <span class="sql-preview">{{ (scope.row.sql_generation?.generated_sql || '').substring(0, 50) }}{{ (scope.row.sql_generation?.generated_sql || '').length > 50 ? '...' : '' }}</span>
+            </el-tooltip>
+          </template>
+        </el-table-column>
+        <el-table-column label="执行状态" width="120">
+          <template #default="scope">
+            <el-tag
+              :type="scope.row.sql_generation?.execution_status === 'SUCCESS' ? 'success' : (scope.row.sql_generation?.execution_status === 'FAILED' ? 'danger' : 'primary')"
+            >
+              {{ scope.row.sql_generation?.execution_status === 'SUCCESS' ? '成功' : (scope.row.sql_generation?.execution_status === 'FAILED' ? '失败' : '运行中') }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="execution_time" label="执行时间(ms)" width="120" align="center">
+          <template #default="scope">
+            <span :class="scope.row.execution_time > 1000 ? 'slow-execution' : ''">{{ scope.row.execution_time ? Math.round(scope.row.execution_time * 1000) : '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="row_count" label="结果行数" width="100" align="center" />
+        <el-table-column prop="created_by.username" label="执行用户" width="120" />
+        <el-table-column prop="created_at" label="执行时间" width="180" />
+        <el-table-column label="操作" width="200" fixed="right">
+          <template #default="scope">
+            <el-button
+              type="primary"
+              size="small"
+              @click="handleViewResult(scope.row)"
+            >
+              查看结果
+            </el-button>
+            <el-button
+              size="small"
+              @click="handleReuseQuery(scope.row)"
+            >
+              复用查询
+            </el-button>
+            <el-button
+              size="small"
+              type="danger"
+              @click="handleDeleteRecord(scope.row)"
+            >
+              删除
+            </el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+      
+      <!-- 分页 -->
+      <div class="pagination-container">
+        <el-pagination
+          v-model:current-page="currentPage"
+          v-model:page-size="pageSize"
+          :page-sizes="[10, 20, 50, 100]"
+          layout="total, sizes, prev, pager, next, jumper"
+          :total="filteredHistory.length"
+          @size-change="handleSizeChange"
+          @current-change="handleCurrentChange"
+        />
+      </div>
+    </div>
+  </BasePage>
 </template>
-
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -311,13 +298,7 @@ onMounted(() => {
 
 <style scoped>
 /* 页面特定样式 */
-.page-container {
-  padding: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  max-width: 100%; /* 新增：覆盖全局样式的 max-width: 1600px，确保铺满 */
-}
+
 .query-history-container {
   width: 100%;
 }
@@ -332,11 +313,7 @@ onMounted(() => {
   align-items: center;
 }
 
-.page-title {
-  margin: 0;
-  font-size: 24px;
-  font-weight: 600;
-}
+
 
 .content {
   padding: 20px 0;

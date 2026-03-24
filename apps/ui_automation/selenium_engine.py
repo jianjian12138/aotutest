@@ -23,16 +23,18 @@ logger = logging.getLogger(__name__)
 class SeleniumTestEngine:
     """Selenium测试执行引擎"""
 
-    def __init__(self, browser_type='chrome', headless=True):
+    def __init__(self, browser_type='chrome', headless=True, device_name=None):
         """
         初始化测试引擎
 
         Args:
             browser_type: 浏览器类型 (chrome, firefox, safari, edge)
             headless: 是否无头模式
+            device_name: H5设备模拟对应的名称
         """
         self.browser_type = browser_type
         self.headless = headless
+        self.device_name = device_name
         self.driver = None
 
     @staticmethod
@@ -169,6 +171,12 @@ class SeleniumTestEngine:
                 options.add_experimental_option('excludeSwitches', ['enable-automation', 'enable-logging'])
                 options.add_argument('--disable-popup-blocking')  # 禁用弹窗拦截（避免某些警告）
                 options.add_argument('--disable-notifications')  # 禁用所有通知
+
+                # 移动端设备模拟
+                if self.device_name:
+                    logger.info(f"✓ 启用 Selenium 设备模拟: {self.device_name}")
+                    mobile_emulation = {"deviceName": self.device_name}
+                    options.add_experimental_option("mobileEmulation", mobile_emulation)
 
                 # 使用缓存优先策略
                 service = Service(ChromeDriverManager().install())
@@ -448,6 +456,33 @@ class SeleniumTestEngine:
                 log += f"  - 执行时间: {execution_time}秒"
                 return True, log, None
 
+            elif action_type == 'urlJump':
+                target_url = resolved_input_value
+                if not target_url:
+                    return False, "✗ URL跳转失败: URL 不能为空", None
+                    
+                if not target_url.startswith('http'):
+                    target_url = f"http://{target_url}"
+                    
+                self.driver.get(target_url)
+                execution_time = round(time.time() - start_time, 2)
+                log = f"✓ URL跳转成功\n"
+                log += f"  - 目标地址: {target_url}\n"
+                log += f"  - 执行时间: {execution_time}秒"
+                return True, log, None
+
+            elif action_type == 'urlExtract':
+                current_url = self.driver.current_url
+                execution_time = round(time.time() - start_time, 2)
+                log = f"✓ URL提取成功\n"
+                log += f"  - 当前地址: {current_url}\n"
+                
+                var_name = resolved_assert_value or "ExtractedURL"
+                log += f"  - 提取为变量: {var_name} (待关联变量管理器)\n"
+                log += f"  - 执行时间: {execution_time}秒"
+                
+                return True, log, None
+
             # 其他操作需要元素定位器
             locator_strategy = element_data.get('locator_strategy', 'css')
             locator_value = element_data.get('locator_value', '')
@@ -702,6 +737,40 @@ class SeleniumTestEngine:
                 log += f"  - 执行时间: {execution_time}秒"
                 return True, log, None
 
+            elif action_type in ['dragAndDrop', 'DRAG_AND_DROP']:
+                target_selector = ''
+                if hasattr(step, 'action_params') and step.action_params:
+                    if isinstance(step.action_params, dict):
+                        target_selector = step.action_params.get('target_selector', '')
+                    elif isinstance(step.action_params, str):
+                        try:
+                            import json
+                            params_dict = json.loads(step.action_params)
+                            target_selector = params_dict.get('target_selector', '')
+                        except:
+                            pass
+                            
+                if not target_selector:
+                    return False, "✕ 拖拽失败: 未配置目标选择器(target_selector，需在操作参数中配置)", None, debug_data
+                    
+                try:
+                    from selenium.webdriver.common.by import By
+                    from selenium.webdriver import ActionChains
+                    by_type = By.XPATH if target_selector.startswith('//') or target_selector.startswith('xpath=') else By.CSS_SELECTOR
+                    actual_selector = target_selector.replace('xpath=', '') if target_selector.startswith('xpath=') else target_selector
+                    target_element_node = self.driver.find_element(by_type, actual_selector)
+                    
+                    actions = ActionChains(self.driver)
+                    actions.drag_and_drop(element, target_element_node).perform()
+                    
+                    execution_time = round(time.time() - start_time, 2)
+                    log = f"✓ 拖拽成功 (目标: {target_selector})\n"
+                    log += f"  - 源元素: {locator_strategy}={locator_value}\n"
+                    log += f"  - 执行时间: {execution_time}秒"
+                    return True, log, None, debug_data
+                except Exception as e:
+                    return False, f"✕ 拖拽失败: {str(e)}", None, debug_data
+
             elif action_type == 'assert':
                 # 根据断言类型执行不同的断言
                 if step.assert_type == 'textContains':
@@ -755,8 +824,32 @@ class SeleniumTestEngine:
                     # 元素已经找到，说明存在
                     log = f"✓ 断言通过: 元素 '{element_name}' 存在"
                     return True, log, None
-
-
+                    
+                elif step.assert_type == 'urlContains':
+                    current_url = self.driver.current_url
+                    if resolved_assert_value in current_url:
+                        log = f"✓ 断言通过: 当前 URL 包含 '{resolved_assert_value}'\n"
+                        log += f"  - 实际 URL: {current_url}\n"
+                        return True, log, None
+                    else:
+                        log = f"✗ 断言失败: 当前 URL 不包含 '{resolved_assert_value}'\n"
+                        log += f"  - 实际 URL: {current_url}"
+                        screenshot = self.driver.get_screenshot_as_png()
+                        screenshot_base64 = f"data:image/png;base64,{base64.b64encode(screenshot).decode()}"
+                        return False, log, screenshot_base64
+                        
+                elif step.assert_type == 'urlEquals':
+                    current_url = self.driver.current_url
+                    if resolved_assert_value == current_url:
+                        log = f"✓ 断言通过: 当前 URL 等于 '{resolved_assert_value}'\n"
+                        log += f"  - 实际 URL: {current_url}\n"
+                        return True, log, None
+                    else:
+                        log = f"✗ 断言失败: 当前 URL 不等于 '{resolved_assert_value}'\n"
+                        log += f"  - 实际 URL: {current_url}"
+                        screenshot = self.driver.get_screenshot_as_png()
+                        screenshot_base64 = f"data:image/png;base64,{base64.b64encode(screenshot).decode()}"
+                        return False, log, screenshot_base64
 
             else:
                 log = f"⚠ 未知的操作类型: {action_type}"
