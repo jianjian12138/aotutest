@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    # 全局注入 Django 运行所需环境变量，保证各 Python 步骤（租户校验 / 审计门禁 / 隔离测试 / 测试套件）一致可用
+    env:
+      SECRET_KEY: ci-test-secret-key
+      DEBUG: "True"
+      FIELD_ENCRYPTION_KEY: ci-test-encryption-key-0123456789abcdef
+      DJANGO_SETTINGS_MODULE: backend.settings
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y libpq-dev gcc
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-django flake8
+
+      - name: Compile check (syntax)
+        run: python -m compileall -q backend apps scripts
+
+      - name: Lint (flake8)
+        run: flake8 backend apps scripts --count --max-line-length=120 --exclude=*/migrations/*
+
+      - name: Check model/migration consistency
+        run: python manage.py makemigrations --check --dry-run
+
+      # ---------------- 租户隔离合入门禁 ----------------
+      - name: Tenant scope validation (ORM path compile)
+        run: python scripts/validate_tenant_scope.py
+
+      - name: Audit baseline CI gate (P0/P1 + P2 register regression)
+        run: python scripts/audit_baseline.py --ci --p2-register scripts/p2_governance.json
+
+      - name: Dual-tenant isolation tests (manage.py test)
+        run: python manage.py test tests.test_tenant_isolation -v 2
+
+      # ---------------- 常规测试 ----------------
+      - name: Run Django ORM tests
+        run: python manage.py test apps.core_platform tests.test_orchestrator_critic tests.test_kg tests.test_rag_retriever --keepdb
+
+      - name: Run pytest suite
+        run: python -m pytest tests/ -q --ignore=tests/test_tenant_isolation.py --django-debug-mode
+
+      - name: Frontend lint
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run lint

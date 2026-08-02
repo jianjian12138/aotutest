@@ -1,0 +1,95 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv_py311/
+venv/
+.venv/
+.venv311/
+env/
+ENV/
+*.egg-info/
+dist/
+build/
+
+# Django
+*.log
+logs/
+media/
+static/
+db.sqlite3
+db.sqlite3-journal
+*.db
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm/
+.yarn/
+dist/
+build/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Documentation
+README.md
+docs/
+*.md
+
+# Scripts
+scripts/
+*.sh
+*.bat
+
+# Docker
+Dockerfile
+docker-compose*.yml
+.dockerignore
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# Allure
+allure/
+allure-results/
+allure-reports/
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.swp
+*.swo
+
+# Vector DB / workspace artifacts (do not ship)
+chroma_db/
+tmp/
+export_test/
+mobile_airtest/
+.workbuddy/
+backups/
+frontend/node_modules/

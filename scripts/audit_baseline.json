@@ -1,0 +1,2849 @@
+{
+  "total": 316,
+  "findings": [
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/api_testing/views/dashboard_views.py",
+      "line": 45,
+      "target": "ApiDashboardViewSet.stats @action",
+      "issue": "ApiProject.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 ApiProject 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/api_testing/views/dashboard_views.py",
+      "line": 49,
+      "target": "ApiDashboardViewSet.stats @action",
+      "issue": "ApiRequest.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 ApiRequest 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/api_testing/views/dashboard_views.py",
+      "line": 51,
+      "target": "ApiDashboardViewSet.stats @action",
+      "issue": "TestSuite.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 TestSuite 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/api_testing/views/dashboard_views.py",
+      "line": 53,
+      "target": "ApiDashboardViewSet.stats @action",
+      "issue": "RequestHistory.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 RequestHistory 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/api_testing/views/dashboard_views.py",
+      "line": 55,
+      "target": "ApiDashboardViewSet.stats @action",
+      "issue": "ApiTestCaseExecution.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 ApiTestCaseExecution 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/api_testing/views/execution_views.py",
+      "line": 160,
+      "target": "TestSuiteViewSet.add_test_cases @action",
+      "issue": "ApiTestCase.objects.get() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 ApiTestCase 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/api_testing/views/project_views.py",
+      "line": 93,
+      "target": "ApiProjectViewSet.create_sample_project @action",
+      "issue": "ApiProject.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 ApiProject 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/api_testing/views/project_views.py",
+      "line": 124,
+      "target": "ApiProjectViewSet.import_api_data @action",
+      "issue": "ApiProject.objects.get() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 ApiProject 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/api_testing/views/project_views.py",
+      "line": 142,
+      "target": "ApiProjectViewSet.import_api_data @action",
+      "issue": "ApiProject.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 ApiProject 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/api_testing/views/project_views.py",
+      "line": 192,
+      "target": "ApiProjectViewSet.get_import_task_status @action",
+      "issue": "ApiImportTask.objects.get() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 ApiImportTask 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/api_testing/views/project_views.py",
+      "line": 222,
+      "target": "ApiProjectViewSet._import_postman_data",
+      "issue": "ApiRequest.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 ApiRequest 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/api_testing/views/project_views.py",
+      "line": 223,
+      "target": "ApiProjectViewSet._import_postman_data",
+      "issue": "ApiCollection.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 ApiCollection 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/api_testing/views/project_views.py",
+      "line": 240,
+      "target": "ApiProjectViewSet._import_postman_data",
+      "issue": "ApiCollection.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 ApiCollection 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/api_testing/views/project_views.py",
+      "line": 244,
+      "target": "ApiProjectViewSet._import_postman_data",
+      "issue": "ApiCollection.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 ApiCollection 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/api_testing/views/project_views.py",
+      "line": 254,
+      "target": "ApiProjectViewSet._import_postman_data",
+      "issue": "ApiCollection.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 ApiCollection 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/api_testing/views/project_views.py",
+      "line": 298,
+      "target": "ApiProjectViewSet._import_postman_data",
+      "issue": "ApiRequest.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 ApiRequest 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/api_testing/views/project_views.py",
+      "line": 349,
+      "target": "ApiProjectViewSet._import_jmeter_data",
+      "issue": "ApiCollection.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 ApiCollection 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/api_testing/views/project_views.py",
+      "line": 371,
+      "target": "ApiProjectViewSet._import_jmeter_data",
+      "issue": "ApiRequest.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 ApiRequest 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/api_testing/views/project_views.py",
+      "line": 422,
+      "target": "ApiProjectViewSet._import_custom_data",
+      "issue": "ApiRequest.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 ApiRequest 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/api_testing/views/project_views.py",
+      "line": 423,
+      "target": "ApiProjectViewSet._import_custom_data",
+      "issue": "ApiCollection.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 ApiCollection 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/api_testing/views/project_views.py",
+      "line": 429,
+      "target": "ApiProjectViewSet._import_custom_data",
+      "issue": "ApiCollection.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 ApiCollection 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/api_testing/views/project_views.py",
+      "line": 484,
+      "target": "ApiProjectViewSet._import_custom_data",
+      "issue": "ApiRequest.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 ApiRequest 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/api_testing/views/project_views.py",
+      "line": 500,
+      "target": "ApiProjectViewSet._import_custom_data",
+      "issue": "ApiCollection.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 ApiCollection 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/api_testing/views/project_views.py",
+      "line": 515,
+      "target": "ApiProjectViewSet._import_custom_data",
+      "issue": "ApiRequest.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 ApiRequest 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/api_testing/views/project_views.py",
+      "line": 529,
+      "target": "ApiProjectViewSet._import_custom_data",
+      "issue": "ApiCollection.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 ApiCollection 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/api_testing/views/project_views.py",
+      "line": 547,
+      "target": "ApiProjectViewSet._import_custom_data",
+      "issue": "ApiRequest.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 ApiRequest 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/api_testing/views/project_views.py",
+      "line": 571,
+      "target": "ApiProjectViewSet._import_swagger_data",
+      "issue": "ApiCollection.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 ApiCollection 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/api_testing/views/project_views.py",
+      "line": 581,
+      "target": "ApiProjectViewSet._import_swagger_data",
+      "issue": "ApiRequest.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 ApiRequest 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/api_testing/views/project_views.py",
+      "line": 663,
+      "target": "EnvironmentViewSet.activate @action",
+      "issue": "Environment.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 Environment 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/api_testing/views/request_views.py",
+      "line": 129,
+      "target": "ApiRequestViewSet.execute @action",
+      "issue": "GlobalParameter.objects.all() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 GlobalParameter 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/api_testing/views/request_views.py",
+      "line": 245,
+      "target": "RequestHistoryViewSet.batch_delete @action",
+      "issue": "RequestHistory.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 RequestHistory 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/api_testing/views/testcase_views.py",
+      "line": 89,
+      "target": "ApiTestCaseModuleViewSet.batch_update_order @action",
+      "issue": "ApiTestCaseModule.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 ApiTestCaseModule 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/assistant/agent_views.py",
+      "line": 24,
+      "target": "AgentExecuteView.post",
+      "issue": "AgentProfile.objects.prefetch_related() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 AgentProfile 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/assistant/agent_views.py",
+      "line": 102,
+      "target": "AgentExecuteStreamView.post",
+      "issue": "AgentProfile.objects.prefetch_related() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 AgentProfile 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/assistant/views.py",
+      "line": 126,
+      "target": "ChatViewSet.send_message @action",
+      "issue": "AIWorkflowConfig.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 AIWorkflowConfig 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/assistant/views.py",
+      "line": 128,
+      "target": "ChatViewSet.send_message @action",
+      "issue": "AIModelConfig.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 AIModelConfig 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/assistant/views.py",
+      "line": 332,
+      "target": "ChatViewSet._handle_workflow_request",
+      "issue": "AIModelConfig.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 AIModelConfig 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/assistant/views.py",
+      "line": 484,
+      "target": "KnowledgeGraphViewSet.graph_data @action",
+      "issue": "KnowledgeEntity.objects.all() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 KnowledgeEntity 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/assistant/views.py",
+      "line": 485,
+      "target": "KnowledgeGraphViewSet.graph_data @action",
+      "issue": "KnowledgeRelationship.objects.all() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 KnowledgeRelationship 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/assistant/views.py",
+      "line": 536,
+      "target": "KnowledgeGraphViewSet.stats @action",
+      "issue": "KnowledgeDocument.objects.count() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 KnowledgeDocument 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/assistant/views.py",
+      "line": 537,
+      "target": "KnowledgeGraphViewSet.stats @action",
+      "issue": "KnowledgeEntity.objects.count() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 KnowledgeEntity 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/assistant/views.py",
+      "line": 538,
+      "target": "KnowledgeGraphViewSet.stats @action",
+      "issue": "KnowledgeRelationship.objects.count() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 KnowledgeRelationship 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/assistant/views.py",
+      "line": 539,
+      "target": "KnowledgeGraphViewSet.stats @action",
+      "issue": "KnowledgeDocument.objects.exists() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 KnowledgeDocument 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/assistant/views.py",
+      "line": 539,
+      "target": "KnowledgeGraphViewSet.stats @action",
+      "issue": "KnowledgeDocument.objects.last() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 KnowledgeDocument 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/core_platform/views/configuration.py",
+      "line": 31,
+      "target": "GlobalParameterViewSet.destroy",
+      "issue": "ApiRequest.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 ApiRequest 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/core_platform/views/configuration.py",
+      "line": 47,
+      "target": "GlobalParameterViewSet.destroy",
+      "issue": "ApiTestCaseStep.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 ApiTestCaseStep 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/core_platform/views/configuration.py",
+      "line": 81,
+      "target": "CommonMethodViewSet.destroy",
+      "issue": "ApiRequest.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 ApiRequest 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/core_platform/views/configuration.py",
+      "line": 93,
+      "target": "CommonMethodViewSet.destroy",
+      "issue": "ApiTestCaseStep.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 ApiTestCaseStep 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/core_platform/views/projects.py",
+      "line": 180,
+      "target": "ProjectEnvironmentListCreateView._user_can_access_project",
+      "issue": "Project.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 Project 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/core_platform/views/projects.py",
+      "line": 181,
+      "target": "ProjectEnvironmentListCreateView._user_can_access_project",
+      "issue": "Project.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 Project 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/core_platform/views/versions.py",
+      "line": 64,
+      "target": "VersionListCreateView.perform_create",
+      "issue": "Project.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 Project 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/data_factory/views.py",
+      "line": 476,
+      "target": "TableMetadataViewSet.list",
+      "issue": "VannaConfig.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 VannaConfig 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/data_factory/views.py",
+      "line": 679,
+      "target": "TableMetadataViewSet.auto_scan @action",
+      "issue": "VannaConfig.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 VannaConfig 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/data_factory/views.py",
+      "line": 702,
+      "target": "DataFactoryDashboardViewSet.summary @action",
+      "issue": "DataFactoryProject.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 DataFactoryProject 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/data_factory/views.py",
+      "line": 708,
+      "target": "DataFactoryDashboardViewSet.summary @action",
+      "issue": "VannaConfig.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 VannaConfig 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/data_factory/views.py",
+      "line": 709,
+      "target": "DataFactoryDashboardViewSet.summary @action",
+      "issue": "SavedQuery.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 SavedQuery 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/data_factory/views.py",
+      "line": 712,
+      "target": "DataFactoryDashboardViewSet.summary @action",
+      "issue": "SqlGeneration.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 SqlGeneration 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/knowledge_graph/views.py",
+      "line": 174,
+      "target": "KnowledgeGraphVizViewSet.entities @action",
+      "issue": "KnowledgeEntity.objects.all() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 KnowledgeEntity 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/knowledge_graph/views.py",
+      "line": 180,
+      "target": "KnowledgeGraphVizViewSet.relations @action",
+      "issue": "KnowledgeRelation.objects.all() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 KnowledgeRelation 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/knowledge_graph/views.py",
+      "line": 188,
+      "target": "KnowledgeGraphVizViewSet.visualization_data @action",
+      "issue": "KnowledgeEntity.objects.all() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 KnowledgeEntity 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/knowledge_graph/views.py",
+      "line": 189,
+      "target": "KnowledgeGraphVizViewSet.visualization_data @action",
+      "issue": "KnowledgeRelation.objects.all() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 KnowledgeRelation 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/midscene/views.py",
+      "line": 351,
+      "target": "MidsceneDashboardViewSet.summary @action",
+      "issue": "MidsceneConfig.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 MidsceneConfig 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/midscene/views.py",
+      "line": 352,
+      "target": "MidsceneDashboardViewSet.summary @action",
+      "issue": "MidsceneTask.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 MidsceneTask 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/performance_test/views.py",
+      "line": 326,
+      "target": "PerformanceEnvironmentViewSet.activate @action",
+      "issue": "PerformanceEnvironment.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 PerformanceEnvironment 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/performance_test/views.py",
+      "line": 416,
+      "target": "PerformanceTestSuiteViewSet.add_requests @action",
+      "issue": "PerformanceRequest.objects.get() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 PerformanceRequest 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/performance_test/views.py",
+      "line": 580,
+      "target": "PerformanceDashboardViewSet.summary @action",
+      "issue": "PerformanceProject.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 PerformanceProject 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/performance_test/views.py",
+      "line": 586,
+      "target": "PerformanceDashboardViewSet.summary @action",
+      "issue": "PerformanceCollection.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 PerformanceCollection 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/performance_test/views.py",
+      "line": 589,
+      "target": "PerformanceDashboardViewSet.summary @action",
+      "issue": "PerformanceRequest.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 PerformanceRequest 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/performance_test/views.py",
+      "line": 592,
+      "target": "PerformanceDashboardViewSet.summary @action",
+      "issue": "PerformanceTestSuite.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 PerformanceTestSuite 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/performance_test/views.py",
+      "line": 595,
+      "target": "PerformanceDashboardViewSet.summary @action",
+      "issue": "PerformanceTestExecution.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 PerformanceTestExecution 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/performance_test/views.py",
+      "line": 600,
+      "target": "PerformanceDashboardViewSet.summary @action",
+      "issue": "PerformanceTestExecution.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 PerformanceTestExecution 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/reports/views.py",
+      "line": 89,
+      "target": "TestReportViewSet.dashboard @action",
+      "issue": "TestPlan.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 TestPlan 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/reports/views.py",
+      "line": 90,
+      "target": "TestReportViewSet.dashboard @action",
+      "issue": "TestCase.objects.all() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 TestCase 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/reports/views.py",
+      "line": 117,
+      "target": "TestReportViewSet.dashboard @action",
+      "issue": "TestRun.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 TestRun 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/reports/views.py",
+      "line": 129,
+      "target": "TestReportViewSet.dashboard @action",
+      "issue": "TestRun.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 TestRun 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/reports/views.py",
+      "line": 151,
+      "target": "TestReportViewSet.status_distribution @action",
+      "issue": "TestRun.objects.all() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 TestRun 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/reports/views.py",
+      "line": 157,
+      "target": "TestReportViewSet.status_distribution @action",
+      "issue": "TestRunCase.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 TestRunCase 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/reports/views.py",
+      "line": 172,
+      "target": "TestReportViewSet.defect_distribution @action",
+      "issue": "TestRunCase.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 TestRunCase 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/reports/views.py",
+      "line": 195,
+      "target": "TestReportViewSet.failed_cases_top @action",
+      "issue": "TestRunCase.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 TestRunCase 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/reports/views.py",
+      "line": 226,
+      "target": "TestReportViewSet.execution_trend @action",
+      "issue": "TestRunCase.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 TestRunCase 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/reports/views.py",
+      "line": 265,
+      "target": "TestReportViewSet.ai_efficiency @action",
+      "issue": "TestCase.objects.all() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 TestCase 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/reports/views.py",
+      "line": 266,
+      "target": "TestReportViewSet.ai_efficiency @action",
+      "issue": "GeneratedTestCase.objects.all() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 GeneratedTestCase 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/reports/views.py",
+      "line": 267,
+      "target": "TestReportViewSet.ai_efficiency @action",
+      "issue": "BusinessRequirement.objects.all() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 BusinessRequirement 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/reports/views.py",
+      "line": 306,
+      "target": "TestReportViewSet.team_workload @action",
+      "issue": "TestRunCase.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 TestRunCase 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/reports/views.py",
+      "line": 498,
+      "target": "TestReportViewSet.analyze @action",
+      "issue": "AIModelConfig.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 AIModelConfig 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/requirement_analysis/views.py",
+      "line": 698,
+      "target": "TestCaseGenerationTaskViewSet.generate @action",
+      "issue": "AIModelConfig.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 AIModelConfig 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/requirement_analysis/views.py",
+      "line": 702,
+      "target": "TestCaseGenerationTaskViewSet.generate @action",
+      "issue": "AIModelConfig.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 AIModelConfig 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/requirement_analysis/views.py",
+      "line": 719,
+      "target": "TestCaseGenerationTaskViewSet.generate @action",
+      "issue": "AIModelConfig.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 AIModelConfig 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/requirement_analysis/views.py",
+      "line": 723,
+      "target": "TestCaseGenerationTaskViewSet.generate @action",
+      "issue": "AIModelConfig.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 AIModelConfig 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/requirement_analysis/views.py",
+      "line": 761,
+      "target": "TestCaseGenerationTaskViewSet.generate @action",
+      "issue": "KnowledgeDocument.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 KnowledgeDocument 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/requirement_analysis/views.py",
+      "line": 1069,
+      "target": "TestCaseGenerationTaskViewSet.save_to_records @action",
+      "issue": "Project.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 Project 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/requirement_analysis/views.py",
+      "line": 1146,
+      "target": "TestCaseGenerationTaskViewSet.saved_records @action",
+      "issue": "TestCaseGenerationTask.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 TestCaseGenerationTask 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/requirement_analysis/views.py",
+      "line": 1207,
+      "target": "TestCaseGenerationTaskViewSet.batch_adopt @action",
+      "issue": "Project.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 Project 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/requirement_analysis/views.py",
+      "line": 1300,
+      "target": "TestCaseGenerationTaskViewSet.batch_adopt_selected @action",
+      "issue": "Project.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 Project 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/reviews/views.py",
+      "line": 57,
+      "target": "TestCaseReviewViewSet.assign_reviewers @action",
+      "issue": "User.objects.get() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 User 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/reviews/views.py",
+      "line": 116,
+      "target": "TestCaseReviewViewSet.my_reviews @action",
+      "issue": "TestCaseReview.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 TestCaseReview 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/strix_security/views.py",
+      "line": 169,
+      "target": "SecurityTestDashboardViewSet.summary @action",
+      "issue": "SecurityTestProject.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 SecurityTestProject 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/strix_security/views.py",
+      "line": 171,
+      "target": "SecurityTestDashboardViewSet.summary @action",
+      "issue": "SecurityTestExecution.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 SecurityTestExecution 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/strix_security/views.py",
+      "line": 172,
+      "target": "SecurityTestDashboardViewSet.summary @action",
+      "issue": "Vulnerability.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 Vulnerability 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/strix_security/views.py",
+      "line": 173,
+      "target": "SecurityTestDashboardViewSet.summary @action",
+      "issue": "Vulnerability.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 Vulnerability 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/strix_security/views.py",
+      "line": 174,
+      "target": "SecurityTestDashboardViewSet.summary @action",
+      "issue": "Vulnerability.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 Vulnerability 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/strix_security/views.py",
+      "line": 175,
+      "target": "SecurityTestDashboardViewSet.summary @action",
+      "issue": "Vulnerability.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 Vulnerability 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/strix_security/views.py",
+      "line": 176,
+      "target": "SecurityTestDashboardViewSet.summary @action",
+      "issue": "Vulnerability.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 Vulnerability 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/strix_security/views.py",
+      "line": 177,
+      "target": "SecurityTestDashboardViewSet.summary @action",
+      "issue": "Vulnerability.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 Vulnerability 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/strix_security/views.py",
+      "line": 179,
+      "target": "SecurityTestDashboardViewSet.summary @action",
+      "issue": "SecurityTestExecution.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 SecurityTestExecution 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/strix_security/views.py",
+      "line": 180,
+      "target": "SecurityTestDashboardViewSet.summary @action",
+      "issue": "Vulnerability.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 Vulnerability 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/testcases/views.py",
+      "line": 114,
+      "target": "TestCaseListCreateView.get_user_accessible_projects",
+      "issue": "Project.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 Project 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/testcases/views.py",
+      "line": 180,
+      "target": "TestCaseDetailView.get_user_accessible_projects",
+      "issue": "Project.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 Project 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/testcases/views.py",
+      "line": 221,
+      "target": "ImportTestCaseView.post",
+      "issue": "Project.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 Project 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/testcases/views.py",
+      "line": 241,
+      "target": "ExportTestCaseView.get",
+      "issue": "TestCase.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 TestCase 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/ui_automation/debug_views.py",
+      "line": 33,
+      "target": "DebugFileViewSet.list",
+      "issue": "UiProject.objects.get() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 UiProject 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/ui_automation/debug_views.py",
+      "line": 43,
+      "target": "DebugFileViewSet.list",
+      "issue": "TestCase.objects.get() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 TestCase 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/ui_automation/views/ai_views.py",
+      "line": 624,
+      "target": "AIExecutionRecordViewSet.run_agent_browser @action",
+      "issue": "UiProject.objects.first() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 UiProject 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/ui_automation/views/ai_views.py",
+      "line": 735,
+      "target": "AIExecutionRecordViewSet.inspect_page @action",
+      "issue": "AIModelConfig.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 AIModelConfig 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/ui_automation/views/dashboard_views.py",
+      "line": 99,
+      "target": "UiDashboardViewSet.stats @action",
+      "issue": "UiProject.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 UiProject 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/ui_automation/views/dashboard_views.py",
+      "line": 103,
+      "target": "UiDashboardViewSet.stats @action",
+      "issue": "TestCase.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 TestCase 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/ui_automation/views/dashboard_views.py",
+      "line": 105,
+      "target": "UiDashboardViewSet.stats @action",
+      "issue": "TestSuite.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 TestSuite 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/ui_automation/views/dashboard_views.py",
+      "line": 107,
+      "target": "UiDashboardViewSet.stats @action",
+      "issue": "TestExecution.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 TestExecution 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/ui_automation/views/dashboard_views.py",
+      "line": 109,
+      "target": "UiDashboardViewSet.stats @action",
+      "issue": "TestCaseExecution.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 TestCaseExecution 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/ui_automation/views/script_views.py",
+      "line": 159,
+      "target": "ScriptElementUsageViewSet._analyze_script_elements",
+      "issue": "Element.objects.get() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 Element 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/ui_automation/views/task_views.py",
+      "line": 186,
+      "target": "UiScheduledTaskViewSet.run_now @action",
+      "issue": "TestCase.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 TestCase 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/ui_automation/views/task_views.py",
+      "line": 479,
+      "target": "UiScheduledTaskViewSet._send_webhook_notification",
+      "issue": "NotificationConfig.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 NotificationConfig 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/ui_automation/views/task_views.py",
+      "line": 706,
+      "target": "NotificationConfigViewSet.set_default @action",
+      "issue": "NotificationConfig.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 NotificationConfig 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/ui_automation/views/testcase_views.py",
+      "line": 151,
+      "target": "UiTestCaseModuleViewSet.batch_update_order @action",
+      "issue": "UiTestCaseModule.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 UiTestCaseModule 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/ui_automation/views/testcase_views.py",
+      "line": 267,
+      "target": "TestCaseViewSet._process_steps",
+      "issue": "LocatorStrategy.objects.get() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 LocatorStrategy 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/ui_automation/views/testcase_views.py",
+      "line": 270,
+      "target": "TestCaseViewSet._process_steps",
+      "issue": "LocatorStrategy.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 LocatorStrategy 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/ui_automation/views/testcase_views.py",
+      "line": 273,
+      "target": "TestCaseViewSet._process_steps",
+      "issue": "LocatorStrategy.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 LocatorStrategy 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/ui_automation/views/testcase_views.py",
+      "line": 276,
+      "target": "TestCaseViewSet._process_steps",
+      "issue": "Element.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 Element 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/ui_automation/views/testcase_views.py",
+      "line": 318,
+      "target": "TestCaseViewSet._process_steps",
+      "issue": "PageObjectElement.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 PageObjectElement 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/ui_automation/views/testcase_views.py",
+      "line": 321,
+      "target": "TestCaseViewSet._process_steps",
+      "issue": "PageObjectElement.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 PageObjectElement 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/ui_automation/views/testcase_views.py",
+      "line": 343,
+      "target": "TestCaseViewSet._process_steps",
+      "issue": "TestCaseStep.objects.filter() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 TestCaseStep 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D1",
+      "severity": "P2",
+      "file": "apps/ui_automation/views/testcase_views.py",
+      "line": 1230,
+      "target": "TestCaseViewSet.batch_run @action",
+      "issue": "TestCase.objects.get() 绕过 get_queryset，租户过滤依赖来源待人工确认",
+      "fix": "改用 self.get_queryset() 派生，或对 TestCase 显式补租户过滤后再按 ID 取用"
+    },
+    {
+      "detector": "D2",
+      "severity": "P2",
+      "file": "apps/api_testing/serializers.py",
+      "line": 17,
+      "target": "UserSerializer(model=User)",
+      "issue": "PII 字段 ['email'] 已声明掩码（PIIMaskMixin，本人/管理员明文，他人掩码）",
+      "fix": "人工复核：掩码强度是否足够、是否存在其他未声明的 PII 字段"
+    },
+    {
+      "detector": "D2",
+      "severity": "P2",
+      "file": "apps/api_testing/serializers.py",
+      "line": 845,
+      "target": "NotificationLogDetailSerializer(model=NotificationLog)",
+      "issue": "PII 字段 ['sender_email'] 已声明掩码（PIIMaskMixin，本人/管理员明文，他人掩码）",
+      "fix": "人工复核：掩码强度是否足够、是否存在其他未声明的 PII 字段"
+    },
+    {
+      "detector": "D2",
+      "severity": "P2",
+      "file": "apps/assistant/serializers.py",
+      "line": 76,
+      "target": "KnowledgeDocumentSerializer(model=KnowledgeDocument)",
+      "issue": "fields='__all__' 全字段输出，建议显式白名单",
+      "fix": "改为显式 fields 白名单，敏感字段设 write_only=True 或提供掩码字段"
+    },
+    {
+      "detector": "D2",
+      "severity": "P2",
+      "file": "apps/assistant/serializers.py",
+      "line": 82,
+      "target": "KnowledgeEntitySerializer(model=KnowledgeEntity)",
+      "issue": "fields='__all__' 全字段输出，建议显式白名单",
+      "fix": "改为显式 fields 白名单，敏感字段设 write_only=True 或提供掩码字段"
+    },
+    {
+      "detector": "D2",
+      "severity": "P2",
+      "file": "apps/assistant/serializers.py",
+      "line": 88,
+      "target": "KnowledgeRelationshipSerializer(model=KnowledgeRelationship)",
+      "issue": "fields='__all__' 全字段输出，建议显式白名单",
+      "fix": "改为显式 fields 白名单，敏感字段设 write_only=True 或提供掩码字段"
+    },
+    {
+      "detector": "D2",
+      "severity": "P2",
+      "file": "apps/assistant/serializers.py",
+      "line": 94,
+      "target": "AgentSkillSerializer(model=AgentSkill)",
+      "issue": "fields='__all__' 全字段输出，建议显式白名单",
+      "fix": "改为显式 fields 白名单，敏感字段设 write_only=True 或提供掩码字段"
+    },
+    {
+      "detector": "D2",
+      "severity": "P2",
+      "file": "apps/core_platform/serializers/configuration.py",
+      "line": 4,
+      "target": "GlobalParameterSerializer(model=GlobalParameter)",
+      "issue": "fields='__all__' 全字段输出，建议显式白名单",
+      "fix": "改为显式 fields 白名单，敏感字段设 write_only=True 或提供掩码字段"
+    },
+    {
+      "detector": "D2",
+      "severity": "P2",
+      "file": "apps/core_platform/serializers/configuration.py",
+      "line": 10,
+      "target": "CommonMethodSerializer(model=CommonMethod)",
+      "issue": "fields='__all__' 全字段输出，建议显式白名单",
+      "fix": "改为显式 fields 白名单，敏感字段设 write_only=True 或提供掩码字段"
+    },
+    {
+      "detector": "D2",
+      "severity": "P2",
+      "file": "apps/core_platform/serializers/projects.py",
+      "line": 10,
+      "target": "ProjectEnvironmentSerializer(model=ProjectEnvironment)",
+      "issue": "fields='__all__' 全字段输出，建议显式白名单",
+      "fix": "改为显式 fields 白名单，敏感字段设 write_only=True 或提供掩码字段"
+    },
+    {
+      "detector": "D2",
+      "severity": "P2",
+      "file": "apps/core_platform/serializers/users.py",
+      "line": 16,
+      "target": "UserSimpleSerializer(model=User)",
+      "issue": "PII 字段 ['email'] 已声明掩码（PIIMaskMixin，本人/管理员明文，他人掩码）",
+      "fix": "人工复核：掩码强度是否足够、是否存在其他未声明的 PII 字段"
+    },
+    {
+      "detector": "D2",
+      "severity": "P2",
+      "file": "apps/core_platform/serializers/users.py",
+      "line": 24,
+      "target": "UserSerializer(model=User)",
+      "issue": "PII 字段 ['email', 'phone'] 已声明掩码（PIIMaskMixin，本人/管理员明文，他人掩码）",
+      "fix": "人工复核：掩码强度是否足够、是否存在其他未声明的 PII 字段"
+    },
+    {
+      "detector": "D2",
+      "severity": "P2",
+      "file": "apps/data_factory/serializers.py",
+      "line": 18,
+      "target": "UserSerializer(model=User)",
+      "issue": "PII 字段 ['email'] 已声明掩码（PIIMaskMixin，本人/管理员明文，他人掩码）",
+      "fix": "人工复核：掩码强度是否足够、是否存在其他未声明的 PII 字段"
+    },
+    {
+      "detector": "D2",
+      "severity": "P2",
+      "file": "apps/data_factory/serializers.py",
+      "line": 28,
+      "target": "VannaConfigSerializer(model=VannaConfig)",
+      "issue": "fields='__all__' 全字段输出，建议显式白名单",
+      "fix": "改为显式 fields 白名单，敏感字段设 write_only=True 或提供掩码字段"
+    },
+    {
+      "detector": "D2",
+      "severity": "P2",
+      "file": "apps/data_factory/serializers.py",
+      "line": 71,
+      "target": "SqlGenerationSerializer(model=SqlGeneration)",
+      "issue": "fields='__all__' 全字段输出，建议显式白名单",
+      "fix": "改为显式 fields 白名单，敏感字段设 write_only=True 或提供掩码字段"
+    },
+    {
+      "detector": "D2",
+      "severity": "P2",
+      "file": "apps/data_factory/serializers.py",
+      "line": 81,
+      "target": "DataFactoryProjectSerializer(model=DataFactoryProject)",
+      "issue": "fields='__all__' 全字段输出，建议显式白名单",
+      "fix": "改为显式 fields 白名单，敏感字段设 write_only=True 或提供掩码字段"
+    },
+    {
+      "detector": "D2",
+      "severity": "P2",
+      "file": "apps/data_factory/serializers.py",
+      "line": 92,
+      "target": "SavedQuerySerializer(model=SavedQuery)",
+      "issue": "fields='__all__' 全字段输出，建议显式白名单",
+      "fix": "改为显式 fields 白名单，敏感字段设 write_only=True 或提供掩码字段"
+    },
+    {
+      "detector": "D2",
+      "severity": "P2",
+      "file": "apps/data_factory/serializers.py",
+      "line": 106,
+      "target": "QueryHistorySerializer(model=QueryHistory)",
+      "issue": "fields='__all__' 全字段输出，建议显式白名单",
+      "fix": "改为显式 fields 白名单，敏感字段设 write_only=True 或提供掩码字段"
+    },
+    {
+      "detector": "D2",
+      "severity": "P2",
+      "file": "apps/data_factory/serializers.py",
+      "line": 133,
+      "target": "DataSourceSerializer(model=DataSource)",
+      "issue": "fields='__all__' 全字段输出，建议显式白名单",
+      "fix": "改为显式 fields 白名单，敏感字段设 write_only=True 或提供掩码字段"
+    },
+    {
+      "detector": "D2",
+      "severity": "P2",
+      "file": "apps/data_factory/serializers.py",
+      "line": 153,
+      "target": "DataPoolSerializer(model=DataPool)",
+      "issue": "fields='__all__' 全字段输出，建议显式白名单",
+      "fix": "改为显式 fields 白名单，敏感字段设 write_only=True 或提供掩码字段"
+    },
+    {
+      "detector": "D2",
+      "severity": "P2",
+      "file": "apps/executions/serializers.py",
+      "line": 52,
+      "target": "TestPlanDetailSerializer(model=TestPlan)",
+      "issue": "fields='__all__' 全字段输出，建议显式白名单",
+      "fix": "改为显式 fields 白名单，敏感字段设 write_only=True 或提供掩码字段"
+    },
+    {
+      "detector": "D2",
+      "severity": "P2",
+      "file": "apps/executions/serializers.py",
+      "line": 62,
+      "target": "TestRunCaseSerializer(model=TestRunCase)",
+      "issue": "fields='__all__' 全字段输出，建议显式白名单",
+      "fix": "改为显式 fields 白名单，敏感字段设 write_only=True 或提供掩码字段"
+    },
+    {
+      "detector": "D2",
+      "severity": "P2",
+      "file": "apps/knowledge_graph/serializers.py",
+      "line": 4,
+      "target": "KnowledgeDocumentSerializer(model=KnowledgeDocument)",
+      "issue": "fields='__all__' 全字段输出，建议显式白名单",
+      "fix": "改为显式 fields 白名单，敏感字段设 write_only=True 或提供掩码字段"
+    },
+    {
+      "detector": "D2",
+      "severity": "P2",
+      "file": "apps/knowledge_graph/serializers.py",
+      "line": 12,
+      "target": "DocumentChunkSerializer(model=DocumentChunk)",
+      "issue": "fields='__all__' 全字段输出，建议显式白名单",
+      "fix": "改为显式 fields 白名单，敏感字段设 write_only=True 或提供掩码字段"
+    },
+    {
+      "detector": "D2",
+      "severity": "P2",
+      "file": "apps/knowledge_graph/serializers.py",
+      "line": 17,
+      "target": "KnowledgeEntitySerializer(model=KnowledgeEntity)",
+      "issue": "fields='__all__' 全字段输出，建议显式白名单",
+      "fix": "改为显式 fields 白名单，敏感字段设 write_only=True 或提供掩码字段"
+    },
+    {
+      "detector": "D2",
+      "severity": "P2",
+      "file": "apps/knowledge_graph/serializers.py",
+      "line": 22,
+      "target": "KnowledgeRelationSerializer(model=KnowledgeRelation)",
+      "issue": "fields='__all__' 全字段输出，建议显式白名单",
+      "fix": "改为显式 fields 白名单，敏感字段设 write_only=True 或提供掩码字段"
+    },
+    {
+      "detector": "D2",
+      "severity": "P2",
+      "file": "apps/midscene/serializers.py",
+      "line": 13,
+      "target": "UserSerializer(model=User)",
+      "issue": "PII 字段 ['email'] 已声明掩码（PIIMaskMixin，本人/管理员明文，他人掩码）",
+      "fix": "人工复核：掩码强度是否足够、是否存在其他未声明的 PII 字段"
+    },
+    {
+      "detector": "D2",
+      "severity": "P2",
+      "file": "apps/midscene/serializers.py",
+      "line": 23,
+      "target": "MidsceneConfigSerializer(model=MidsceneConfig)",
+      "issue": "fields='__all__' 全字段输出，建议显式白名单",
+      "fix": "改为显式 fields 白名单，敏感字段设 write_only=True 或提供掩码字段"
+    },
+    {
+      "detector": "D2",
+      "severity": "P2",
+      "file": "apps/midscene/serializers.py",
+      "line": 35,
+      "target": "MidsceneTaskSerializer(model=MidsceneTask)",
+      "issue": "fields='__all__' 全字段输出，建议显式白名单",
+      "fix": "改为显式 fields 白名单，敏感字段设 write_only=True 或提供掩码字段"
+    },
+    {
+      "detector": "D2",
+      "severity": "P2",
+      "file": "apps/midscene/serializers.py",
+      "line": 48,
+      "target": "MidsceneExecutionLogSerializer(model=MidsceneExecutionLog)",
+      "issue": "fields='__all__' 全字段输出，建议显式白名单",
+      "fix": "改为显式 fields 白名单，敏感字段设 write_only=True 或提供掩码字段"
+    },
+    {
+      "detector": "D2",
+      "severity": "P2",
+      "file": "apps/performance_test/serializers.py",
+      "line": 20,
+      "target": "UserSerializer(model=User)",
+      "issue": "PII 字段 ['email'] 已声明掩码（PIIMaskMixin，本人/管理员明文，他人掩码）",
+      "fix": "人工复核：掩码强度是否足够、是否存在其他未声明的 PII 字段"
+    },
+    {
+      "detector": "D2",
+      "severity": "P2",
+      "file": "apps/performance_test/serializers.py",
+      "line": 30,
+      "target": "PerformanceProjectSerializer(model=PerformanceProject)",
+      "issue": "fields='__all__' 全字段输出，建议显式白名单",
+      "fix": "改为显式 fields 白名单，敏感字段设 write_only=True 或提供掩码字段"
+    },
+    {
+      "detector": "D2",
+      "severity": "P2",
+      "file": "apps/performance_test/serializers.py",
+      "line": 40,
+      "target": "PerformanceCollectionSerializer(model=PerformanceCollection)",
+      "issue": "fields='__all__' 全字段输出，建议显式白名单",
+      "fix": "改为显式 fields 白名单，敏感字段设 write_only=True 或提供掩码字段"
+    },
+    {
+      "detector": "D2",
+      "severity": "P2",
+      "file": "apps/performance_test/serializers.py",
+      "line": 50,
+      "target": "PerformanceRequestSerializer(model=PerformanceRequest)",
+      "issue": "fields='__all__' 全字段输出，建议显式白名单",
+      "fix": "改为显式 fields 白名单，敏感字段设 write_only=True 或提供掩码字段"
+    },
+    {
+      "detector": "D2",
+      "severity": "P2",
+      "file": "apps/performance_test/serializers.py",
+      "line": 60,
+      "target": "PerformanceEnvironmentSerializer(model=PerformanceEnvironment)",
+      "issue": "fields='__all__' 全字段输出，建议显式白名单",
+      "fix": "改为显式 fields 白名单，敏感字段设 write_only=True 或提供掩码字段"
+    },
+    {
+      "detector": "D2",
+      "severity": "P2",
+      "file": "apps/performance_test/serializers.py",
+      "line": 70,
+      "target": "PerformanceTestSuiteRequestSerializer(model=PerformanceTestSuiteRequest)",
+      "issue": "fields='__all__' 全字段输出，建议显式白名单",
+      "fix": "改为显式 fields 白名单，敏感字段设 write_only=True 或提供掩码字段"
+    },
+    {
+      "detector": "D2",
+      "severity": "P2",
+      "file": "apps/performance_test/serializers.py",
+      "line": 80,
+      "target": "PerformanceTestSuiteSerializer(model=PerformanceTestSuite)",
+      "issue": "fields='__all__' 全字段输出，建议显式白名单",
+      "fix": "改为显式 fields 白名单，敏感字段设 write_only=True 或提供掩码字段"
+    },
+    {
+      "detector": "D2",
+      "severity": "P2",
+      "file": "apps/performance_test/serializers.py",
+      "line": 92,
+      "target": "PerformanceTestExecutionSerializer(model=PerformanceTestExecution)",
+      "issue": "fields='__all__' 全字段输出，建议显式白名单",
+      "fix": "改为显式 fields 白名单，敏感字段设 write_only=True 或提供掩码字段"
+    },
+    {
+      "detector": "D2",
+      "severity": "P2",
+      "file": "apps/performance_test/serializers.py",
+      "line": 102,
+      "target": "PerformanceTestHistorySerializer(model=PerformanceTestHistory)",
+      "issue": "fields='__all__' 全字段输出，建议显式白名单",
+      "fix": "改为显式 fields 白名单，敏感字段设 write_only=True 或提供掩码字段"
+    },
+    {
+      "detector": "D2",
+      "severity": "P2",
+      "file": "apps/performance_test/serializers.py",
+      "line": 113,
+      "target": "PerformanceScheduledTaskSerializer(model=PerformanceScheduledTask)",
+      "issue": "fields='__all__' 全字段输出，建议显式白名单",
+      "fix": "改为显式 fields 白名单，敏感字段设 write_only=True 或提供掩码字段"
+    },
+    {
+      "detector": "D2",
+      "severity": "P2",
+      "file": "apps/performance_test/serializers.py",
+      "line": 123,
+      "target": "PerformanceTaskExecutionLogSerializer(model=PerformanceTaskExecutionLog)",
+      "issue": "fields='__all__' 全字段输出，建议显式白名单",
+      "fix": "改为显式 fields 白名单，敏感字段设 write_only=True 或提供掩码字段"
+    },
+    {
+      "detector": "D2",
+      "severity": "P2",
+      "file": "apps/reports/serializers.py",
+      "line": 5,
+      "target": "ReportTemplateSerializer(model=ReportTemplate)",
+      "issue": "fields='__all__' 全字段输出，建议显式白名单",
+      "fix": "改为显式 fields 白名单，敏感字段设 write_only=True 或提供掩码字段"
+    },
+    {
+      "detector": "D2",
+      "severity": "P2",
+      "file": "apps/scheduler/serializers.py",
+      "line": 25,
+      "target": "ScheduledTaskSerializer(model=ScheduledTask)",
+      "issue": "fields='__all__' 全字段输出，建议显式白名单",
+      "fix": "改为显式 fields 白名单，敏感字段设 write_only=True 或提供掩码字段"
+    },
+    {
+      "detector": "D2",
+      "severity": "P2",
+      "file": "apps/scheduler/serializers.py",
+      "line": 43,
+      "target": "TaskExecutionLogSerializer(model=TaskExecutionLog)",
+      "issue": "fields='__all__' 全字段输出，建议显式白名单",
+      "fix": "改为显式 fields 白名单，敏感字段设 write_only=True 或提供掩码字段"
+    },
+    {
+      "detector": "D2",
+      "severity": "P2",
+      "file": "apps/strix_security/serializers.py",
+      "line": 15,
+      "target": "UserSerializer(model=User)",
+      "issue": "PII 字段 ['email'] 已声明掩码（PIIMaskMixin，本人/管理员明文，他人掩码）",
+      "fix": "人工复核：掩码强度是否足够、是否存在其他未声明的 PII 字段"
+    },
+    {
+      "detector": "D2",
+      "severity": "P2",
+      "file": "apps/strix_security/serializers.py",
+      "line": 25,
+      "target": "StrixConfigSerializer(model=StrixConfig)",
+      "issue": "fields='__all__' 全字段输出，建议显式白名单",
+      "fix": "改为显式 fields 白名单，敏感字段设 write_only=True 或提供掩码字段"
+    },
+    {
+      "detector": "D2",
+      "severity": "P2",
+      "file": "apps/strix_security/serializers.py",
+      "line": 37,
+      "target": "SecurityTestProjectSerializer(model=SecurityTestProject)",
+      "issue": "fields='__all__' 全字段输出，建议显式白名单",
+      "fix": "改为显式 fields 白名单，敏感字段设 write_only=True 或提供掩码字段"
+    },
+    {
+      "detector": "D2",
+      "severity": "P2",
+      "file": "apps/strix_security/serializers.py",
+      "line": 47,
+      "target": "SecurityTestExecutionSerializer(model=SecurityTestExecution)",
+      "issue": "fields='__all__' 全字段输出，建议显式白名单",
+      "fix": "改为显式 fields 白名单，敏感字段设 write_only=True 或提供掩码字段"
+    },
+    {
+      "detector": "D2",
+      "severity": "P2",
+      "file": "apps/strix_security/serializers.py",
+      "line": 57,
+      "target": "VulnerabilitySerializer(model=Vulnerability)",
+      "issue": "fields='__all__' 全字段输出，建议显式白名单",
+      "fix": "改为显式 fields 白名单，敏感字段设 write_only=True 或提供掩码字段"
+    },
+    {
+      "detector": "D2",
+      "severity": "P2",
+      "file": "apps/strix_security/serializers.py",
+      "line": 66,
+      "target": "SecurityTestHistorySerializer(model=SecurityTestHistory)",
+      "issue": "fields='__all__' 全字段输出，建议显式白名单",
+      "fix": "改为显式 fields 白名单，敏感字段设 write_only=True 或提供掩码字段"
+    },
+    {
+      "detector": "D2",
+      "severity": "P2",
+      "file": "apps/testcases/serializers.py",
+      "line": 6,
+      "target": "TestCaseStepSerializer(model=TestCaseStep)",
+      "issue": "fields='__all__' 全字段输出，建议显式白名单",
+      "fix": "改为显式 fields 白名单，敏感字段设 write_only=True 或提供掩码字段"
+    },
+    {
+      "detector": "D2",
+      "severity": "P2",
+      "file": "apps/testcases/serializers.py",
+      "line": 11,
+      "target": "TestCaseAttachmentSerializer(model=TestCaseAttachment)",
+      "issue": "fields='__all__' 全字段输出，建议显式白名单",
+      "fix": "改为显式 fields 白名单，敏感字段设 write_only=True 或提供掩码字段"
+    },
+    {
+      "detector": "D2",
+      "severity": "P2",
+      "file": "apps/testcases/serializers.py",
+      "line": 18,
+      "target": "TestCaseCommentSerializer(model=TestCaseComment)",
+      "issue": "fields='__all__' 全字段输出，建议显式白名单",
+      "fix": "改为显式 fields 白名单，敏感字段设 write_only=True 或提供掩码字段"
+    },
+    {
+      "detector": "D2",
+      "severity": "P2",
+      "file": "apps/testcases/serializers.py",
+      "line": 51,
+      "target": "TestCaseSerializer(model=TestCase)",
+      "issue": "fields='__all__' 全字段输出，建议显式白名单",
+      "fix": "改为显式 fields 白名单，敏感字段设 write_only=True 或提供掩码字段"
+    },
+    {
+      "detector": "D2",
+      "severity": "P2",
+      "file": "apps/ui_automation/serializers/element.py",
+      "line": 17,
+      "target": "LocatorStrategySerializer(model=LocatorStrategy)",
+      "issue": "fields='__all__' 全字段输出，建议显式白名单",
+      "fix": "改为显式 fields 白名单，敏感字段设 write_only=True 或提供掩码字段"
+    },
+    {
+      "detector": "D2",
+      "severity": "P2",
+      "file": "apps/ui_automation/serializers/element.py",
+      "line": 23,
+      "target": "ElementSerializer(model=Element)",
+      "issue": "fields='__all__' 全字段输出，建议显式白名单",
+      "fix": "改为显式 fields 白名单，敏感字段设 write_only=True 或提供掩码字段"
+    },
+    {
+      "detector": "D2",
+      "severity": "P2",
+      "file": "apps/ui_automation/serializers/element.py",
+      "line": 99,
+      "target": "ElementGroupSerializer(model=ElementGroup)",
+      "issue": "fields='__all__' 全字段输出，建议显式白名单",
+      "fix": "改为显式 fields 白名单，敏感字段设 write_only=True 或提供掩码字段"
+    },
+    {
+      "detector": "D2",
+      "severity": "P2",
+      "file": "apps/ui_automation/serializers/element.py",
+      "line": 126,
+      "target": "ElementEnhancedSerializer(model=Element)",
+      "issue": "fields='__all__' 全字段输出，建议显式白名单",
+      "fix": "改为显式 fields 白名单，敏感字段设 write_only=True 或提供掩码字段"
+    },
+    {
+      "detector": "D2",
+      "severity": "P2",
+      "file": "apps/ui_automation/serializers/element.py",
+      "line": 227,
+      "target": "PageObjectSerializer(model=PageObject)",
+      "issue": "fields='__all__' 全字段输出，建议显式白名单",
+      "fix": "改为显式 fields 白名单，敏感字段设 write_only=True 或提供掩码字段"
+    },
+    {
+      "detector": "D2",
+      "severity": "P2",
+      "file": "apps/ui_automation/serializers/element.py",
+      "line": 266,
+      "target": "PageObjectElementSerializer(model=PageObjectElement)",
+      "issue": "fields='__all__' 全字段输出，建议显式白名单",
+      "fix": "改为显式 fields 白名单，敏感字段设 write_only=True 或提供掩码字段"
+    },
+    {
+      "detector": "D2",
+      "severity": "P2",
+      "file": "apps/ui_automation/serializers/execution.py",
+      "line": 49,
+      "target": "TestSuiteSerializer(model=TestSuite)",
+      "issue": "fields='__all__' 全字段输出，建议显式白名单",
+      "fix": "改为显式 fields 白名单，敏感字段设 write_only=True 或提供掩码字段"
+    },
+    {
+      "detector": "D2",
+      "severity": "P2",
+      "file": "apps/ui_automation/serializers/execution.py",
+      "line": 85,
+      "target": "TestSuiteWithScriptsSerializer(model=TestSuite)",
+      "issue": "fields='__all__' 全字段输出，建议显式白名单",
+      "fix": "改为显式 fields 白名单，敏感字段设 write_only=True 或提供掩码字段"
+    },
+    {
+      "detector": "D2",
+      "severity": "P2",
+      "file": "apps/ui_automation/serializers/execution.py",
+      "line": 94,
+      "target": "TestExecutionSerializer(model=TestExecution)",
+      "issue": "fields='__all__' 全字段输出，建议显式白名单",
+      "fix": "改为显式 fields 白名单，敏感字段设 write_only=True 或提供掩码字段"
+    },
+    {
+      "detector": "D2",
+      "severity": "P2",
+      "file": "apps/ui_automation/serializers/execution.py",
+      "line": 136,
+      "target": "ScreenshotSerializer(model=Screenshot)",
+      "issue": "fields='__all__' 全字段输出，建议显式白名单",
+      "fix": "改为显式 fields 白名单，敏感字段设 write_only=True 或提供掩码字段"
+    },
+    {
+      "detector": "D2",
+      "severity": "P2",
+      "file": "apps/ui_automation/serializers/project.py",
+      "line": 18,
+      "target": "UserSerializer(model=User)",
+      "issue": "PII 字段 ['email'] 已声明掩码（PIIMaskMixin，本人/管理员明文，他人掩码）",
+      "fix": "人工复核：掩码强度是否足够、是否存在其他未声明的 PII 字段"
+    },
+    {
+      "detector": "D2",
+      "severity": "P2",
+      "file": "apps/ui_automation/serializers/project.py",
+      "line": 27,
+      "target": "UiProjectSerializer(model=UiProject)",
+      "issue": "fields='__all__' 全字段输出，建议显式白名单",
+      "fix": "改为显式 fields 白名单，敏感字段设 write_only=True 或提供掩码字段"
+    },
+    {
+      "detector": "D2",
+      "severity": "P2",
+      "file": "apps/ui_automation/serializers/project.py",
+      "line": 49,
+      "target": "UiDeviceSerializer(model=UiDevice)",
+      "issue": "fields='__all__' 全字段输出，建议显式白名单",
+      "fix": "改为显式 fields 白名单，敏感字段设 write_only=True 或提供掩码字段"
+    },
+    {
+      "detector": "D2",
+      "severity": "P2",
+      "file": "apps/ui_automation/serializers/project.py",
+      "line": 61,
+      "target": "ExecutionNodeSerializer(model=ExecutionNode)",
+      "issue": "fields='__all__' 全字段输出，建议显式白名单",
+      "fix": "改为显式 fields 白名单，敏感字段设 write_only=True 或提供掩码字段"
+    },
+    {
+      "detector": "D2",
+      "severity": "P2",
+      "file": "apps/ui_automation/serializers/script.py",
+      "line": 18,
+      "target": "TestScriptSerializer(model=TestScript)",
+      "issue": "fields='__all__' 全字段输出，建议显式白名单",
+      "fix": "改为显式 fields 白名单，敏感字段设 write_only=True 或提供掩码字段"
+    },
+    {
+      "detector": "D2",
+      "severity": "P2",
+      "file": "apps/ui_automation/serializers/script.py",
+      "line": 40,
+      "target": "ScriptStepSerializer(model=ScriptStep)",
+      "issue": "fields='__all__' 全字段输出，建议显式白名单",
+      "fix": "改为显式 fields 白名单，敏感字段设 write_only=True 或提供掩码字段"
+    },
+    {
+      "detector": "D2",
+      "severity": "P2",
+      "file": "apps/ui_automation/serializers/script.py",
+      "line": 67,
+      "target": "ScriptElementUsageSerializer(model=ScriptElementUsage)",
+      "issue": "fields='__all__' 全字段输出，建议显式白名单",
+      "fix": "改为显式 fields 白名单，敏感字段设 write_only=True 或提供掩码字段"
+    },
+    {
+      "detector": "D2",
+      "severity": "P2",
+      "file": "apps/ui_automation/serializers/task.py",
+      "line": 222,
+      "target": "NotificationLogSerializer(model=NotificationLog)",
+      "issue": "PII 字段 ['sender_email'] 已声明掩码（PIIMaskMixin，本人/管理员明文，他人掩码）",
+      "fix": "人工复核：掩码强度是否足够、是否存在其他未声明的 PII 字段"
+    },
+    {
+      "detector": "D2",
+      "severity": "P2",
+      "file": "apps/ui_automation/serializers/testcase.py",
+      "line": 156,
+      "target": "AICaseSerializer(model=AICase)",
+      "issue": "fields='__all__' 全字段输出，建议显式白名单",
+      "fix": "改为显式 fields 白名单，敏感字段设 write_only=True 或提供掩码字段"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/api_testing/management/commands/run_api_scheduler.py",
+      "line": 56,
+      "target": "time.sleep 伪装耗时",
+      "issue": "生产代码疑似模拟实现: time.sleep(10)",
+      "fix": "实现真实逻辑；确实无法实现的返回 501 并显式标注\"演示数据\"，禁止静默造假"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/api_testing/utils/requests_runner.py",
+      "line": 404,
+      "target": "time.sleep 伪装耗时",
+      "issue": "生产代码疑似模拟实现: time.sleep(step.wait_time / 1000.0)",
+      "fix": "实现真实逻辑；确实无法实现的返回 501 并显式标注\"演示数据\"，禁止静默造假"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/api_testing/utils/variables.py",
+      "line": 126,
+      "target": "random 造数",
+      "issue": "已声明为真实现（audit: real-impl）：数据池随机取值是造数功能本身（${pool.名称.字段} 变量解析），非伪造执行结果｜命中行: row = random.choice(pool.data)",
+      "fix": "人工复核该声明是否成立；若实为假实现须撤销标记并按 501 处置"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/api_testing/views/execution_views.py",
+      "line": 287,
+      "target": "time.sleep 伪装耗时",
+      "issue": "生产代码疑似模拟实现: time.sleep(1)",
+      "fix": "实现真实逻辑；确实无法实现的返回 501 并显式标注\"演示数据\"，禁止静默造假"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/assistant/agent_factory.py",
+      "line": 50,
+      "target": "mock 数据/结果",
+      "issue": "已声明为真实现（audit: real-impl）：system_prompt 文案描述该 Agent 的职责（供给测试数据），非伪造实现｜命中行: system_prompt=\"You are a Data Engineering AI. You understand",
+      "fix": "人工复核该声明是否成立；若实为假实现须撤销标记并按 501 处置"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/assistant/services.py",
+      "line": 92,
+      "target": "Mock 降级模式",
+      "issue": "关键词命中于注释/文档字符串（非可执行代码）: \"\"\"调用真实 AI 引擎抽取实体和关系；仅当无任何可用大模型配置时降级为 mock（明确标注）。\"\"\"",
+      "fix": "人工复核：确认该处只是说明性文字，而非遗留的未实现逻辑"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/assistant/services.py",
+      "line": 113,
+      "target": "Mock 降级模式",
+      "issue": "关键词命中于注释/文档字符串（非可执行代码）: # 仅当完全无可用的大模型配置时才降级 mock",
+      "fix": "人工复核：确认该处只是说明性文字，而非遗留的未实现逻辑"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/assistant/services.py",
+      "line": 117,
+      "target": "Mock 降级模式",
+      "issue": "已声明为真实现（audit: real-impl）：降级路径的告警日志；降级产物已按口径强制打标 demo_ 前缀 + [演示数据] 描述，graph_data 接口返回 is_demo 与 demo_data_warning，用户可辨识｜命中行: logger.warning(\"知识图谱：未配置激活的 AI 模型，使用 mock 抽取（演示数据）。\")",
+      "fix": "人工复核该声明是否成立；若实为假实现须撤销标记并按 501 处置"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/assistant/services.py",
+      "line": 166,
+      "target": "假数据/伪造",
+      "issue": "关键词命中于注释/文档字符串（非可执行代码）: # 已有可用的大模型配置却调用失败：绝不静默造\"演示\"假数据污染知识库，",
+      "fix": "人工复核：确认该处只是说明性文字，而非遗留的未实现逻辑"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/assistant/services.py",
+      "line": 169,
+      "target": "假数据/伪造",
+      "issue": "关键词命中于注释/文档字符串（非可执行代码）: # audit: real-impl 错误日志文案（说明\"拒绝生成假数据\"的整改行为本身），非造假实现",
+      "fix": "人工复核：确认该处只是说明性文字，而非遗留的未实现逻辑"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/assistant/services.py",
+      "line": 170,
+      "target": "假数据/伪造",
+      "issue": "已声明为真实现（audit: real-impl）：错误日志文案（说明\"拒绝生成假数据\"的整改行为本身），非造假实现｜命中行: \"知识图谱 LLM 抽取失败（已有配置，拒绝生成假数据，错误已暴露）：doc_id=%s 错误=%s\",",
+      "fix": "人工复核该声明是否成立；若实为假实现须撤销标记并按 501 处置"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/assistant/skills_library.py",
+      "line": 31,
+      "target": "假数据/伪造",
+      "issue": "关键词命中于注释/文档字符串（非可执行代码）: # 原实现伪造 Playwright 执行结果与假截图，已按整改要求移除",
+      "fix": "人工复核：确认该处只是说明性文字，而非遗留的未实现逻辑"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/data_factory/views.py",
+      "line": 80,
+      "target": "假数据/伪造",
+      "issue": "关键词命中于注释/文档字符串（非可执行代码）: \"\"\"真实执行 SQL 并返回结构化结果（替代原模拟假数据），失败抛异常。\"\"\"",
+      "fix": "人工复核：确认该处只是说明性文字，而非遗留的未实现逻辑"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/executions/k8s_service.py",
+      "line": 11,
+      "target": "假数据/伪造",
+      "issue": "关键词命中于注释/文档字符串（非可执行代码）: 及假日志，会被误认为真实执行结果，已按整改要求移除。",
+      "fix": "人工复核：确认该处只是说明性文字，而非遗留的未实现逻辑"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/knowledge_graph/connectors/aliyun.py",
+      "line": 5,
+      "target": "假数据/伪造",
+      "issue": "关键词命中于注释/文档字符串（非可执行代码）: 真实对接能力本期未交付；原 mock 假数据已按整改要求移除，",
+      "fix": "人工复核：确认该处只是说明性文字，而非遗留的未实现逻辑"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/knowledge_graph/connectors/youdao.py",
+      "line": 5,
+      "target": "假数据/伪造",
+      "issue": "关键词命中于注释/文档字符串（非可执行代码）: 真实对接能力本期未交付；原 mock 假数据已按整改要求移除，",
+      "fix": "人工复核：确认该处只是说明性文字，而非遗留的未实现逻辑"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/reports/views.py",
+      "line": 544,
+      "target": "time.sleep 伪装耗时",
+      "issue": "已声明为真实现（audit: real-impl）：AI 调用失败后的重试退避等待，非伪装耗时｜命中行: time.sleep(1) # 短暂亦避让",
+      "fix": "人工复核该声明是否成立；若实为假实现须撤销标记并按 501 处置"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/requirement_analysis/views.py",
+      "line": 67,
+      "target": "中文\"模拟X\"",
+      "issue": "关键词命中于注释/文档字符串（非可执行代码）: # 执行真实分析（原为写死的模拟分析结果，已按整改要求移除）",
+      "fix": "人工复核：确认该处只是说明性文字，而非遗留的未实现逻辑"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/requirement_analysis/views.py",
+      "line": 344,
+      "target": "中文\"模拟X\"",
+      "issue": "关键词命中于注释/文档字符串（非可执行代码）: # 执行真实分析（原为写死的模拟分析结果，已按整改要求移除）",
+      "fix": "人工复核：确认该处只是说明性文字，而非遗留的未实现逻辑"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/requirement_analysis/views.py",
+      "line": 462,
+      "target": "假数据/伪造",
+      "issue": "关键词命中于注释/文档字符串（非可执行代码）: # 分析失败时如实暴露错误，不再静默回退到伪造的\"备用分析\"假数据",
+      "fix": "人工复核：确认该处只是说明性文字，而非遗留的未实现逻辑"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/testcases/management/commands/init_ui_automation_data.py",
+      "line": 203,
+      "target": "random 造数",
+      "issue": "生产代码疑似模拟实现: step_count = random.randint(2, 5)",
+      "fix": "实现真实逻辑；确实无法实现的返回 501 并显式标注\"演示数据\"，禁止静默造假"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/testcases/management/commands/init_ui_automation_data.py",
+      "line": 208,
+      "target": "random 造数",
+      "issue": "生产代码疑似模拟实现: action_type=random.choice(['click', 'fill', 'wait', 'assert']),",
+      "fix": "实现真实逻辑；确实无法实现的返回 501 并显式标注\"演示数据\"，禁止静默造假"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/testcases/management/commands/init_ui_automation_data.py",
+      "line": 209,
+      "target": "random 造数",
+      "issue": "生产代码疑似模拟实现: element=random.choice(elements) if random.random() > 0.3 else None,",
+      "fix": "实现真实逻辑；确实无法实现的返回 501 并显式标注\"演示数据\"，禁止静默造假"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/testcases/management/commands/init_ui_automation_data.py",
+      "line": 210,
+      "target": "random 造数",
+      "issue": "生产代码疑似模拟实现: input_value=f'test_value_{i}' if random.choice(['click', 'fill', 'wait', 'assert']) == 'fi",
+      "fix": "实现真实逻辑；确实无法实现的返回 501 并显式标注\"演示数据\"，禁止静默造假"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/testcases/management/commands/init_ui_automation_data.py",
+      "line": 211,
+      "target": "random 造数",
+      "issue": "生产代码疑似模拟实现: wait_time=random.randint(500, 2000),",
+      "fix": "实现真实逻辑；确实无法实现的返回 501 并显式标注\"演示数据\"，禁止静默造假"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/testcases/management/commands/init_ui_automation_data.py",
+      "line": 212,
+      "target": "random 造数",
+      "issue": "生产代码疑似模拟实现: assert_type=random.choice(['equals', 'contains', 'exists']) if random.choice(['click', 'fi",
+      "fix": "实现真实逻辑；确实无法实现的返回 501 并显式标注\"演示数据\"，禁止静默造假"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/testcases/management/commands/init_ui_automation_data.py",
+      "line": 213,
+      "target": "random 造数",
+      "issue": "生产代码疑似模拟实现: assert_value=f'expected_{i}' if random.choice(['click', 'fill', 'wait', 'assert']) == 'ass",
+      "fix": "实现真实逻辑；确实无法实现的返回 501 并显式标注\"演示数据\"，禁止静默造假"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/testcases/management/commands/init_ui_automation_data.py",
+      "line": 239,
+      "target": "random 造数",
+      "issue": "生产代码疑似模拟实现: suite_test_cases = random.sample(test_cases, random.randint(1, 3))",
+      "fix": "实现真实逻辑；确实无法实现的返回 501 并显式标注\"演示数据\"，禁止静默造假"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/testcases/management/commands/init_ui_automation_data.py",
+      "line": 251,
+      "target": "random 造数",
+      "issue": "生产代码疑似模拟实现: test_suite = random.choice(test_suites)",
+      "fix": "实现真实逻辑；确实无法实现的返回 501 并显式标注\"演示数据\"，禁止静默造假"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/testcases/management/commands/init_ui_automation_data.py",
+      "line": 257,
+      "target": "random 造数",
+      "issue": "生产代码疑似模拟实现: 'status': random.choice(['SUCCESS', 'FAILED', 'ABORTED']),",
+      "fix": "实现真实逻辑；确实无法实现的返回 501 并显式标注\"演示数据\"，禁止静默造假"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/testcases/management/commands/init_ui_automation_data.py",
+      "line": 258,
+      "target": "random 造数",
+      "issue": "生产代码疑似模拟实现: 'started_at': timezone.now() - timezone.timedelta(minutes=random.randint(10, 120)),",
+      "fix": "实现真实逻辑；确实无法实现的返回 501 并显式标注\"演示数据\"，禁止静默造假"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/testcases/management/commands/init_ui_automation_data.py",
+      "line": 259,
+      "target": "random 造数",
+      "issue": "生产代码疑似模拟实现: 'finished_at': timezone.now() - timezone.timedelta(minutes=random.randint(5, 60)),",
+      "fix": "实现真实逻辑；确实无法实现的返回 501 并显式标注\"演示数据\"，禁止静默造假"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/testcases/management/commands/init_ui_automation_data.py",
+      "line": 260,
+      "target": "random 造数",
+      "issue": "生产代码疑似模拟实现: 'duration': random.randint(30, 300),",
+      "fix": "实现真实逻辑；确实无法实现的返回 501 并显式标注\"演示数据\"，禁止静默造假"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/testcases/management/commands/init_ui_automation_data.py",
+      "line": 261,
+      "target": "random 造数",
+      "issue": "生产代码疑似模拟实现: 'engine': random.choice(['playwright', 'selenium']),",
+      "fix": "实现真实逻辑；确实无法实现的返回 501 并显式标注\"演示数据\"，禁止静默造假"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/testcases/management/commands/init_ui_automation_data.py",
+      "line": 262,
+      "target": "random 造数",
+      "issue": "生产代码疑似模拟实现: 'browser': random.choice(['chrome', 'firefox', 'edge']),",
+      "fix": "实现真实逻辑；确实无法实现的返回 501 并显式标注\"演示数据\"，禁止静默造假"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/testcases/management/commands/init_ui_automation_data.py",
+      "line": 267,
+      "target": "random 造数",
+      "issue": "生产代码疑似模拟实现: test_script = random.choice(scripts)",
+      "fix": "实现真实逻辑；确实无法实现的返回 501 并显式标注\"演示数据\"，禁止静默造假"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/testcases/management/commands/init_ui_automation_data.py",
+      "line": 273,
+      "target": "random 造数",
+      "issue": "生产代码疑似模拟实现: 'status': random.choice(['SUCCESS', 'FAILED', 'ABORTED']),",
+      "fix": "实现真实逻辑；确实无法实现的返回 501 并显式标注\"演示数据\"，禁止静默造假"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/testcases/management/commands/init_ui_automation_data.py",
+      "line": 274,
+      "target": "random 造数",
+      "issue": "生产代码疑似模拟实现: 'started_at': timezone.now() - timezone.timedelta(minutes=random.randint(10, 120)),",
+      "fix": "实现真实逻辑；确实无法实现的返回 501 并显式标注\"演示数据\"，禁止静默造假"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/testcases/management/commands/init_ui_automation_data.py",
+      "line": 275,
+      "target": "random 造数",
+      "issue": "生产代码疑似模拟实现: 'finished_at': timezone.now() - timezone.timedelta(minutes=random.randint(5, 60)),",
+      "fix": "实现真实逻辑；确实无法实现的返回 501 并显式标注\"演示数据\"，禁止静默造假"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/testcases/management/commands/init_ui_automation_data.py",
+      "line": 276,
+      "target": "random 造数",
+      "issue": "生产代码疑似模拟实现: 'duration': random.randint(30, 300),",
+      "fix": "实现真实逻辑；确实无法实现的返回 501 并显式标注\"演示数据\"，禁止静默造假"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/testcases/management/commands/init_ui_automation_data.py",
+      "line": 277,
+      "target": "random 造数",
+      "issue": "生产代码疑似模拟实现: 'engine': random.choice(['playwright', 'selenium']),",
+      "fix": "实现真实逻辑；确实无法实现的返回 501 并显式标注\"演示数据\"，禁止静默造假"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/testcases/management/commands/init_ui_automation_data.py",
+      "line": 278,
+      "target": "random 造数",
+      "issue": "生产代码疑似模拟实现: 'browser': random.choice(['chrome', 'firefox', 'edge']),",
+      "fix": "实现真实逻辑；确实无法实现的返回 501 并显式标注\"演示数据\"，禁止静默造假"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/testcases/management/commands/init_ui_automation_data.py",
+      "line": 285,
+      "target": "random 造数",
+      "issue": "生产代码疑似模拟实现: test_case = random.choice(test_cases)",
+      "fix": "实现真实逻辑；确实无法实现的返回 501 并显式标注\"演示数据\"，禁止静默造假"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/testcases/management/commands/init_ui_automation_data.py",
+      "line": 291,
+      "target": "random 造数",
+      "issue": "生产代码疑似模拟实现: 'status': random.choice(['passed', 'failed', 'error']),",
+      "fix": "实现真实逻辑；确实无法实现的返回 501 并显式标注\"演示数据\"，禁止静默造假"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/testcases/management/commands/init_ui_automation_data.py",
+      "line": 292,
+      "target": "random 造数",
+      "issue": "生产代码疑似模拟实现: 'started_at': timezone.now() - timezone.timedelta(minutes=random.randint(10, 120)),",
+      "fix": "实现真实逻辑；确实无法实现的返回 501 并显式标注\"演示数据\"，禁止静默造假"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/testcases/management/commands/init_ui_automation_data.py",
+      "line": 293,
+      "target": "random 造数",
+      "issue": "生产代码疑似模拟实现: 'finished_at': timezone.now() - timezone.timedelta(minutes=random.randint(5, 60)),",
+      "fix": "实现真实逻辑；确实无法实现的返回 501 并显式标注\"演示数据\"，禁止静默造假"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/testcases/management/commands/init_ui_automation_data.py",
+      "line": 294,
+      "target": "random 造数",
+      "issue": "生产代码疑似模拟实现: 'execution_time': random.randint(30, 300),",
+      "fix": "实现真实逻辑；确实无法实现的返回 501 并显式标注\"演示数据\"，禁止静默造假"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/testcases/management/commands/init_ui_automation_data.py",
+      "line": 295,
+      "target": "random 造数",
+      "issue": "生产代码疑似模拟实现: 'engine': random.choice(['playwright', 'selenium']),",
+      "fix": "实现真实逻辑；确实无法实现的返回 501 并显式标注\"演示数据\"，禁止静默造假"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/testcases/management/commands/init_ui_automation_data.py",
+      "line": 296,
+      "target": "random 造数",
+      "issue": "生产代码疑似模拟实现: 'browser': random.choice(['chrome', 'firefox', 'edge']),",
+      "fix": "实现真实逻辑；确实无法实现的返回 501 并显式标注\"演示数据\"，禁止静默造假"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/ui_automation/ai_vision_web.py",
+      "line": 380,
+      "target": "TODO 未实现",
+      "issue": "关键词命中于注释/文档字符串（非可执行代码）: # TODO: Implement actual JS injection to draw bounding boxes with IDs",
+      "fix": "人工复核：确认该处只是说明性文字，而非遗留的未实现逻辑"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/ui_automation/appium_engine.py",
+      "line": 234,
+      "target": "time.sleep 伪装耗时",
+      "issue": "生产代码疑似模拟实现: time.sleep(min(10, step_data.get('wait_time', 1000) / 1000.0))",
+      "fix": "实现真实逻辑；确实无法实现的返回 501 并显式标注\"演示数据\"，禁止静默造假"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/ui_automation/appium_engine.py",
+      "line": 247,
+      "target": "time.sleep 伪装耗时",
+      "issue": "生产代码疑似模拟实现: time.sleep(step_data.get('wait_time', 500) / 1000.0)",
+      "fix": "实现真实逻辑；确实无法实现的返回 501 并显式标注\"演示数据\"，禁止静默造假"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/ui_automation/executor/playwright_runner.py",
+      "line": 173,
+      "target": "中文\"模拟X\"",
+      "issue": "关键词命中于注释/文档字符串（非可执行代码）: # 尝试获取 Playwright 中的设备模拟数据",
+      "fix": "人工复核：确认该处只是说明性文字，而非遗留的未实现逻辑"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/ui_automation/executor/playwright_runner.py",
+      "line": 209,
+      "target": "time.sleep 伪装耗时",
+      "issue": "生产代码疑似模拟实现: time.sleep(extra_wait)",
+      "fix": "实现真实逻辑；确实无法实现的返回 501 并显式标注\"演示数据\"，禁止静默造假"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/ui_automation/executor/selenium_runner.py",
+      "line": 216,
+      "target": "time.sleep 伪装耗时",
+      "issue": "生产代码疑似模拟实现: time.sleep(extra_wait)",
+      "fix": "实现真实逻辑；确实无法实现的返回 501 并显式标注\"演示数据\"，禁止静默造假"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/ui_automation/executor/selenium_runner.py",
+      "line": 549,
+      "target": "time.sleep 伪装耗时",
+      "issue": "生产代码疑似模拟实现: time.sleep(0.8)  # 等待800ms，确保下拉框完全展开",
+      "fix": "实现真实逻辑；确实无法实现的返回 501 并显式标注\"演示数据\"，禁止静默造假"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/ui_automation/executor/selenium_runner.py",
+      "line": 551,
+      "target": "time.sleep 伪装耗时",
+      "issue": "生产代码疑似模拟实现: time.sleep(0.3)  # 其他操作等待300ms",
+      "fix": "实现真实逻辑；确实无法实现的返回 501 并显式标注\"演示数据\"，禁止静默造假"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/ui_automation/executor/selenium_runner.py",
+      "line": 746,
+      "target": "time.sleep 伪装耗时",
+      "issue": "生产代码疑似模拟实现: time.sleep(0.5)",
+      "fix": "实现真实逻辑；确实无法实现的返回 501 并显式标注\"演示数据\"，禁止静默造假"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/ui_automation/executor/selenium_runner.py",
+      "line": 748,
+      "target": "time.sleep 伪装耗时",
+      "issue": "生产代码疑似模拟实现: time.sleep(0.5)",
+      "fix": "实现真实逻辑；确实无法实现的返回 501 并显式标注\"演示数据\"，禁止静默造假"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/ui_automation/executor/selenium_runner.py",
+      "line": 772,
+      "target": "time.sleep 伪装耗时",
+      "issue": "生产代码疑似模拟实现: time.sleep(wait_time)",
+      "fix": "实现真实逻辑；确实无法实现的返回 501 并显式标注\"演示数据\"，禁止静默造假"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/ui_automation/executor/selenium_runner.py",
+      "line": 779,
+      "target": "time.sleep 伪装耗时",
+      "issue": "生产代码疑似模拟实现: time.sleep(0.3)",
+      "fix": "实现真实逻辑；确实无法实现的返回 501 并显式标注\"演示数据\"，禁止静默造假"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/ui_automation/executor/selenium_runner.py",
+      "line": 786,
+      "target": "time.sleep 伪装耗时",
+      "issue": "生产代码疑似模拟实现: time.sleep(0.3)  # 等待滚动完成",
+      "fix": "实现真实逻辑；确实无法实现的返回 501 并显式标注\"演示数据\"，禁止静默造假"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/ui_automation/executor/selenium_runner.py",
+      "line": 822,
+      "target": "time.sleep 伪装耗时",
+      "issue": "生产代码疑似模拟实现: time.sleep(0.5)",
+      "fix": "实现真实逻辑；确实无法实现的返回 501 并显式标注\"演示数据\"，禁止静默造假"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/ui_automation/executor/selenium_runner.py",
+      "line": 855,
+      "target": "time.sleep 伪装耗时",
+      "issue": "生产代码疑似模拟实现: time.sleep(wait_time)",
+      "fix": "实现真实逻辑；确实无法实现的返回 501 并显式标注\"演示数据\"，禁止静默造假"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/ui_automation/executor/selenium_runner.py",
+      "line": 857,
+      "target": "time.sleep 伪装耗时",
+      "issue": "生产代码疑似模拟实现: time.sleep(0.3)  # 确保元素状态稳定",
+      "fix": "实现真实逻辑；确实无法实现的返回 501 并显式标注\"演示数据\"，禁止静默造假"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/ui_automation/executor/selenium_runner.py",
+      "line": 883,
+      "target": "time.sleep 伪装耗时",
+      "issue": "生产代码疑似模拟实现: time.sleep(wait_time)",
+      "fix": "实现真实逻辑；确实无法实现的返回 501 并显式标注\"演示数据\"，禁止静默造假"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/ui_automation/executor/selenium_runner.py",
+      "line": 885,
+      "target": "time.sleep 伪装耗时",
+      "issue": "生产代码疑似模拟实现: time.sleep(0.3)",
+      "fix": "实现真实逻辑；确实无法实现的返回 501 并显式标注\"演示数据\"，禁止静默造假"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/ui_automation/executor/selenium_runner.py",
+      "line": 908,
+      "target": "time.sleep 伪装耗时",
+      "issue": "生产代码疑似模拟实现: time.sleep(wait_time)",
+      "fix": "实现真实逻辑；确实无法实现的返回 501 并显式标注\"演示数据\"，禁止静默造假"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/ui_automation/executor/selenium_runner.py",
+      "line": 910,
+      "target": "time.sleep 伪装耗时",
+      "issue": "生产代码疑似模拟实现: time.sleep(0.3)  # 确保元素状态稳定",
+      "fix": "实现真实逻辑；确实无法实现的返回 501 并显式标注\"演示数据\"，禁止静默造假"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/ui_automation/executor/selenium_runner.py",
+      "line": 928,
+      "target": "time.sleep 伪装耗时",
+      "issue": "生产代码疑似模拟实现: time.sleep(wait_time)",
+      "fix": "实现真实逻辑；确实无法实现的返回 501 并显式标注\"演示数据\"，禁止静默造假"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/ui_automation/executor/selenium_runner.py",
+      "line": 930,
+      "target": "time.sleep 伪装耗时",
+      "issue": "生产代码疑似模拟实现: time.sleep(0.3)  # 确保元素状态稳定",
+      "fix": "实现真实逻辑；确实无法实现的返回 501 并显式标注\"演示数据\"，禁止静默造假"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/ui_automation/executor/selenium_runner.py",
+      "line": 978,
+      "target": "time.sleep 伪装耗时",
+      "issue": "生产代码疑似模拟实现: time.sleep(step_data['wait_time'] / 1000)",
+      "fix": "实现真实逻辑；确实无法实现的返回 501 并显式标注\"演示数据\"，禁止静默造假"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/ui_automation/minium_engine.py",
+      "line": 12,
+      "target": "mock 假实例/假对象",
+      "issue": "关键词命中于注释/文档字符串（非可执行代码）: 引擎会静默降级为 \"mock_instance\"，随后所有步骤一律返回 True 与",
+      "fix": "人工复核：确认该处只是说明性文字，而非遗留的未实现逻辑"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/ui_automation/minium_engine.py",
+      "line": 13,
+      "target": "Mock 结果标记",
+      "issue": "关键词命中于注释/文档字符串（非可执行代码）: \"✓ [Mock] ...\" 日志——用户在平台上看到小程序用例\"全部通过\"，",
+      "fix": "人工复核：确认该处只是说明性文字，而非遗留的未实现逻辑"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/ui_automation/minium_engine.py",
+      "line": 38,
+      "target": "中文\"模拟X\"",
+      "issue": "生产代码疑似模拟实现: \"（本平台不会以模拟结果冒充真实执行）\"",
+      "fix": "实现真实逻辑；确实无法实现的返回 501 并显式标注\"演示数据\"，禁止静默造假"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/ui_automation/minium_engine.py",
+      "line": 52,
+      "target": "中文\"模拟X\"",
+      "issue": "生产代码疑似模拟实现: \"（本平台不会以模拟结果冒充真实执行）\"",
+      "fix": "实现真实逻辑；确实无法实现的返回 501 并显式标注\"演示数据\"，禁止静默造假"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/ui_automation/minium_engine.py",
+      "line": 120,
+      "target": "time.sleep 伪装耗时",
+      "issue": "已声明为真实现（audit: real-impl）：wait 动作的真实等待，时长来自用例配置 step.wait_time｜命中行: time.sleep(wait_seconds)",
+      "fix": "人工复核该声明是否成立；若实为假实现须撤销标记并按 501 处置"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/ui_automation/selenium_engine.py",
+      "line": 385,
+      "target": "time.sleep 伪装耗时",
+      "issue": "已声明为真实现（audit: real-impl）：wait 动作的真实等待，时长来自用例配置 step.wait_time｜命中行: time.sleep(wait_seconds)",
+      "fix": "人工复核该声明是否成立；若实为假实现须撤销标记并按 501 处置"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/ui_automation/selenium_engine.py",
+      "line": 443,
+      "target": "time.sleep 伪装耗时",
+      "issue": "生产代码疑似模拟实现: time.sleep(0.5)",
+      "fix": "实现真实逻辑；确实无法实现的返回 501 并显式标注\"演示数据\"，禁止静默造假"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/ui_automation/selenium_engine.py",
+      "line": 554,
+      "target": "time.sleep 伪装耗时",
+      "issue": "生产代码疑似模拟实现: time.sleep(0.3)  # 等待滚动完成",
+      "fix": "实现真实逻辑；确实无法实现的返回 501 并显式标注\"演示数据\"，禁止静默造假"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/ui_automation/selenium_engine.py",
+      "line": 569,
+      "target": "time.sleep 伪装耗时",
+      "issue": "生产代码疑似模拟实现: time.sleep(wait_time)",
+      "fix": "实现真实逻辑；确实无法实现的返回 501 并显式标注\"演示数据\"，禁止静默造假"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/ui_automation/selenium_engine.py",
+      "line": 584,
+      "target": "time.sleep 伪装耗时",
+      "issue": "生产代码疑似模拟实现: time.sleep(0.3)",
+      "fix": "实现真实逻辑；确实无法实现的返回 501 并显式标注\"演示数据\"，禁止静默造假"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/ui_automation/selenium_engine.py",
+      "line": 603,
+      "target": "time.sleep 伪装耗时",
+      "issue": "已声明为真实现（audit: real-impl）：真实页面交互后的稳定等待（DOM 渲染），非伪装耗时｜命中行: time.sleep(0.5)",
+      "fix": "人工复核该声明是否成立；若实为假实现须撤销标记并按 501 处置"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/ui_automation/selenium_engine.py",
+      "line": 651,
+      "target": "time.sleep 伪装耗时",
+      "issue": "已声明为真实现（audit: real-impl）：真实页面交互后的稳定等待（DOM 渲染），非伪装耗时｜命中行: time.sleep(0.3)",
+      "fix": "人工复核该声明是否成立；若实为假实现须撤销标记并按 501 处置"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/ui_automation/selenium_engine.py",
+      "line": 660,
+      "target": "time.sleep 伪装耗时",
+      "issue": "生产代码疑似模拟实现: time.sleep(wait_time)",
+      "fix": "实现真实逻辑；确实无法实现的返回 501 并显式标注\"演示数据\"，禁止静默造假"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/ui_automation/selenium_engine.py",
+      "line": 662,
+      "target": "time.sleep 伪装耗时",
+      "issue": "生产代码疑似模拟实现: time.sleep(0.3)  # 确保元素状态稳定",
+      "fix": "实现真实逻辑；确实无法实现的返回 501 并显式标注\"演示数据\"，禁止静默造假"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/ui_automation/selenium_engine.py",
+      "line": 686,
+      "target": "time.sleep 伪装耗时",
+      "issue": "生产代码疑似模拟实现: time.sleep(wait_time)",
+      "fix": "实现真实逻辑；确实无法实现的返回 501 并显式标注\"演示数据\"，禁止静默造假"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/ui_automation/selenium_engine.py",
+      "line": 688,
+      "target": "time.sleep 伪装耗时",
+      "issue": "生产代码疑似模拟实现: time.sleep(0.3)  # 确保元素状态稳定",
+      "fix": "实现真实逻辑；确实无法实现的返回 501 并显式标注\"演示数据\"，禁止静默造假"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/ui_automation/selenium_engine.py",
+      "line": 736,
+      "target": "time.sleep 伪装耗时",
+      "issue": "已声明为真实现（audit: real-impl）：等待浏览器滚动动画完成后再截图，真实需要｜命中行: time.sleep(0.3)  # 等待滚动完成",
+      "fix": "人工复核该声明是否成立；若实为假实现须撤销标记并按 501 处置"
+    },
+    {
+      "detector": "D3",
+      "severity": "P2",
+      "file": "apps/ui_automation/selenium_engine.py",
+      "line": 1107,
+      "target": "time.sleep 伪装耗时",
+      "issue": "已声明为真实现（audit: real-impl）：用例显式配置的额外等待时长 extra_wait，真实需要｜命中行: time.sleep(extra_wait)",
+      "fix": "人工复核该声明是否成立；若实为假实现须撤销标记并按 501 处置"
+    },
+    {
+      "detector": "D4",
+      "severity": "P2",
+      "file": "apps/api_testing/views/project_views.py",
+      "line": 615,
+      "target": "EnvironmentViewSet",
+      "issue": "已显式声明自管租户过滤（tenant_scope_self_managed=True），理由：get_queryset 自管归属边界：LOCAL 环境限 Q(owner=user)|Q(members=user) 的 ApiProject（协作成员可见性不变）；GLOBAL 环境本轮由“全平台任意登录用户可读”收敛为“本人或与本人共享 ApiProject 的协作者所创建”，只收紧不放宽。Environment 无 organization 字段且 ApiProject 亦无 organization，自动解析会命中 project__organization 直接 FieldError；退而按 created_by 叠加又会把项目成员可见的 LOCAL 环境收成 owner-only、破坏协作，故声明自管",
+      "fix": "人工复核自定义 get_queryset 的过滤是否真正覆盖全部读取路径且不弱于组织级隔离"
+    },
+    {
+      "detector": "D4",
+      "severity": "P2",
+      "file": "apps/api_testing/views/project_views.py",
+      "line": 676,
+      "target": "UserViewSet",
+      "issue": "已显式声明自管租户过滤（tenant_scope_self_managed=True），理由：get_queryset 已实现严于组织级隔离的边界：管理员全量，其余用户仅能看到自己一行（fail-closed）。User 模型自带 organization 字段，若改用自动解析会放宽为“同组织用户互相可见”，直接暴露 email 等 PII，属可见性倒退，故声明自管",
+      "fix": "人工复核自定义 get_queryset 的过滤是否真正覆盖全部读取路径且不弱于组织级隔离"
+    },
+    {
+      "detector": "D4",
+      "severity": "P2",
+      "file": "apps/api_testing/views/request_views.py",
+      "line": 53,
+      "target": "ApiRequestViewSet",
+      "issue": "已显式声明自管租户过滤（tenant_scope_self_managed=True），理由：get_queryset 以 collection__project__in = Q(owner=user)|Q(members=user) 的 ApiProject 做归属过滤，未命中即空集（fail-closed）；query_params 的 project 只在该已收敛集合上二次收窄，传他人 project id 也读不到数据。ApiRequest 无 organization、亦无 project 直连字段，自动解析会落到 created_by，把项目成员共享的接口收成 creator-only、破坏协作，故声明自管",
+      "fix": "人工复核自定义 get_queryset 的过滤是否真正覆盖全部读取路径且不弱于组织级隔离"
+    },
+    {
+      "detector": "D4",
+      "severity": "P2",
+      "file": "apps/api_testing/views/task_views.py",
+      "line": 596,
+      "target": "NotificationLogViewSet",
+      "issue": "已显式声明自管租户过滤（tenant_scope_self_managed=True），理由：已核实 NotificationLog.task_id 是裸 IntegerField（无外键，见 apps/notifications/models.py:77），模型无 organization / project / created_by 任一租户字段，自动解析必然 fail-closed 清零、让用户看不到自己任务的通知；写 task__xxx 多跳路径则直接 FieldError 500。故由 get_queryset 反查归属：先取 Q(owner=user)|Q(members=user) 的 ApiProject，再取其下 TestSuite / ApiCollection 关联的 ScheduledTask 以及 created_by=user 的任务，按 task_id__in 收敛，未命中即空集（fail-closed），边界不弱于组织级隔离",
+      "fix": "人工复核自定义 get_queryset 的过滤是否真正覆盖全部读取路径且不弱于组织级隔离"
+    },
+    {
+      "detector": "D4",
+      "severity": "P2",
+      "file": "apps/api_testing/views/testcase_views.py",
+      "line": 37,
+      "target": "ApiTestCaseModuleViewSet",
+      "issue": "已显式声明自管租户过滤（tenant_scope_self_managed=True），理由：get_queryset 以 super().get_queryset() 起步，完整继承 BaseProjectViewSet 的归属边界：携带 project_id 时校验该项目的 owner/members（传他人 project_id 返回空集），未携带时因 ApiTestCaseModule 无 created_by 字段而直接 none()，两路均 fail-closed；其后仅追加 parent__isnull 层级筛选，不放宽任何可见性。模型有 project 外键但 ApiProject 无 organization 字段，自动解析会命中 project__organization 导致 FieldError，故声明自管",
+      "fix": "人工复核自定义 get_queryset 的过滤是否真正覆盖全部读取路径且不弱于组织级隔离"
+    },
+    {
+      "detector": "D4",
+      "severity": "P2",
+      "file": "apps/assistant/agent_config_views.py",
+      "line": 8,
+      "target": "AgentSkillViewSet",
+      "issue": "已显式声明租户豁免（tenant_scope_exempt=True），理由：平台级 Agent 技能字典表，模型无租户字段，全租户共享只读；写操作已由 IsAdminOrReadOnly 限制为管理员",
+      "fix": "人工复核该豁免理由是否成立；若资源实际含租户数据，须撤销豁免并接入隔离"
+    },
+    {
+      "detector": "D4",
+      "severity": "P2",
+      "file": "apps/assistant/agent_config_views.py",
+      "line": 24,
+      "target": "AgentProfileViewSet",
+      "issue": "已显式声明租户豁免（tenant_scope_exempt=True），理由：平台级 Agent 专家画像（name 全局唯一、无租户字段），全租户共享使用；不含密钥类敏感数据",
+      "fix": "人工复核该豁免理由是否成立；若资源实际含租户数据，须撤销豁免并接入隔离"
+    },
+    {
+      "detector": "D4",
+      "severity": "P2",
+      "file": "apps/core_platform/views/projects.py",
+      "line": 17,
+      "target": "ProjectListCreateView",
+      "issue": "已显式声明自管租户过滤（tenant_scope_self_managed=True），理由：自定义 get_queryset 以 Q(owner=user)|Q(members=user) 按项目归属过滤：用户只能看到自己拥有或被邀请加入的项目，未命中即空集（fail-closed），边界不弱于组织级隔离；Project.organization 可为空且注册用户默认无组织，叠加自动 org 过滤会把无组织用户的自有项目清零，并把跨组织协作成员误伤为不可见",
+      "fix": "人工复核自定义 get_queryset 的过滤是否真正覆盖全部读取路径且不弱于组织级隔离"
+    },
+    {
+      "detector": "D4",
+      "severity": "P2",
+      "file": "apps/core_platform/views/projects.py",
+      "line": 71,
+      "target": "ProjectDetailView",
+      "issue": "已显式声明自管租户过滤（tenant_scope_self_managed=True），理由：自定义 get_queryset 以 Q(owner=user)|Q(members=user) 按项目归属过滤，非归属项目直接不可达（fail-closed），边界不弱于组织级隔离；Project.organization 可为空，叠加自动 org 过滤会清零无组织用户对自有项目的访问，并阻断跨组织协作成员，属功能倒退。管理员全量可见沿用原有语义",
+      "fix": "人工复核自定义 get_queryset 的过滤是否真正覆盖全部读取路径且不弱于组织级隔离"
+    },
+    {
+      "detector": "D4",
+      "severity": "P2",
+      "file": "apps/core_platform/views/projects.py",
+      "line": 164,
+      "target": "ProjectEnvironmentListCreateView",
+      "issue": "已显式声明自管租户过滤（tenant_scope_self_managed=True），理由：get_queryset 先经 _user_can_access_project() 校验 URL 上的 project_id 是否属于当前用户（owner|members，管理员放行），校验不通过直接返回 none()，用户拿别人的 project_id 也读不到环境配置；该归属校验不弱于 project__organization 过滤，且 Project.organization 可为空，叠加自动过滤会误伤无组织用户与跨组织协作成员",
+      "fix": "人工复核自定义 get_queryset 的过滤是否真正覆盖全部读取路径且不弱于组织级隔离"
+    },
+    {
+      "detector": "D4",
+      "severity": "P2",
+      "file": "apps/core_platform/views/rbac.py",
+      "line": 21,
+      "target": "RoleViewSet",
+      "issue": "已显式声明租户豁免（tenant_scope_exempt=True），理由：Role 为平台级角色字典表（无 organization 字段、code 全局唯一），全租户共享读取；写操作已由 IsTenantAdminOrReadOnly 限制为管理员",
+      "fix": "人工复核该豁免理由是否成立；若资源实际含租户数据，须撤销豁免并接入隔离"
+    },
+    {
+      "detector": "D4",
+      "severity": "P2",
+      "file": "apps/core_platform/views/rbac.py",
+      "line": 33,
+      "target": "PermissionViewSet",
+      "issue": "已显式声明租户豁免（tenant_scope_exempt=True），理由：Django 内置 auth.Permission 权限字典表，平台级公共只读数据，无租户字段；视图为 ReadOnlyModelViewSet 且需全量供角色编辑器勾选",
+      "fix": "人工复核该豁免理由是否成立；若资源实际含租户数据，须撤销豁免并接入隔离"
+    },
+    {
+      "detector": "D4",
+      "severity": "P2",
+      "file": "apps/core_platform/views/rbac.py",
+      "line": 47,
+      "target": "UserRoleViewSet",
+      "issue": "已显式声明自管租户过滤（tenant_scope_self_managed=True），理由：自定义 get_queryset 已按主体身份分级收敛用户可见范围：平台管理员全量、租户管理员限本组织（无组织时仅自己）、普通用户仅 id=自己，严于组织级隔离；若叠加自动解析（User 模型会被解析为 organization 过滤），普通用户将能看到同组织其他人的 PII，属可见性放宽，绝不可接受",
+      "fix": "人工复核自定义 get_queryset 的过滤是否真正覆盖全部读取路径且不弱于组织级隔离"
+    },
+    {
+      "detector": "D4",
+      "severity": "P2",
+      "file": "apps/core_platform/views/users.py",
+      "line": 61,
+      "target": "RegisterView",
+      "issue": "已显式声明租户豁免（tenant_scope_exempt=True），理由：公开注册端点（AllowAny），匿名请求无租户上下文；CreateAPIView 仅创建不列举，queryset 为框架占位，无跨租户数据读取面",
+      "fix": "人工复核该豁免理由是否成立；若资源实际含租户数据，须撤销豁免并接入隔离"
+    },
+    {
+      "detector": "D4",
+      "severity": "P2",
+      "file": "apps/core_platform/views/users.py",
+      "line": 151,
+      "target": "UserListView",
+      "issue": "已显式声明自管租户过滤（tenant_scope_self_managed=True），理由：自定义 get_queryset 对非管理员只返回 id=自己这一行（管理员全量，沿用原语义），是最严的用户级边界；User 模型会被自动解析为 organization 过滤，一旦叠加，同组织用户即可互相列出对方的邮箱等 PII，相对原\"仅可见自己\"是可见性放宽；且注册用户默认无组织，org 过滤还会让其连自己都看不到",
+      "fix": "人工复核自定义 get_queryset 的过滤是否真正覆盖全部读取路径且不弱于组织级隔离"
+    },
+    {
+      "detector": "D4",
+      "severity": "P2",
+      "file": "apps/core_platform/views/users.py",
+      "line": 173,
+      "target": "UserDetailView",
+      "issue": "已显式声明自管租户过滤（tenant_scope_self_managed=True），理由：同 UserListView：非管理员仅能取到 id=自己的对象，他人 id 一律 404（fail-closed），严于组织级隔离；叠加自动 organization 过滤会让同组织用户互相读取详情 PII（放宽），并使无组织用户读不到自己",
+      "fix": "人工复核自定义 get_queryset 的过滤是否真正覆盖全部读取路径且不弱于组织级隔离"
+    },
+    {
+      "detector": "D4",
+      "severity": "P2",
+      "file": "apps/core_platform/views/versions.py",
+      "line": 13,
+      "target": "VersionListCreateView",
+      "issue": "已显式声明自管租户过滤（tenant_scope_self_managed=True），理由：get_queryset 先算出当前用户可访问项目集合（Q(owner=user)|Q(members=user)），再以 projects__in 限定版本，不属于这些项目的版本一律不可见（fail-closed），即使 query_params 传入他人 projects 也只能在该集合内二次收窄；Version 只有 projects 这一 M2M 关联、无 organization/project 单外键，自动解析会退化为 created_by，把协作成员可见的共享版本收紧成\"仅自己创建\"，属功能倒退",
+      "fix": "人工复核自定义 get_queryset 的过滤是否真正覆盖全部读取路径且不弱于组织级隔离"
+    },
+    {
+      "detector": "D4",
+      "severity": "P2",
+      "file": "apps/core_platform/views/versions.py",
+      "line": 78,
+      "target": "VersionDetailView",
+      "issue": "已显式声明自管租户过滤（tenant_scope_self_managed=True），理由：同 VersionListCreateView：仅返回归属于当前用户 owner|members 项目的版本，他人项目的版本不可达（fail-closed）；Version 无 organization/project 单外键，自动解析会退化为 created_by，把协作成员共享的版本收紧为仅自己创建，属功能倒退",
+      "fix": "人工复核自定义 get_queryset 的过滤是否真正覆盖全部读取路径且不弱于组织级隔离"
+    },
+    {
+      "detector": "D4",
+      "severity": "P2",
+      "file": "apps/defects/views.py",
+      "line": 43,
+      "target": "DefectViewSet",
+      "issue": "已显式声明自管租户过滤（tenant_scope_self_managed=True），理由：get_queryset 显式实现组织级边界：管理员全量；有组织用户限 organization=本组织（与原 TenantScopedViewSetMixin 等价）；无组织用户（organization 为空）原实现会退化为 organization IS NULL，使所有无组织用户互相看到对方缺陷，此处收敛为仅 reporter/assignee/所属项目 owner|members 自己相关的缺陷，只收紧不放宽，同时避免自动解析在 org 为空时整体 fail-closed 清零、让用户看不到自己上报的缺陷",
+      "fix": "人工复核自定义 get_queryset 的过滤是否真正覆盖全部读取路径且不弱于组织级隔离"
+    },
+    {
+      "detector": "D4",
+      "severity": "P2",
+      "file": "apps/performance_test/views.py",
+      "line": 114,
+      "target": "PerformanceRequestViewSet",
+      "issue": "已显式声明自管租户过滤（tenant_scope_self_managed=True），理由：get_queryset 以 collection__project__in = Q(owner=user)|Q(members=user) 的 PerformanceProject 做归属过滤，未命中即空集（fail-closed），边界不弱于组织级隔离。PerformanceRequest 无 organization、亦无 project 直连字段，自动解析会落到 created_by，把项目成员共享的请求收成 creator-only、破坏协作，故声明自管",
+      "fix": "人工复核自定义 get_queryset 的过滤是否真正覆盖全部读取路径且不弱于组织级隔离"
+    },
+    {
+      "detector": "D4",
+      "severity": "P2",
+      "file": "apps/ui_automation/views/task_views.py",
+      "line": 713,
+      "target": "NotificationLogViewSet",
+      "issue": "已显式声明自管租户过滤（tenant_scope_self_managed=True），理由：已核实 NotificationLog.task_id 是裸 IntegerField（无外键，见 apps/notifications/models.py:77），模型无 organization / project / created_by 任一租户字段，自动解析必然 fail-closed 清零、让用户看不到自己任务的通知；写 task__xxx 多跳路径则直接 FieldError 500。故由 get_queryset 反查归属：取 Q(owner=user)|Q(members=user) 的 UiProject 名下的 UiScheduledTask 及 created_by=user 的任务，按 task_id__in 收敛，未命中即空集（fail-closed），边界不弱于组织级隔离",
+      "fix": "人工复核自定义 get_queryset 的过滤是否真正覆盖全部读取路径且不弱于组织级隔离"
+    },
+    {
+      "detector": "D4",
+      "severity": "P2",
+      "file": "apps/ui_automation/views/testcase_views.py",
+      "line": 91,
+      "target": "UiTestCaseModuleViewSet",
+      "issue": "已显式声明自管租户过滤（tenant_scope_self_managed=True），理由：get_queryset 以 super().get_queryset() 起步，完整继承 BaseProjectViewSet 的归属边界：携带 project_id 时校验该项目的 owner/members（传他人 project_id 返回空集），未携带时因 UiTestCaseModule 无 created_by 字段而直接 none()，两路均 fail-closed；其后仅追加 parent__isnull 层级筛选，不放宽任何可见性。模型有 project 外键但 UiProject 无 organization 字段，自动解析会命中 project__organization 导致 FieldError，故声明自管",
+      "fix": "人工复核自定义 get_queryset 的过滤是否真正覆盖全部读取路径且不弱于组织级隔离"
+    }
+  ]
+}

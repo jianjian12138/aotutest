@@ -1,0 +1,56 @@
+# Django Framework & API
+Django==4.2.7
+djangorestframework==3.14.0
+djangorestframework-simplejwt==5.5.1
+django-cors-headers==4.3.1
+django-filter==23.5
+drf-spectacular==0.27.0
+django-simpleui==2025.6.24
+
+# Production Server
+gunicorn>=21.2.0
+
+# Security (EncryptedTextField 凭据加密)
+cryptography>=42.0.0
+
+# Configuration & Utilities
+python-decouple==3.8
+PyYAML==6.0.2
+requests==2.32.4
+python-jenkins>=1.8.0
+croniter==6.0.0
+
+# Database & Cache
+PyMySQL==1.1.0
+psycopg2-binary>=2.9.11
+
+# Task Queue (Django-Q2)
+django-q2==1.7.6
+
+# Document Processing (Reports/Export)
+pillow==11.3.0
+reportlab==4.2.0
+PyPDF2==3.0.1
+python-docx==1.2.0
+openpyxl>=3.1.2
+xlrd>=2.0.1
+
+# Automated Testing
+pytest==8.4.1
+allure-pytest==2.15.0
+playwright>=1.40.0
+selenium==4.15.2
+webdriver-manager==4.0.1
+locust>=2.28.0
+
+# AI & Data Processing
+vanna>=0.1.63
+chromadb>=0.4.0
+langchain==0.3.0
+langchain-community==0.3.0
+langchain-core==0.3.63
+langchain-text-splitters==0.3.8
+langchain-experimental>=0.0.47
+faker>=22.5.1
+jsonpath-ng>=1.6.0
+openai>=1.40.0

@@ -1,0 +1,634 @@
+<template>
+  <BasePage :title=" testPlan.name ">
+    <template #header-actions><el-button @click="$router.back()">返回</el-button>
+        <el-tag v-if="testPlan.version" type="primary" size="large" class="version-tag">
+          <el-icon><Stamp /></el-icon>
+          {{ testPlan.version }}
+        </el-tag></template>
+    
+    <div class="card-container">
+      <!-- 项目信息 -->
+      <div class="project-info" style="margin-bottom: 20px; color: #606266;">
+        <el-icon class="info-icon" style="vertical-align: middle; margin-right: 5px;"><FolderOpened /></el-icon>
+        <span v-if="testPlan.projects && testPlan.projects.length > 0">
+          {{ testPlan.projects.join(', ') }}
+        </span>
+        <span v-else class="no-data">未关联项目</span>
+      </div>
+
+      <!-- 测试执行区域 -->
+      <div v-if="testPlan.test_runs && testPlan.test_runs.length > 0">
+        <div v-for="run in testPlan.test_runs" :key="run.id" class="test-run-card">
+          <!-- 运行头部 -->
+          <div class="run-header">
+            <div class="run-title-section">
+              <h2 class="run-title">{{ run.name }}</h2>
+              <el-tag :type="getRunStatusType(run.progress)" size="large" class="run-status-tag">
+                {{ getRunStatusText(run.progress) }}
+              </el-tag>
+            </div>
+            
+            <!-- 统计卡片 -->
+            <div class="stats-cards">
+              <div class="stat-card total">
+                <el-icon class="stat-icon"><Document /></el-icon>
+                <div class="stat-content">
+                  <div class="stat-value">{{ run.progress.total }}</div>
+                  <div class="stat-label">总计</div>
+                </div>
+              </div>
+              <div class="stat-card passed">
+                <el-icon class="stat-icon"><CircleCheck /></el-icon>
+                <div class="stat-content">
+                  <div class="stat-value">{{ run.progress.passed }}</div>
+                  <div class="stat-label">通过</div>
+                </div>
+              </div>
+              <div class="stat-card failed">
+                <el-icon class="stat-icon"><CircleClose /></el-icon>
+                <div class="stat-content">
+                  <div class="stat-value">{{ run.progress.failed }}</div>
+                  <div class="stat-label">失败</div>
+                </div>
+              </div>
+              <div class="stat-card blocked">
+                <el-icon class="stat-icon"><WarningFilled /></el-icon>
+                <div class="stat-content">
+                  <div class="stat-value">{{ run.progress.blocked }}</div>
+                  <div class="stat-label">阻塞</div>
+                </div>
+              </div>
+              <div class="stat-card untested">
+                <el-icon class="stat-icon"><QuestionFilled /></el-icon>
+                <div class="stat-content">
+                  <div class="stat-value">{{ run.progress.untested }}</div>
+                  <div class="stat-label">未测</div>
+                </div>
+              </div>
+            </div>
+          </div>
+  
+          <!-- 进度条 -->
+          <div class="progress-section">
+            <el-progress 
+              :percentage="run.progress.progress" 
+              :stroke-width="12"
+              :color="getProgressColor(run.progress.progress)"
+              :show-text="true">
+              <template #default="{ percentage }">
+                <span class="progress-text">{{ percentage }}%</span>
+              </template>
+            </el-progress>
+          </div>
+  
+          <!-- 批量操作按钮 -->
+          <div v-if="selectedCases.length > 0" class="batch-actions">
+            <el-button 
+              type="danger" 
+              :icon="Delete"
+              @click="batchDeleteCases"
+              :disabled="isDeleting">
+              批量删除 ({{ selectedCases.length }})
+            </el-button>
+          </div>
+          
+          <!-- 用例表格 -->
+          <el-table 
+            ref="tableRef"
+            :data="paginatedCases(run.run_cases)" 
+            style="width: 100%" 
+            class="execution-table"
+            @selection-change="handleSelectionChange"
+            :row-key="(row) => row.id">
+            <el-table-column type="selection" width="55" :reserve-selection="true" />
+            <el-table-column 
+              type="index" 
+              label="序号" 
+              width="80" 
+              :index="getSerialNumber" />
+            <el-table-column prop="testcase" label="测试用例" min-width="250" />
+            <el-table-column label="执行状态" width="150">
+              <template #default="scope">
+                <el-select 
+                  v-model="scope.row.status" 
+                  @change="updateCaseStatus(scope.row)"
+                  size="small">
+                  <el-option label="未测试" value="untested" />
+                  <el-option label="通过" value="passed" />
+                  <el-option label="失败" value="failed" />
+                  <el-option label="阻塞" value="blocked" />
+                  <el-option label="重测" value="retest" />
+                </el-select>
+              </template>
+            </el-table-column>
+            <el-table-column label="备注" min-width="250">
+              <template #default="scope">
+                <el-input 
+                  v-model="scope.row.comments" 
+                  placeholder="请输入备注"
+                  type="textarea"
+                  :rows="2"
+                  size="small"
+                  @blur="updateCaseDetails(scope.row)">
+                </el-input>
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" width="200" fixed="right">
+              <template #default="scope">
+                <el-button 
+                  size="small" 
+                  type="primary" 
+                  :icon="Clock"
+                  @click="viewCaseHistory(scope.row)">
+                  历史
+                </el-button>
+                <el-button 
+                  size="small" 
+                  type="warning" 
+                  :icon="Warning"
+                  @click="openFileDefect(scope.row)">
+                  提缺陷
+                </el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+  
+          <!-- 分页组件 -->
+          <div v-if="run.run_cases && run.run_cases.length > 0" class="pagination-container">
+            <el-pagination
+              v-model:current-page="currentPage"
+              v-model:page-size="pageSize"
+              :page-sizes="[10, 20, 50, 100]"
+              :total="run.run_cases.length"
+              layout="total, sizes, prev, pager, next, jumper"
+              @current-change="handlePageChange"
+              @size-change="handleSizeChange">
+            </el-pagination>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 历史记录对话框 -->
+    <el-dialog 
+      title="执行历史记录" 
+      v-model="historyDialogVisible" 
+      width="80%">
+      <el-table :data="currentCaseHistory" style="width: 100%">
+        <el-table-column prop="status" label="状态" width="100">
+          <template #default="scope">
+            <el-tag :type="getStatusType(scope.row.status)">
+              {{ getStatusText(scope.row.status) }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="comments" label="备注" show-overflow-tooltip />
+        <el-table-column prop="executed_by.username" label="执行者" width="120" />
+        <el-table-column prop="executed_at" label="执行时间" width="180">
+          <template #default="scope">
+            {{ formatDate(scope.row.executed_at) }}
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-dialog>
+
+    <!-- 提交缺陷对话框 -->
+    <el-dialog
+      title="提交缺陷"
+      v-model="defectDialogVisible"
+      width="600px">
+      <el-form :model="defectForm" label-width="100px">
+        <el-form-item label="标题" required>
+          <el-input v-model="defectForm.title" placeholder="缺陷标题" />
+        </el-form-item>
+        <el-form-item label="严重程度">
+          <el-select v-model="defectForm.severity" style="width:100%">
+            <el-option v-for="s in defectSeverityOptions" :key="s.value" :label="s.label" :value="s.value" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="优先级">
+          <el-select v-model="defectForm.priority" style="width:100%">
+            <el-option v-for="p in defectPriorityOptions" :key="p.value" :label="p.label" :value="p.value" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="环境">
+          <el-input v-model="defectForm.environment" placeholder="如 staging / prod" />
+        </el-form-item>
+        <el-form-item label="复现步骤">
+          <el-input v-model="defectForm.steps" type="textarea" :rows="3" />
+        </el-form-item>
+        <el-form-item label="描述">
+          <el-input v-model="defectForm.description" type="textarea" :rows="4" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="defectDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="submittingDefect" @click="submitDefect">提交</el-button>
+      </template>
+    </el-dialog>
+  </BasePage>
+</template>
+<script setup>
+import { ref, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { 
+  Delete, Clock, Document, CircleCheck, CircleClose, 
+  WarningFilled, QuestionFilled, Stamp, FolderOpened, Warning 
+} from '@element-plus/icons-vue'
+import axios from 'axios'
+import api from '@/utils/api'
+
+const route = useRoute()
+const testPlan = ref({})
+const historyDialogVisible = ref(false)
+const currentCaseHistory = ref([])
+const selectedCases = ref([])
+const currentPage = ref(1)
+const pageSize = ref(10)
+const isDeleting = ref(false)
+const tableRef = ref(null)
+
+// 提交缺陷相关
+const defectDialogVisible = ref(false)
+const submittingDefect = ref(false)
+const defectForm = ref({
+  title: '', severity: 'major', priority: 'P2',
+  environment: '', steps: '', description: '', related_execution_id: null
+})
+const defectSeverityOptions = [
+  { value: 'critical', label: '致命' }, { value: 'major', label: '严重' },
+  { value: 'minor', label: '一般' }, { value: 'trivial', label: '轻微' },
+]
+const defectPriorityOptions = [
+  { value: 'P0', label: 'P0-最高' }, { value: 'P1', label: 'P1-高' },
+  { value: 'P2', label: 'P2-中' }, { value: 'P3', label: 'P3-低' },
+]
+
+const openFileDefect = (runCase) => {
+  defectForm.value = {
+    title: `用例执行失败：${runCase.testcase || ''}`.trim(),
+    severity: 'major',
+    priority: 'P2',
+    environment: '',
+    steps: '',
+    description: `测试用例：${runCase.testcase || '-'}\n执行状态：${getStatusText(runCase.status)}\n备注：${runCase.comments || '-'}`,
+    related_execution_id: runCase.id,
+  }
+  defectDialogVisible.value = true
+}
+
+const submitDefect = async () => {
+  if (!defectForm.value.title) {
+    ElMessage.warning('请填写标题')
+    return
+  }
+  submittingDefect.value = true
+  try {
+    const payload = { ...defectForm.value }
+    if (!payload.related_execution_id) delete payload.related_execution_id
+    await api.post('/defects/defects/', payload)
+    ElMessage.success('缺陷已提交')
+    defectDialogVisible.value = false
+  } catch (error) {
+    const msg = error?.response?.data?.message || error?.response?.data?.detail || error?.message || '提交失败'
+    ElMessage.error('提交失败：' + msg)
+  } finally {
+    submittingDefect.value = false
+  }
+}
+
+const fetchTestPlan = async () => {
+  try {
+    const planId = route.params.id
+    const response = await axios.get(`/api/executions/plans/${planId}/`)
+    testPlan.value = response.data
+  } catch (error) {
+    ElMessage.error('获取测试计划失败')
+  }
+}
+
+const updateCaseStatus = async (runCase) => {
+  try {
+    await axios.patch(`/api/executions/run_cases/${runCase.id}/update_status/`, {
+      status: runCase.status,
+      comments: runCase.comments || ''
+    })
+    await fetchTestPlan() // 刷新数据以更新进度和最后执行时间
+    ElMessage.success('状态更新成功')
+  } catch (error) {
+    ElMessage.error('状态更新失败')
+  }
+}
+
+const updateCaseDetails = async (runCase) => {
+  try {
+    await axios.patch(`/api/executions/run_cases/${runCase.id}/update_status/`, {
+      status: runCase.status,
+      comments: runCase.comments || ''
+    })
+    ElMessage.success('详细信息更新成功')
+  } catch (error) {
+    ElMessage.error('详细信息更新失败')
+  }
+}
+
+const viewCaseHistory = async (runCase) => {
+  try {
+    const response = await axios.get(`/api/executions/run_cases/${runCase.id}/history/`)
+    currentCaseHistory.value = response.data
+    historyDialogVisible.value = true
+  } catch (error) {
+    ElMessage.error('获取历史记录失败')
+  }
+}
+
+// 处理选择变化
+const handleSelectionChange = (selection) => {
+  selectedCases.value = selection
+}
+
+// 批量删除
+const batchDeleteCases = async () => {
+  if (selectedCases.value.length === 0) {
+    ElMessage.warning('请先选择要删除的用例')
+    return
+  }
+
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除选中的 ${selectedCases.value.length} 个用例吗？此操作不可恢复。`,
+      '警告',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+
+    isDeleting.value = true
+    let successCount = 0
+    let failCount = 0
+
+    for (const runCase of selectedCases.value) {
+      try {
+        await axios.delete(`/api/executions/run_cases/${runCase.id}/`)
+        successCount++
+      } catch (error) {
+        console.error(`删除用例 ${runCase.id} 失败:`, error)
+        failCount++
+      }
+    }
+
+    if (successCount > 0) {
+      ElMessage.success(`成功删除 ${successCount} 个用例${failCount > 0 ? `，${failCount} 个失败` : ''}`)
+    } else {
+      ElMessage.error('删除失败')
+    }
+
+    selectedCases.value = []
+    await fetchTestPlan()
+
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('批量删除失败:', error)
+      ElMessage.error('批量删除失败')
+    }
+  } finally {
+    isDeleting.value = false
+  }
+}
+
+// 分页相关
+const paginatedCases = (cases) => {
+  if (!cases) return []
+  const start = (currentPage.value - 1) * pageSize.value
+  const end = start + pageSize.value
+  return cases.slice(start, end)
+}
+
+const getSerialNumber = (index) => {
+  return (currentPage.value - 1) * pageSize.value + index + 1
+}
+
+const handlePageChange = () => {
+  selectedCases.value = []
+  // 清空表格选择
+  if (tableRef.value) {
+    tableRef.value.clearSelection()
+  }
+}
+
+const handleSizeChange = () => {
+  currentPage.value = 1
+  selectedCases.value = []
+  // 清空表格选择
+  if (tableRef.value) {
+    tableRef.value.clearSelection()
+  }
+}
+
+const formatDate = (dateString) => {
+  if (!dateString) return '-'
+  return new Date(dateString).toLocaleString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+}
+
+const getProgressColor = (percentage) => {
+  if (percentage < 30) return '#f56c6c'
+  if (percentage < 70) return '#e6a23c'
+  return '#67c23a'
+}
+
+const getRunStatusType = (progress) => {
+  if (progress.progress === 100) return 'success'
+  if (progress.failed > 0) return 'danger'
+  if (progress.blocked > 0) return 'warning'
+  return 'info'
+}
+
+const getRunStatusText = (progress) => {
+  if (progress.progress === 100) return '已完成'
+  if (progress.untested === progress.total) return '未开始'
+  return '进行中'
+}
+
+const getStatusType = (status) => {
+  const typeMap = {
+    'untested': 'info',
+    'passed': 'success',
+    'failed': 'danger',
+    'blocked': 'warning',
+    'retest': 'primary'
+  }
+  return typeMap[status] || 'info'
+}
+
+const getStatusText = (status) => {
+  const textMap = {
+    'untested': '未测试',
+    'passed': '通过',
+    'failed': '失败',
+    'blocked': '阻塞',
+    'retest': '重测'
+  }
+  return textMap[status] || status
+}
+
+onMounted(() => {
+  fetchTestPlan()
+})
+</script>
+
+<style scoped>
+/* 页面特定样式 */
+
+
+
+
+
+
+
+
+
+/* 测试运行卡片 */
+.test-run-card {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 24px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+}
+
+.run-header {
+  margin-bottom: 24px;
+}
+
+.run-title-section {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.run-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.run-status-tag {
+  font-weight: 600;
+}
+
+/* 美化的统计卡片 */
+.stats-cards {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.stat-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 12px;
+  transition: all 0.3s ease;
+  cursor: default;
+}
+
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.stat-card.total {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.stat-card.passed {
+  background: linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%);
+  color: #155724;
+}
+
+.stat-card.failed {
+  background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+  color: #721c24;
+}
+
+.stat-card.blocked {
+  background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
+  color: #856404;
+}
+
+.stat-card.untested {
+  background: linear-gradient(135deg, #e0e7ff 0%, #cfd9ff 100%);
+  color: #383d41;
+}
+
+.stat-icon {
+  font-size: 32px;
+  opacity: 0.9;
+}
+
+.stat-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.stat-value {
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.stat-label {
+  font-size: 12px;
+  margin-top: 4px;
+  opacity: 0.9;
+}
+
+/* 进度条区域 */
+.progress-section {
+  margin-bottom: 24px;
+  padding: 16px;
+  background: #f8f9fa;
+  border-radius: 8px;
+}
+
+.progress-text {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+/* 批量操作 */
+.batch-actions {
+  margin-bottom: 16px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* 表格样式 */
+.execution-table {
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+/* 分页 */
+.pagination-container {
+  margin-top: 20px;
+  display: flex;
+  justify-content: center;
+}
+
+
+</style>

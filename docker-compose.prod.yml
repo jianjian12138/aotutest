@@ -1,0 +1,71 @@
+# 生产环境加固 Compose 配置
+#
+# 使用方式：docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# 与基础 docker-compose.yml 的区别：
+#   1. 所有服务均设置 deploy.resources.limits（CPU + 内存上限）
+#   2. 所有服务均配置 healthcheck
+#   3. frontend 挂载 TLS 证书目录
+#   4. 端口仅绑定 127.0.0.1（由前置反向代理/负载均衡器对外暴露）
+
+version: '3.8'
+
+services:
+  redis:
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  postgres:
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 1G
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-testing_user} -d ${DB_NAME:-testing_platform}"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  backend:
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import django; django.setup(); from django.db import connection; connection.ensure_connection()\" 2>/dev/null || exit 1"]
+      interval: 30s
+      timeout: 15s
+      retries: 3
+      start_period: 40s
+
+  qcluster:
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+
+  frontend:
+    volumes:
+      - ./deploy/ssl:/etc/nginx/ssl:ro
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s

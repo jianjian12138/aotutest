@@ -1,0 +1,145 @@
+version: '3.8'
+
+# 任务队列说明：本项目使用 django-q2（ORM broker），不使用 Celery。
+# 后台任务由 qcluster 服务承载（python manage.py qcluster）。
+# Redis 仅用于缓存（可选），不是队列依赖。
+
+x-backend-env: &backend-env
+  DEBUG: "False"
+  SECRET_KEY: ${SECRET_KEY:?请在 .env 中设置强随机 SECRET_KEY（生产禁止默认值）}
+  FIELD_ENCRYPTION_KEY: ${FIELD_ENCRYPTION_KEY:-}
+  ALLOWED_HOSTS: ${ALLOWED_HOSTS:-localhost,127.0.0.1}
+  DB_ENGINE: django.db.backends.postgresql
+  DB_NAME: ${DB_NAME:-testing_platform}
+  DB_USER: ${DB_USER:-testing_user}
+  DB_PASSWORD: ${DB_PASSWORD:?请在 .env 中设置数据库密码}
+  DB_HOST: postgres
+  DB_PORT: "5432"
+  REDIS_HOST: redis
+  REDIS_PORT: "6379"
+
+services:
+  # Redis服务（缓存，可选）
+  redis:
+    image: redis:7-alpine
+    container_name: testing-platform-redis
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    networks:
+      - testing-network
+
+  # PostgreSQL数据库
+  postgres:
+    image: postgres:15-alpine
+    container_name: testing-platform-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-testing_platform}
+      POSTGRES_USER: ${DB_USER:-testing_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?请在 .env 中设置数据库密码}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - testing-network
+
+  # Django后端服务
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: testing-platform-backend
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8000:8000"
+    environment:
+      <<: *backend-env
+    volumes:
+      - backend_static:/app/static
+      - backend_media:/app/media
+      - backend_logs:/app/logs
+    depends_on:
+      - redis
+      - postgres
+    networks:
+      - testing-network
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+    command: >
+      sh -c "python manage.py migrate --noinput &&
+             python manage.py collectstatic --noinput &&
+             gunicorn backend.wsgi:application --bind 0.0.0.0:8000 --workers 4 --timeout 120"
+
+  # django-q2 任务集群（替代原 Celery worker/beat）
+  qcluster:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: testing-platform-qcluster
+    restart: unless-stopped
+    environment:
+      <<: *backend-env
+    volumes:
+      - backend_media:/app/media
+      - backend_logs:/app/logs
+    depends_on:
+      - postgres
+      - backend
+    networks:
+      - testing-network
+    healthcheck:
+      test: ["CMD", "python", "manage.py", "check"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    command: python manage.py qcluster
+
+  # Vue前端服务（Nginx + TLS）
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: testing-platform-frontend
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:80:80"
+      - "127.0.0.1:443:443"
+    volumes:
+      # 挂载 TLS 证书目录（nginx.conf 引用 /etc/nginx/ssl/）
+      - ./deploy/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - backend
+    networks:
+      - testing-network
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+networks:
+  testing-network:
+    driver: bridge
+
+volumes:
+  redis_data:
+    driver: local
+  postgres_data:
+    driver: local
+  backend_static:
+    driver: local
+  backend_media:
+    driver: local
+  backend_logs:
+    driver: local

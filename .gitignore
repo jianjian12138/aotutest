@@ -1,0 +1,108 @@
+# 忽略虚拟环境及项目产生的临时文件
+.venv/
+venv_py311/
+venv/
+env/
+.idea/
+.claude/
+.vscode/
+.trae/
+.qoder/
+__pycache__/
+.DS_Store
+.pytest_cache
+*.sqlite3
+*.log
+*.png
+llm_debug.txt
+logs/*
+!logs/.gitkeep
+
+# Python 编译文件
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# 临时文件
+*.tmp
+*.temp
+*.bak
+*.swp
+*.swo
+*~
+
+# 忽略所有 app/*/migrations/ 目录下的所有内容 (包括文件和子目录)
+apps/*/migrations/*
+!apps/*/migrations/__init__.py
+
+# 忽略media下的子目录及文件，但保留.gitkeep文件
+media/allure-reports/*
+!media/allure-reports/.gitkeep
+media/allure-results/*
+!media/allure-results/.gitkeep
+media/requirement_docs/*
+!media/requirement_docs/.gitkeep
+media/ai_recording/*
+!media/ai_recording/.gitkeep
+media/knowledge_docs/*
+
+# 测试缓存
+.pytest_cache/
+.coverage
+htmlcov/
+
+# IDE 配置补充
+*.swp
+*.swo
+
+# 忽略前端文件
+frontend/node_modules/
+frontend/.DS_Store
+frontend/*.log
+frontend/dist/
+frontend/.vite/
+frontend/build/
+
+# User specific exclusions
+# 注意：scripts/ 下的治理脚本与审计基线是交付物，必须纳入版本控制（CI 合入门禁依赖
+# scripts/audit_baseline.py、scripts/validate_tenant_scope.py、scripts/p2_governance.json 等）。
+# 仅忽略脚本目录内的临时/生成产物，不再整体忽略 scripts/。
+scripts/__pycache__/
+scripts/*.pyc
+recorded_script.py
+.env
+temp/
+insert_sample_data.py
+debug_sync.py
+
+# SSL certificates (never commit real certs)
+deploy/ssl/*.pem
+deploy/ssl/*.key
+deploy/ssl/*.crt
+
+# Allure 测试报告工具
+allure/bin/
+allure/lib/
+allure/plugins/
+!allure/.gitkeep
+
+# ChromaDB 向量数据库
+chroma_db/*
+
+# Agent & IDE Metadata
+.agents/
+.arts/
+.codeartsdoer/
+.codebuddy/
+
+# Root Level Test Scripts（仅忽略仓库根目录下的临时测试脚本，不忽略 tests/ 下的正式测试用例）
+/test_*.py
+setup_config_data.py
+verify_fix.py
+
+# Junction Exclusions
+allure/
+static/
+frontend/node_modules/
+db.sqlite3
