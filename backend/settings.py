@@ -69,6 +69,9 @@ THIRD_PARTY_APPS = [
 LOCAL_APPS = [
     'apps.core_platform',
 
+    # 路线三 · Phase 0 权限制高点：租户功能开关（agent 测评 / LLM 测试 等能力按租户开通）
+    'apps.tenant_features',
+
     'apps.testcases',
     'apps.testsuites',
     'apps.executions',

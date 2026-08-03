@@ -21,6 +21,9 @@ urlpatterns = [
 
     path('api/', include('apps.core_platform.urls')),
 
+    # 路线三 · Phase 0 权限制高点：租户功能开关（agent 测评 / LLM 测试 等能力按租户开通）
+    path('api/tenant-features/', include('apps.tenant_features.urls')),
+
     path('api/testcases/', include('apps.testcases.urls')),
     path('api/testsuites/', include('apps.testsuites.urls')),
     path('api/executions/', include('apps.executions.urls')),
