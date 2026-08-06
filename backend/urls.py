@@ -24,6 +24,9 @@ urlpatterns = [
     # 路线三 · Phase 0 权限制高点：租户功能开关（agent 测评 / LLM 测试 等能力按租户开通）
     path('api/tenant-features/', include('apps.tenant_features.urls')),
 
+    # 路线三 · Phase 2 核心：eval-native 评测舱（数据集 / 评估引擎 / 严格租户隔离）
+    path('api/eval/', include('apps.eval_pod.urls')),
+
     path('api/testcases/', include('apps.testcases.urls')),
     path('api/testsuites/', include('apps.testsuites.urls')),
     path('api/executions/', include('apps.executions.urls')),

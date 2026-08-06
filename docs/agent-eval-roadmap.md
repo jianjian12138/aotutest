@@ -46,7 +46,7 @@
 
 ## 2. Phase 0 · 多租户功能开关（✅ 已完成 2026-08-03）
 
-**交付物**（`feat/agent-eval-v2` 分支，`apps/tenant_features/`）：
+**交付物**（`agent-eval-v2` 分支，`apps/tenant_features/`）：
 - `TenantFeature` 模型（`tenant` + `feature_code` + `enabled` + `quota` + `expires_at`），含 `is_active`（过期自动失效）。
 - `tenant_has_feature(org, code)` 辅助函数 + `HasTenantFeature` DRF 权限类（严格 fail-closed）。
 - `TenantFeatureViewSet`（`/api/tenant-features/features/`）：成员只读本租户状态，租户管理员可开关。
@@ -152,9 +152,73 @@
 
 ## 10. 下一步 30 天行动（立即启动）
 
-1. **合入 Phase 0**：将 `feat/agent-eval-v2` 推送到远端演进分支，作为基底。
+1. **合入 Phase 0**：将 `agent-eval-v2` 推送到远端演进分支，作为基底。
 2. **Phase 1 启动**：架构师出"评测舱与底座契约"文档；前端完成功能开关菜单渲染。
 3. **Phase 2 单租户试点**：选一个甲方，用 handbook 脚手架（`starter/`）落地 M2–M3，真实跑 ≥500 用例，验证需求。
 4. **安全合规预评审**：明确 LLM 出域边界与租户模型配置方案。
 
 > 注：本路线图与 `升级方案评审报告.md` 配套使用；路线三已为最终决策，不再评估"纯扩充 / 纯新建"。
+
+---
+
+## 11. 实施进度（演进分支 `agent-eval-v2`，基于 `new-main` `8fbf5f6`）
+
+> 提交链路：`8fbf5f6`(new-main) → `0033b4c`(Phase0 功能开关) → 本批次(Phase1 契约 + Phase2 M2/M3/M4 评测舱核心)
+
+| 阶段 | 里程碑 | 状态 | 交付物 |
+|---|---|---|---|
+| Phase 0 | 多租户功能开关 | ✅ 已完成 | `apps/tenant_features`（TenantFeature + HasTenantFeature fail-closed + 视图集） |
+| **Phase 1** | **底座契约**（门禁 + 严格隔离） | ✅ **已落地** | `apps/eval_pod` 所有 API 叠加 `HasTenantFeature(AGENT_EVAL)` 门禁 + `TenantAwareViewSetMixin(staff_has_full_access=False)`；EvalDataset/EvalCase/GraderConfig/EvalRun 全部按 `organization` 隔离，平台管理员亦非"超级读者" |
+| **Phase 2 · M2** | **数据集管理** | ✅ **已落地** | `EvalDataset` + `EvalCase`（含 `is_edge` 边缘用例标记、`edge_ratio`/`case_count` 属性） |
+| **Phase 2 · M3** | **评估引擎** | ✅ **已落地** | `graders.py`：规则（精确/包含/正则）+ LLM-as-Judge（复用 `AIModelConfig`）+ **无配置/失败确定性降级 `HEURISTIC`（零外送）**；`grade_run` 汇总（含边缘用例通过率）；`EvalRun.run` @action 端到端落库 |
+| Phase 2 · M4 | **Trace 步骤级观测** | ✅ **已落地** | `EvalTrace` + `EvalTraceStep`（规划/工具/观察/输出/错误步骤，按 step_index 回放）；`/api/eval/traces/` 存储+检索；失败归因基座（区分「规划弱」vs「工具错」）；租户隔离经 `run__organization` + 越权创建拦截 |
+| Phase 2 · M5 | 报告看板 | ⬜ 待建 | 评测报告 / 分数趋势 / 质量门禁阈值 |
+| Phase 3 | 智能体自动化辅舱 | ⬜ 待建 | agent 生成用例 + 复用执行设施 + 确定性基线 |
+| Phase 4 | 门禁 + 可观测进 CI | ⬜ 待建 | 扩展 `ci.yml` 加 eval 维度门禁；Langfuse/OTel 接 Trace |
+| 横切·安全 | 租户自有模型配置 | ⬜ 待办 | 给 `AIModelConfig` 加 `organization` 字段，使 LLM 调用按租户隔离端点（当前先用平台级 `AIModelConfig`，无配置即降级，保证未订阅租户零出域） |
+
+**本批次质量验证**：
+- `apps.eval_pod` 回归测试 **19 tests OK**（覆盖规则/LLM 裁判降级与注入、指标库 offline 启发式、功能开关门禁 403、租户隔离 [数据集 + Trace]、RULE 评测端到端落库、HITL 复核门、Trace 创建/回放/越权拦截）。
+- `manage.py check` 无问题；`apps.tenant_features`(4) 全绿；Phase 0 基座稳固。
+- 本批次交付：Phase2 M3（指标库 + 复核门）+ M4（Trace 后端）+ 开源对标文档。
+
+**工程约定提醒（重要）**：本项目 `.gitignore` 忽略所有 `apps/*/migrations/*`，迁移**本地生成、不入库**（`makemigrations` 后由 syncdb/本地迁移建表）。因此：
+- 测试前需本地 `makemigrations`（本项目约定，迁移不入版本库）；
+- CI 现有 `makemigrations --check` 在全新 clone 上会因迁移被忽略而潜在失效，建议后续单独立项修复（要么 CI 前置 `makemigrations`，要么改为提交迁移）。
+- 本批次仅提交 `apps/eval_pod/` 源码、`backend/settings.py`、`backend/urls.py`、`docs/agent-eval-roadmap.md`，不提交任何迁移文件。
+
+---
+
+## 12. 开源对标与借鉴（2026-08-06 增补）
+
+> 完整分析见 `docs/eval-platform-benchmark.md`。结论：不重造轮子、不照搬重基建；评估引擎指标库借鉴 DeepEval，可观测借鉴 Langfuse 的"层"但用 Django+Postgres 实现（不引 ClickHouse）。
+
+**对标六强**：promptfoo（TS/红队/CI，MIT）、DeepEval（Python/30+ 指标/pytest 风，Apache-2.0）、Langfuse（Next.js+ClickHouse 全栈可观测）、One-Eval（React+Vite+FastAPI+LangGraph，NL2Eval+人机协同+中文基准）、Giskard（Python/agent checks+红队扫描）、Ragas（RAG 专用）。
+
+**公众号《多Agent协作测试系统实战》评估 → 高度相关**：四角色分工（调度/用例生成/执行调度/结果分析）、结果分析=LLM-as-Judge、渐进四步落地、代价（中间格式设计/错误传播/调度单点）。直接细化 M3 与 Phase 3；其"错误传播→需分析端合理性校验+人机复核门"为我们补足 HITL 的依据。
+
+**我方最该补的四件事（按性价比）**：
+1. (A) 丰富 grader 指标库（faithfulness/relevancy/bias/toxicity/tool_correctness/plan_adherence）+ 强制 reason；
+2. (B) 人机协同复核门（`EvalResult.review_status`，阻断误报）；
+3. (C) 数据集版本化 + Diff；
+4. (D) Trace 模型（步骤级观测，M4）。
+
+**红队/安全维度**作为独立评测类型（`kind=REDTEAM`）单独立项，借鉴 promptfoo/Giskard。
+
+---
+
+## 13. 修订后的分阶段计划（融入对标借鉴）
+
+| 阶段 | 里程碑 | 借鉴来源 | 状态 |
+|---|---|---|---|
+| Phase 2 · M2+ | 数据集版本化 + Diff | promptfoo/DeepEval/One-Eval | ⬜ 待建 |
+| Phase 2 · M3+ | **指标库扩充**（faithfulness/relevancy/bias/toxicity/tool_correctness/plan_adherence，全 offline 降级）+ **强制 reason** | DeepEval / Giskard | ✅ 已落地 |
+| Phase 2 · M3+ | **人机协同复核门**（review_status + reviewer，阻断误报） | One-Eval / Giskard | ✅ 已落地 |
+| Phase 2 · M4 | Trace 模型（步骤级观测/回放，Django+Postgres） | Langfuse / One-Eval | ✅ 后端已落地（回放 UI 待前端） |
+| Phase 2 · M5 | 多维报告 / 模型排名 / 趋势 | One-Eval / Langfuse | ⬜ 待建 |
+| Phase 2 · 安全 | 红队评测类型（kind=REDTEAM，越狱/泄漏扫描） | promptfoo / Giskard | ⬜ 待建 |
+| Phase 3 | 多 Agent 编排（生成/执行/分析 拆分，按文章四步法渐进） | 公众号文章 | ⬜ 待建 |
+| Phase 4 | CI 质量门禁（分数阈值 + 回归拦截 + 安全 PR 审查） | promptfoo / DeepEval | ⬜ 待建 |
+| 横切 | `AIModelConfig` 加 `organization`（租户自有模型，彻底隔离出域） | — | ⬜ 待建 |
+
+**设计原则（写入 Phase 3）**：① 分工提升专注度（文章）；② 中间格式（`EvalCase` schema）必须稳定；③ 错误传播防护 = 分析端合理性校验 + 人机复核门；④ 所有 LLM 指标必须有 offline/HEURISTIC 降级，保证未订阅租户零出域。

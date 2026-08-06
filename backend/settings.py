@@ -72,6 +72,9 @@ LOCAL_APPS = [
     # 路线三 · Phase 0 权限制高点：租户功能开关（agent 测评 / LLM 测试 等能力按租户开通）
     'apps.tenant_features',
 
+    # 路线三 · Phase 2 核心：eval-native 评测舱（数据集 / 评估引擎 / 严格租户隔离）
+    'apps.eval_pod',
+
     'apps.testcases',
     'apps.testsuites',
     'apps.executions',
