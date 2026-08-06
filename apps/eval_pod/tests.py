@@ -257,6 +257,41 @@ class EvalPodContractTest(TestCase):
         self.assertFalse(result.passed)             # PII 命中 → 不通过
         self.assertEqual(result.review_status, 'PENDING')  # 安全结果默认待复核
 
+    def test_dataset_report_aggregation(self):
+        """报告看板：趋势/聚合/各评分器维度汇总正确，且他租户不可见（404）。"""
+        ds = EvalDataset.objects.create(organization=self.org_a, name='ds-rep', version='v1')
+        EvalCase.objects.create(dataset=ds, input_text='q', expected='ok')
+        g_rule = GraderConfig.objects.create(
+            organization=self.org_a, name='gr', grader_type='RULE', rubric={'mode': 'contains'}
+        )
+        g_rt = GraderConfig.objects.create(
+            organization=self.org_a, name='grt', grader_type='REDTEAM'
+        )
+        # run1 RULE 满分；run2 REDTEAM 0.4（按 created_at 顺序 run1 先、run2 后）
+        EvalRun.objects.create(
+            organization=self.org_a, dataset=ds, grader=g_rule, status='DONE',
+            mean_score=1.0, pass_rate=1.0, edge_pass_rate=None,
+        )
+        run2 = EvalRun.objects.create(
+            organization=self.org_a, dataset=ds, grader=g_rt, status='DONE',
+            mean_score=0.4, pass_rate=0.5, edge_pass_rate=None,
+        )
+
+        resp = self.client_a.get(f'/api/eval/datasets/{ds.id}/report/')
+        self.assertEqual(resp.status_code, 200, resp.content)
+        payload = resp.data['data']
+        self.assertEqual(payload['total_runs'], 2)
+        self.assertEqual(payload['avg_mean_score'], 0.7)
+        self.assertEqual(payload['latest']['id'], run2.id)  # 时间升序末位
+        self.assertEqual(payload['best']['mean_score'], 1.0)
+        self.assertEqual(payload['worst']['mean_score'], 0.4)
+        gtypes = {b['grader_type'] for b in payload['grader_breakdown']}
+        self.assertEqual(gtypes, {'RULE', 'REDTEAM'})
+
+        # 他租户访问 → 404（严格隔离）
+        r2 = self.client_b.get(f'/api/eval/datasets/{ds.id}/report/')
+        self.assertEqual(r2.status_code, 404)
+
 
 class MetricUnitTest(TestCase):
     """指标类离线启发式（零外送、确定性）。"""

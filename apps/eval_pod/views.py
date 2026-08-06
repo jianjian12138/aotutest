@@ -45,6 +45,70 @@ class EvalDatasetViewSet(_EvalBase, viewsets.ModelViewSet):
     queryset = EvalDataset.objects.all()
     serializer_class = EvalDatasetSerializer
 
+    @action(detail=True, methods=['get'])
+    def report(self, request, pk=None):
+        """M5 报告看板数据：数据集下全部运行的趋势 + 聚合概览 + 各评分器维度汇总。
+
+        供前端绘制分数趋势图与概览卡片（对齐 Opik 生产监控看板），
+        使非技术同事也能看懂评测结论。仅读取，不产生副作用。
+        租户隔离经 _EvalBase 的 organization 过滤（他租户数据集 → 404）。
+        """
+        dataset = self.get_object()
+        runs = (
+            EvalRun.objects.filter(dataset=dataset)
+            .select_related('grader')
+            .order_by('created_at')
+        )
+        runs_data = EvalRunSerializer(runs, many=True).data
+        total = len(runs_data)
+        if total:
+            mean_scores = [r['mean_score'] for r in runs_data if r['mean_score'] is not None]
+            pass_rates = [r['pass_rate'] for r in runs_data if r['pass_rate'] is not None]
+            avg_mean = round(sum(mean_scores) / len(mean_scores), 3) if mean_scores else None
+            avg_pass = round(sum(pass_rates) / len(pass_rates), 3) if pass_rates else None
+            latest = runs_data[-1]
+            best = max(
+                runs_data,
+                key=lambda r: r['mean_score'] if r['mean_score'] is not None else -1,
+            )
+            worst = min(
+                runs_data,
+                key=lambda r: r['mean_score'] if r['mean_score'] is not None else 2,
+            )
+            by_grader = {}
+            for r in runs:
+                gt = r.grader.grader_type
+                d = by_grader.setdefault(gt, {'count': 0, 'scores': []})
+                d['count'] += 1
+                if r.mean_score is not None:
+                    d['scores'].append(r.mean_score)
+            grader_breakdown = [
+                {
+                    'grader_type': gt,
+                    'run_count': d['count'],
+                    'avg_mean_score': (
+                        round(sum(d['scores']) / len(d['scores']), 3)
+                        if d['scores'] else None
+                    ),
+                }
+                for gt, d in by_grader.items()
+            ]
+        else:
+            latest = best = worst = None
+            avg_mean = avg_pass = None
+            grader_breakdown = []
+        return Response({
+            'dataset': EvalDatasetSerializer(dataset).data,
+            'total_runs': total,
+            'latest': latest,
+            'best': best,
+            'worst': worst,
+            'avg_mean_score': avg_mean,
+            'avg_pass_rate': avg_pass,
+            'grader_breakdown': grader_breakdown,
+            'runs': runs_data,
+        }, status=status.HTTP_200_OK)
+
 
 class EvalCaseViewSet(_EvalBase, viewsets.ModelViewSet):
     # 用例经 dataset 归属于租户

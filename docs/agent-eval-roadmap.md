@@ -173,15 +173,16 @@
 | **Phase 2 · M3** | **评估引擎** | ✅ **已落地** | `graders.py`：规则（精确/包含/正则）+ LLM-as-Judge（复用 `AIModelConfig`）+ **无配置/失败确定性降级 `HEURISTIC`（零外送）**；`grade_run` 汇总（含边缘用例通过率）；`EvalRun.run` @action 端到端落库 |
 | Phase 2 · M4 | **Trace 步骤级观测** | ✅ **已落地** | `EvalTrace` + `EvalTraceStep`（规划/工具/观察/输出/错误步骤，按 step_index 回放）；`/api/eval/traces/` 存储+检索；失败归因基座（区分「规划弱」vs「工具错」）；租户隔离经 `run__organization` + 越权创建拦截 |
 | Phase 2 · M3+ | **红队/安全扫描（REDTEAM）** | ✅ **已落地** | `GraderConfig.grader_type=REDTEAM` + `graders.redteam_grade`：离线启发式扫描 **PII 泄漏 / 越狱-注入企图 / 毒性内容**（零外送），可选 LLM 升级；命中即不通过、默认 PENDING 待复核（对齐 Opik Guardrails + promptfoo/Giskard + Inspect AI elicitation） |
+| Phase 2 · M5 | **报告看板（后端聚合）** | ✅ **后端已落地** | `EvalDatasetViewSet.report`：数据集下运行趋势（按时间升序）+ 聚合概览（latest/best/worst/avg）+ 各评分器维度汇总（grader_breakdown）；前端看板（Vue）待接入 |
 | Phase 2 · M5 | 报告看板 | ⬜ 待建 | 评测报告 / 分数趋势 / 质量门禁阈值 |
 | Phase 3 | 智能体自动化辅舱 | ⬜ 待建 | agent 生成用例 + 复用执行设施 + 确定性基线 |
 | Phase 4 | 门禁 + 可观测进 CI | ⬜ 待建 | 扩展 `ci.yml` 加 eval 维度门禁；Langfuse/OTel 接 Trace |
 | 横切·安全 | 租户自有模型配置 | ⬜ 待办 | 给 `AIModelConfig` 加 `organization` 字段，使 LLM 调用按租户隔离端点（当前先用平台级 `AIModelConfig`，无配置即降级，保证未订阅租户零出域） |
 
 **本批次质量验证**：
-- `apps.eval_pod` 回归测试 **24 tests OK**（覆盖规则/LLM 裁判降级与注入、指标库 offline 启发式、红队 PII/越狱离线扫描、功能开关门禁 403、租户隔离 [数据集 + Trace]、RULE 评测端到端落库、HITL 复核门、Trace 创建/回放/越权拦截、REDTEAM 端到端拦截）。
+- `apps.eval_pod` 回归测试 **25 tests OK**（覆盖规则/LLM 裁判降级与注入、指标库 offline 启发式、红队 PII/越狱离线扫描、功能开关门禁 403、租户隔离 [数据集 + Trace]、RULE 评测端到端落库、HITL 复核门、Trace 创建/回放/越权拦截、REDTEAM 端到端拦截、报告看板聚合与隔离）。
 - `manage.py check` 无问题；`apps.tenant_features`(4) 全绿；Phase 0 基座稳固。
-- 本批次交付：Phase2 M3（指标库 + 复核门）+ M4（Trace 后端）+ 红队 REDTEAM 维度 + 开源对标文档增补（Opik/Phoenix/Inspect AI）。
+- 本批次交付：Phase2 M3（指标库 + 复核门）+ M4（Trace 后端）+ 红队 REDTEAM 维度 + M5 报告看板（后端）+ 开源对标文档增补（Opik/Phoenix/Inspect AI）。
 
 **工程约定提醒（重要）**：本项目 `.gitignore` 忽略所有 `apps/*/migrations/*`，迁移**本地生成、不入库**（`makemigrations` 后由 syncdb/本地迁移建表）。因此：
 - 测试前需本地 `makemigrations`（本项目约定，迁移不入版本库）；
@@ -216,7 +217,7 @@
 | Phase 2 · M3+ | **指标库扩充**（faithfulness/relevancy/bias/toxicity/tool_correctness/plan_adherence，全 offline 降级）+ **强制 reason** | DeepEval / Giskard | ✅ 已落地 |
 | Phase 2 · M3+ | **人机协同复核门**（review_status + reviewer，阻断误报） | One-Eval / Giskard | ✅ 已落地 |
 | Phase 2 · M4 | Trace 模型（步骤级观测/回放，Django+Postgres） | Langfuse / One-Eval | ✅ 后端已落地（回放 UI 待前端） |
-| Phase 2 · M5 | 多维报告 / 模型排名 / 趋势 | One-Eval / Langfuse | ⬜ 待建 |
+| Phase 2 · M5 | 多维报告 / 模型排名 / 趋势 | One-Eval / Langfuse | ✅ 后端已落地（前端看板待 Vue 接入） |
 | Phase 2 · 安全 | 红队评测类型（kind=REDTEAM，越狱/泄漏扫描） | promptfoo / Giskard | ✅ 已落地（offline 启发式优先，可选 LLM 升级） |
 | Phase 3 | 多 Agent 编排（生成/执行/分析 拆分，按文章四步法渐进） | 公众号文章 | ⬜ 待建 |
 | Phase 4 | CI 质量门禁（分数阈值 + 回归拦截 + 安全 PR 审查） | promptfoo / DeepEval | ⬜ 待建 |
