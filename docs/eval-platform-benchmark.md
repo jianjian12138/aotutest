@@ -16,6 +16,9 @@
 | **One-Eval**（北大） | React+Vite / FastAPI / LangGraph+DataFlow / Py3.10-11 | 全栈评测编排 | NL2Eval（自然语言发起）、全链路追踪、人机协同、100+ 基准（含 C-Eval/CMMLU）、Docker 沙箱、HTML 报告 | 否（本地/仓库工具） | 是（React+Vite） | Apache-2.0 |
 | **Giskard** | Python / uv monorepo / Pydantic / pytest | LLM Agent 测试/扫描库 | agent checks（judge/语义/groundedness）、红队扫描（garak/deepteam/lidar）、鲁棒性/偏见 | 否 | 否（CLI rich） | 待确认(permissive) |
 | **Ragas** | Python | RAG 评估库 | 10+ RAG 指标（忠实度/相关性/上下文精度召回），无需标注 | 否 | 否 | Apache-2.0 |
+| **Opik**（Comet） | Python / TS / React；自托管全栈 | 全栈观测+评估平台 | Agent Tracing（trace 树/工具调用）、LLM Eval（数据集/实验/LLM-as-Judge）、Prompt Playground、生产监控、**Guardrails（PII/越狱/离题筛查）**、Agent Optimizer、CI(PyTest) | 多项目（workspace） | 是（完整） | Apache-2.0 |
+| **Arize Phoenix** | Python / TS / GraphQL / Postgres（SQLite 默认） | 全栈可观测+评估 | Session→Trace→Span 追踪（OpenInference）、evals、数据集/实验、**过滤 DSL**、Helm 部署、CI 自动评估 | 多项目 | 是（Web UI） | 源码开放（ELv2 常见） |
+| **Inspect AI**（UK AISI） | Python / TS 前端子模块 | Agent 评估框架 | Solver/Task、Scorer（标量/分类）、200+ 预置 eval、agent-client-protocol、**红队(elicitation 扩展)**、CI 并行 | 否（离线评测） | 是（TS 视图） | MIT |
 
 ---
 
@@ -59,9 +62,32 @@
 ### 2.6 Ragas（RAG 评估库，补充）
 - 仅做 RAG：faithfulness/answer_relevancy/context_precision/recall；无需 ground truth。若我们未来评测 RAG 类 agent，直接复用其指标思路。
 
+### 2.7 Opik（Comet，★20k+，全栈观测+评估标杆，2026-08-06 增补）
+- **技术栈**：Python 后端 + TS/React 前端；可本地（SQLite/Postgres）或云自托管；OpenTelemetry/OpenInference 集成广（LangChain/LlamaIndex/LiteLLM/DSPy 等）。
+- **能力**：AI Agent Tracing（完整 trace 树、工具调用、会话日志，设计可扩展 40M+ traces/天）；LLM Evaluation（Datasets + Experiments + LLM-as-Judge 指标：幻觉/审核/RAG 相关性/上下文精度）；Prompt/Playground；生产监控；**Guardrails（PII 检测脱敏、越狱/离题/竞品提及筛查）**；Agent Optimizer（Few-shot Bayesian/MIPRO/进化/MetaPrompt）；PyTest CI 集成。
+- **优点**：真正全栈、自托管免费、观测+评估+优化+护栏一体、集成生态最全。
+- **缺点**：后端较重（ClickHouse/Postgres 生产组件）；Guardrails 默认用内置/第三方模型，需配置才契合"数据不出域"。
+- **借鉴**：① **Guardrails（PII/越狱/离题筛查）= 我们缺的"红队/安全维度"的现成定义**——应作为评测舱独立评测类型（kind=REDTEAM），且必须有 offline 启发式（不送外部模型）；② 反馈分数标注（human feedback score）对应我们已落地的 HITL 复核门；③ trace 树 + 在线评估规则对应 M4 Trace + Phase4 门禁。
+
+### 2.8 Arize Phoenix（全栈可观测+评估，2026-08-06 增补）
+- **技术栈**：Python + TS/React 前端；GraphQL API；存储双方言 **SQLite（默认/本地）与 PostgreSQL（生产）**；Helm/K8s 部署；Vitest。
+- **能力**：Session→Trace→Span 层级追踪（OpenInference traces）；evals（集成 Harbor 跑真实 agent 评估 + reward 阈值门控）；数据集/实验（split、experiment-run 过滤）；**表达式过滤 DSL**（类 Python 语法）；CI 自动评估。
+- **优点**：数据模型清晰（Session/Trace/Span + 聚合列）、过滤 DSL 强、原生支持 agent 评估、云原生部署。
+- **缺点**：DSL 编译器 + 双方言 SQL + 多后端维护面大；协议常见 ELv2（源码可见但有限制）；嵌入现有 Django 系统需自行桥接。
+- **借鉴**：① 其 **Session→Trace→Span 层级**验证了我们 M4 `EvalTrace/EvalTraceStep` 的建模方向（步骤级观测）；② 过滤 DSL 的"条件下推到分页 SQL"性能经验，可借鉴到我们未来的 Trace 检索/报告查询；③ 默认 SQLite、生产 Postgres 的"双方言"思路，与我们 Django+Postgres 一致。
+
+### 2.9 Inspect AI（UK AISI，★agent 评估框架，2026-08-06 增补）
+- **技术栈**：Python（requires-python ≥3.10）+ TS 前端子模块；Quarto 文档；uv/pytest；适配 agent-client-protocol（ACP 0.12+）、HuggingFace Hub、OpenAI 兼容 API。
+- **能力**：LLM/agent 评估框架；**Solver/Task**（prompt 工程/工具调用/多轮对话）；**Scorer**（标量/分类分数、自定义指标、NaN 安全序列化、分类分数 round-trip）；**200+ 预置 eval**；红队以 **elicitation 扩展**形式存在（非内置攻击引擎）；CI 并行（`make test-parallel`）。
+- **优点**：官方背景可信、MIT 商用友好、内置组件丰富、扩展性强（Python 包解耦评估逻辑与核心）、结果可重现（严谨日志）。
+- **缺点**：红队能力依赖扩展实现（非开箱即用攻击平台）；前端需独立 TS 子模块；偏向离线评测与分数聚合，无实时对抗编排。
+- **借鉴**：① **扩展机制**（Python 包解耦"评估/红队逻辑"与核心框架）正好对应我们 `GraderConfig.grader_type` 的插件式指标架构——红队可封装为独立 grader 类型；② 评分日志严谨性（NaN 保留、分类 round-trip）值得红队评测复用；③ ACP 多轮/工具调用抽象可借鉴到我们 agent 评测的输入 schema。
+
 ---
 
 ## 3. 公众号《多Agent协作测试系统实战》评估
+
+> **结论先行：这篇文章对我们升级「高度有帮助」（直接相关）。** 它直接给出了 **Phase 3（智能体自动化辅舱）的可落地架构蓝图**——四角色分工（调度/用例生成/执行调度/结果分析）+ 渐进四步法；并点出我们必须防范的**核心风险（错误静默传播 → 人机复核门）**；其"机械断言 + 语义判断（LLM-as-Judge）+ 模式识别（跨用例失败分布）"三层分析法，正好对应我们已落地的 rule / LLM-Judge / 聚合报告。下面展开。
 
 ### 3.1 核心观点
 - **四角色分工**：调度 Agent（拆解/分配/汇总）、用例生成 Agent（需求→结构化用例集 JSON）、执行调度 Agent（按依赖注入+并发执行，只记录不判断）、结果分析 Agent（机械断言+**语义判断用 LLM-as-Judge**+跨用例模式识别）。
@@ -84,7 +110,7 @@
 | 指标库广度 | rule+LLM-judge+heuristic | 缺 faithfulness/relevancy/bias/toxicity/tool_correctness/plan_adherence | DeepEval | 高 |
 | 结果 reason 强制 | 有 reason 字段但未强制 | 允许空→静默通过风险 | Giskard | 中 |
 | 人机协同复核 | 无 | 缺复核门（误报阻断） | One-Eval/Giskard | 高 |
-| 红队/安全测试 | 无 | 缺越狱/泄漏扫描 | promptfoo/Giskard | 中 |
+| 红队/安全测试 | 无 | 缺越狱/泄漏/PII 扫描 | promptfoo/Giskard/**Opik(Guardrails)**/Inspect AI(elicitation) | 中 |
 | Trace 可观测 | 无（M4 待建） | 缺步骤级追踪/回放 | Langfuse/One-Eval | 高 |
 | 多维报告/榜单 | 仅 run 汇总 | 缺趋势/模型排名 | One-Eval/Langfuse | 中 |
 | 多 Agent 编排 | 同步 @action | 缺生成/执行/分析 Agent 拆分 | 公众号文章 | 中 |
@@ -99,6 +125,7 @@
    - (B) 人机协同复核门（EvalResult.review_status，阻断误报）；
    - (C) 数据集版本化 + Diff；
    - (D) Trace 模型（步骤级观测，M4）。
-3. **红队/安全维度**作为独立评测类型（kind=REDTEAM）单独立项，借鉴 promptfoo/Giskard。
-4. **多 Agent 编排**按公众号四步法渐进：先把"分析=LLM-as-Judge"做稳，再演进"生成/执行/分析"Agent 拆分。
+3. **红队/安全维度**作为独立评测类型（kind=REDTEAM）单独立项，借鉴 promptfoo/Giskard + **Opik Guardrails（PII/越狱/离题筛查）** + Inspect AI（elicitation 扩展）；必须以 **offline 启发式**实现核心扫描（不送外部模型，契合数据不出域）。
+4. **多 Agent 编排**按公众号四步法渐进：先把"分析=LLM-as-Judge"做稳，再演进"生成/执行/分析"Agent 拆分（Phase 3）。
 5. **文章高度相关**，其"分工 + 渐进 + 错误传播防护"应写入 Phase 3 设计原则。
+6. **Trace 建模方向已验证**：Phoenix 的 Session→Trace→Span 层级、Opik 的 trace 树，均印证我们 M4 `EvalTrace/EvalTraceStep` 步骤级观测的设计是对的；未来可加"过滤 DSL/条件下推"优化检索（借鉴 Phoenix）。

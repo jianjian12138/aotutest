@@ -90,6 +90,7 @@ class GraderConfig(models.Model):
         ('TOXICITY', '毒性/有害性'),
         ('TOOL_CORRECTNESS', '工具调用正确性'),
         ('PLAN_ADHERENCE', '计划遵循度'),
+        ('REDTEAM', '红队/安全扫描'),
     ]
 
     organization = models.ForeignKey(
