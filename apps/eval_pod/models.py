@@ -56,10 +56,18 @@ class EvalDataset(models.Model):
 
 
 class EvalCase(models.Model):
-    """评测用例：输入 + 期望（含边缘用例标记）。"""
+    """评测用例：输入 + 期望（含边缘用例标记）。
+
+    code 为可选业务键，用于跨数据集版本 diff 对应（A3 数据集版本化）。
+    为空时由 clone_version 派生为 case-<id>，保证历史数据也能正确比对。
+    """
 
     dataset = models.ForeignKey(
         EvalDataset, on_delete=models.CASCADE, related_name='cases'
+    )
+    code = models.CharField(
+        max_length=120, blank=True, null=True, db_index=True,
+        help_text='用例业务键（可选），跨版本 diff 对应键；为空时系统派生 case-<id>',
     )
     input_text = models.TextField(help_text='被测模型/智能体的输入或提示')
     expected = models.TextField(blank=True, help_text='期望输出 / 参考答案')

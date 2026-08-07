@@ -16,6 +16,7 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+import re
 from django.utils import timezone
 
 from apps.core_platform.permissions import TenantAwareViewSetMixin
@@ -107,6 +108,110 @@ class EvalDatasetViewSet(_EvalBase, viewsets.ModelViewSet):
             'avg_pass_rate': avg_pass,
             'grader_breakdown': grader_breakdown,
             'runs': runs_data,
+        }, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'])
+    def clone_version(self, request, pk=None):
+        """A3 数据集版本化：基于当前数据集（base）创建同组织/同名的新版本并复制全部用例。
+
+        历史版本保留可查（EvalDataset 按 (organization, name, version) 唯一）。
+        body 可选 {"new_version": "v2", "description": "..."}；缺省自动 bump 版本号。
+        复制用例时保留 code（保证跨版本 diff 对应），原 code 为空则派生 case-<id>。
+        """
+        base = self.get_object()
+        new_version = request.data.get('new_version') or self._next_version(base)
+        if EvalDataset.objects.filter(
+            organization=base.organization, name=base.name, version=new_version
+        ).exists():
+            return Response(
+                {'detail': f'版本 {new_version} 已存在'}, status=status.HTTP_400_BAD_REQUEST
+            )
+        new_ds = EvalDataset.objects.create(
+            organization=base.organization,
+            name=base.name,
+            version=new_version,
+            description=request.data.get('description') or base.description,
+            created_by=request.user,
+        )
+        for c in base.cases.all():
+            EvalCase.objects.create(
+                dataset=new_ds,
+                code=c.code or f'case-{c.id}',
+                input_text=c.input_text,
+                expected=c.expected,
+                is_edge=c.is_edge,
+                meta=c.meta,
+            )
+        return Response(EvalDatasetSerializer(new_ds).data, status=status.HTTP_201_CREATED)
+
+    @staticmethod
+    def _next_version(base):
+        """同 (organization, name) 下最大尾随数字版本号 +1（v1→v2）；非数字版本回退 {version}-v2。"""
+        siblings = EvalDataset.objects.filter(
+            organization=base.organization, name=base.name
+        ).values_list('version', flat=True)
+        max_n = 0
+        for v in siblings:
+            m = re.search(r'(\d+)', str(v))
+            if m:
+                max_n = max(max_n, int(m.group(1)))
+        return f'v{max_n + 1}' if max_n else f'{base.version}-v2'
+
+    @action(detail=False, methods=['get'])
+    def diff(self, request):
+        """A3 数据集 Diff：对比 base/target 两个数据集（同租户）的用例级差异。
+
+        query: ?base=<id>&target=<id>
+        按 case.code 对应（空 code 派生 case-<id>），返回 added/removed/changed/unchanged
+        及每条 changed 的字段级差异（input_text/expected/is_edge）。严格租户隔离（他租户 → 404）。
+        """
+        base_id = request.query_params.get('base')
+        target_id = request.query_params.get('target')
+        if not base_id or not target_id:
+            return Response(
+                {'detail': '需提供 base 与 target 数据集 id'}, status=status.HTTP_400_BAD_REQUEST
+            )
+        org = request.user.organization
+        base = EvalDataset.objects.filter(id=base_id, organization=org).first()
+        target = EvalDataset.objects.filter(id=target_id, organization=org).first()
+        if not base or not target:
+            return Response(
+                {'detail': '数据集不存在或不属于本租户'}, status=status.HTTP_404_NOT_FOUND
+            )
+
+        def key(c):
+            return c.code or f'case-{c.id}'
+
+        base_map = {key(c): c for c in base.cases.all()}
+        target_map = {key(c): c for c in target.cases.all()}
+        added, removed, changed, unchanged = [], [], [], []
+        for k, tc in target_map.items():
+            if k not in base_map:
+                added.append({'code': k, 'input_text': tc.input_text, 'expected': tc.expected})
+            else:
+                bc = base_map[k]
+                diffs = {}
+                if bc.input_text != tc.input_text:
+                    diffs['input_text'] = {'base': bc.input_text, 'target': tc.input_text}
+                if bc.expected != tc.expected:
+                    diffs['expected'] = {'base': bc.expected, 'target': tc.expected}
+                if bc.is_edge != tc.is_edge:
+                    diffs['is_edge'] = {'base': bc.is_edge, 'target': tc.is_edge}
+                if diffs:
+                    changed.append({'code': k, 'diffs': diffs})
+                else:
+                    unchanged.append({'code': k})
+        for k, bc in base_map.items():
+            if k not in target_map:
+                removed.append({'code': k, 'input_text': bc.input_text, 'expected': bc.expected})
+        return Response({
+            'base': {'id': base.id, 'name': base.name, 'version': base.version, 'case_count': len(base_map)},
+            'target': {'id': target.id, 'name': target.name, 'version': target.version, 'case_count': len(target_map)},
+            'summary': {
+                'added': len(added), 'removed': len(removed),
+                'changed': len(changed), 'unchanged': len(unchanged),
+            },
+            'added': added, 'removed': removed, 'changed': changed, 'unchanged': unchanged,
         }, status=status.HTTP_200_OK)
 
 

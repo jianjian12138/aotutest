@@ -582,3 +582,96 @@ class TenantModelAndLeaderboardTest(TestCase):
         resp_b = self.client_b.get('/api/eval/runs/leaderboard/')
         self.assertEqual(resp_b.status_code, 200)
         self.assertEqual(resp_b.data['data']['total_runs'], 0)
+
+
+# ============================================================
+# F. Phase A · A3 数据集版本化 + Diff（对齐 Langfuse datasets / One-Eval DataFlow）
+# ============================================================
+class DatasetVersioningTest(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.org_a = Organization.objects.create(name='甲方A', code='org-a')
+        cls.org_b = Organization.objects.create(name='甲方B', code='org-b')
+        cls.user_a = User.objects.create_user('ua', password='x')
+        cls.user_a.organization = cls.org_a
+        cls.user_a.save()
+        cls.user_b = User.objects.create_user('ub', password='x')
+        cls.user_b.organization = cls.org_b
+        cls.user_b.save()
+        TenantFeature.objects.create(tenant=cls.org_a, feature_code=FeatureCode.AGENT_EVAL, enabled=True)
+        TenantFeature.objects.create(tenant=cls.org_b, feature_code=FeatureCode.AGENT_EVAL, enabled=True)
+        cls.client_a = APIClient()
+        cls.client_a.force_authenticate(cls.user_a)
+        cls.client_b = APIClient()
+        cls.client_b.force_authenticate(cls.user_b)
+
+    def test_clone_version_copies_cases_and_bumps(self):
+        """clone_version：v1→v2，用例与 code 完整复制，原数据集不受影响，新版本可查。"""
+        ds = EvalDataset.objects.create(organization=self.org_a, name='ds-ver', version='v1')
+        EvalCase.objects.create(dataset=ds, code='q1', input_text='i1', expected='e1')
+        EvalCase.objects.create(dataset=ds, code='q2', input_text='i2', expected='e2')
+        resp = self.client_a.post(f'/api/eval/datasets/{ds.id}/clone_version/')
+        self.assertEqual(resp.status_code, 201, resp.content)
+        self.assertEqual(resp.data['data']['version'], 'v2')
+        target = EvalDataset.objects.get(name='ds-ver', version='v2', organization=self.org_a)
+        self.assertEqual(target.cases.count(), 2)
+        self.assertEqual(set(target.cases.values_list('code', flat=True)), {'q1', 'q2'})
+        # 原数据集不受影响（历史版本保留可查）
+        self.assertEqual(EvalDataset.objects.filter(name='ds-ver', organization=self.org_a).count(), 2)
+
+    def test_clone_version_duplicate_version_400(self):
+        """指定已存在的版本号 → 400。"""
+        ds = EvalDataset.objects.create(organization=self.org_a, name='ds-dup', version='v1')
+        resp = self.client_a.post(
+            f'/api/eval/datasets/{ds.id}/clone_version/',
+            {'new_version': 'v1'}, format='json',
+        )
+        self.assertEqual(resp.status_code, 400)
+
+    def test_diff_detects_added_removed_changed(self):
+        """diff：正确识别 added/removed/changed/unchanged（按 code 对应），含字段级差异。"""
+        ds = EvalDataset.objects.create(organization=self.org_a, name='ds-diff', version='v1')
+        EvalCase.objects.create(dataset=ds, code='q1', input_text='i1', expected='e1')
+        EvalCase.objects.create(dataset=ds, code='q2', input_text='i2', expected='e2')
+        EvalCase.objects.create(dataset=ds, code='q3', input_text='i3', expected='e3')
+        resp = self.client_a.post(f'/api/eval/datasets/{ds.id}/clone_version/')
+        self.assertEqual(resp.status_code, 201)
+        target = EvalDataset.objects.get(name='ds-diff', version='v2', organization=self.org_a)
+        # 改 q2 expected（changed），删 q3（removed），加 q4（added）
+        EvalCase.objects.filter(dataset=target, code='q2').update(expected='e2-changed')
+        EvalCase.objects.filter(dataset=target, code='q3').delete()
+        EvalCase.objects.create(dataset=target, code='q4', input_text='i4', expected='e4')
+
+        resp = self.client_a.get(f'/api/eval/datasets/diff/?base={ds.id}&target={target.id}')
+        self.assertEqual(resp.status_code, 200, resp.content)
+        payload = resp.data['data']
+        self.assertEqual(payload['summary'], {'added': 1, 'removed': 1, 'changed': 1, 'unchanged': 1})
+        self.assertEqual({a['code'] for a in payload['added']}, {'q4'})
+        self.assertEqual({r['code'] for r in payload['removed']}, {'q3'})
+        self.assertEqual({c['code'] for c in payload['changed']}, {'q2'})
+        ch = next(c for c in payload['changed'] if c['code'] == 'q2')
+        self.assertEqual(ch['diffs']['expected']['target'], 'e2-changed')
+
+    def test_diff_falls_back_to_case_id_key(self):
+        """无 code 的用例（历史数据）按 case-<id> 派生键对应，clone 后 diff 应 unchanged。"""
+        ds = EvalDataset.objects.create(organization=self.org_a, name='ds-nocode', version='v1')
+        c = EvalCase.objects.create(dataset=ds, input_text='x', expected='y')  # code 为空
+        self.assertIsNone(c.code)
+        t = self.client_a.post(f'/api/eval/datasets/{ds.id}/clone_version/')
+        self.assertEqual(t.status_code, 201)
+        t_ds = EvalDataset.objects.get(name='ds-nocode', version='v2', organization=self.org_a)
+        # clone 时派生 code=case-<id>，故同一用例应 unchanged
+        r = self.client_a.get(f'/api/eval/datasets/diff/?base={ds.id}&target={t_ds.id}')
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.data['data']['summary']['unchanged'], 1)
+        self.assertEqual(r.data['data']['summary']['added'], 0)
+        self.assertEqual(r.data['data']['summary']['removed'], 0)
+
+    def test_diff_cross_tenant_404(self):
+        """乙方用甲方两个数据集 id 调 diff → 404（严格租户隔离）。"""
+        ds = EvalDataset.objects.create(organization=self.org_a, name='ds-x', version='v1')
+        EvalCase.objects.create(dataset=ds, code='q1', input_text='i', expected='e')
+        self.client_a.post(f'/api/eval/datasets/{ds.id}/clone_version/')
+        target = EvalDataset.objects.get(name='ds-x', version='v2', organization=self.org_a)
+        r = self.client_b.get(f'/api/eval/datasets/diff/?base={ds.id}&target={target.id}')
+        self.assertEqual(r.status_code, 404)

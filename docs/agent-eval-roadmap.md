@@ -179,11 +179,12 @@
 | Phase 4 | 门禁 + 可观测进 CI | ⬜ 待建 | 扩展 `ci.yml` 加 eval 维度门禁；Langfuse/OTel 接 Trace |
 | 横切·安全 | 租户自有模型配置（**A2**） | ✅ **已落地** | 给 `AIModelConfig` 加 `organization` 字段 + `for_tenant()` 取数；评测舱 LLM 裁判只取本租户激活配置，平台级配置不被取用，无自有模型租户确定性降级（零外域） |
 | Phase A · **A4** | 全局/跨数据集榜单（leaderboard） | ✅ **已落地** | `EvalRunViewSet.leaderboard`：模型排名（按 `model_config.model_name`）+ 数据集排名，复用 report 聚合，严格按租户隔离；`EvalRun.model_config` 溯源字段支撑跨模型比较 |
+| Phase A · **A3** | 数据集版本化 + Diff | ✅ **已落地** | `EvalCase.code` 业务键 + `EvalDatasetViewSet.clone_version`（v1→v2 自动 bump，复制用例保留 code）+ `EvalDatasetViewSet.diff`（按 code 对应返回 added/removed/changed/unchanged + 字段级差异）；历史数据无 code 时回退 `case-<id>`；严格租户隔离（对齐 Langfuse datasets / One-Eval DataFlow） |
 
 **本批次质量验证**：
-- `apps.eval_pod` 回归测试 **29 tests OK**（在 25 项基础上新增：A2 租户自有模型出域隔离 3 项[for_tenant 排除平台级 / 甲方用自有配置走 LLM_JUDGE / 乙方无配置降级 HEURISTIC 零外送] + A4 全局榜单 1 项[模型+数据集排名与租户隔离]）。
+- `apps.eval_pod` 回归测试 **34 tests OK**（在 29 项基础上新增：A3 数据集版本化+Diff 5 项[clone 复制用例并自动 bump / 重复版本 400 / diff added-removed-changed-unchanged / 无 code 回退 case-<id> / 跨租户 diff 404]）。
 - `manage.py check` 无问题；Phase 0 基座稳固。
-- 本批次交付：Phase A·**A2 租户自有模型（数据不出域）** + **A4 全局/跨数据集榜单**；含 `AIModelConfig.organization` 迁移与 `EvalRun.model_config` 溯源迁移（本地生成不入库）。
+- 本批次交付：Phase A·**A2 租户自有模型（数据不出域）** + **A3 数据集版本化 + Diff** + **A4 全局/跨数据集榜单**；含 `AIModelConfig.organization`、`EvalRun.model_config`、`EvalCase.code` 迁移（本地生成不入库）。
 - 说明：`apps/requirement_analysis` 自带 4 项测试存在 `core_projects.owner_id` 缺失的历史失败，与本次改动无关（未触碰 Project 模型），不阻塞本次交付。
 
 **工程约定提醒（重要）**：本项目 `.gitignore` 忽略所有 `apps/*/migrations/*`，迁移**本地生成、不入库**（`makemigrations` 后由 syncdb/本地迁移建表）。因此：
@@ -215,7 +216,7 @@
 
 | 阶段 | 里程碑 | 借鉴来源 | 状态 |
 |---|---|---|---|
-| Phase 2 · M2+ | 数据集版本化 + Diff | promptfoo/DeepEval/One-Eval | ⬜ 待建 |
+| Phase A · **A3** | 数据集版本化 + Diff | promptfoo/DeepEval/One-Eval | ✅ 已落地 |
 | Phase 2 · M3+ | **指标库扩充**（faithfulness/relevancy/bias/toxicity/tool_correctness/plan_adherence，全 offline 降级）+ **强制 reason** | DeepEval / Giskard | ✅ 已落地 |
 | Phase 2 · M3+ | **人机协同复核门**（review_status + reviewer，阻断误报） | One-Eval / Giskard | ✅ 已落地 |
 | Phase 2 · M4 | Trace 模型（步骤级观测/回放，Django+Postgres） | Langfuse / One-Eval | ✅ 后端已落地（回放 UI 待前端） |

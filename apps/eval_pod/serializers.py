@@ -9,7 +9,7 @@ from .models import (
 class EvalCaseSerializer(serializers.ModelSerializer):
     class Meta:
         model = EvalCase
-        fields = ('id', 'dataset', 'input_text', 'expected', 'is_edge', 'meta', 'created_at')
+        fields = ('id', 'dataset', 'code', 'input_text', 'expected', 'is_edge', 'meta', 'created_at')
         read_only_fields = ('id', 'created_at')
 
     def validate_is_edge(self, value):
