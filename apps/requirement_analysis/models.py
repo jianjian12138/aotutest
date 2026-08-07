@@ -1,6 +1,6 @@
 from django.db import models
 from django.utils import timezone
-from apps.core_platform.models import User
+from apps.core_platform.models import User, Organization
 from apps.core_platform.models import Project
 from backend.utils.crypto import EncryptedTextField
 import json
@@ -237,6 +237,12 @@ class AIModelConfig(models.Model):
     temperature = models.FloatField(default=0.7, verbose_name='温度参数')
     top_p = models.FloatField(default=0.9, verbose_name='Top P参数')
     is_active = models.BooleanField(default=True, db_index=True, verbose_name='是否启用')
+    organization = models.ForeignKey(
+        Organization, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='ai_model_configs', verbose_name='所属租户',
+        help_text='租户自有模型配置；为空表示平台级共享配置。'
+                  '评测舱 LLM 裁判只取本租户配置，不取平台级，以兑现「数据不出域」红线',
+    )
     created_by = models.ForeignKey(User, on_delete=models.CASCADE, verbose_name='创建者')
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='创建时间')
     updated_at = models.DateTimeField(auto_now=True, verbose_name='更新时间')
@@ -259,6 +265,19 @@ class AIModelConfig(models.Model):
             role=role, 
             is_active=True
         ).first()
+
+    @classmethod
+    def for_tenant(cls, organization, role=None):
+        """取某租户激活的模型配置（评测舱 LLM 裁判专用）。
+
+        仅返回归属该租户的配置；无则返 None → 调用方确定性降级为启发式（零外送），
+        保证未配置自有模型的租户数据不会触达任何外部 LLM 端点（数据不出域红线）。
+        平台级（organization 为空）配置**不**用于评测舱 LLM 裁判。
+        """
+        qs = cls.objects.filter(is_active=True, organization=organization)
+        if role:
+            qs = qs.filter(role=role)
+        return qs.order_by('-updated_at').first()
 
 
 class PromptConfig(models.Model):

@@ -54,10 +54,15 @@ class GraderConfigSerializer(serializers.ModelSerializer):
 
 
 class EvalRunSerializer(serializers.ModelSerializer):
+    model_config_name = serializers.CharField(
+        source='model_config.model_name', read_only=True, default=None
+    )
+
     class Meta:
         model = EvalRun
         fields = (
-            'id', 'organization', 'dataset', 'grader', 'status',
+            'id', 'organization', 'dataset', 'grader', 'model_config',
+            'model_config_name', 'status',
             'mean_score', 'pass_rate', 'edge_pass_rate', 'created_at', 'created_by',
         )
         read_only_fields = (

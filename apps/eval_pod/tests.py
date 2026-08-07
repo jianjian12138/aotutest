@@ -13,11 +13,13 @@ B. 底座契约（Phase 1）：
    - RULE 评测 run @action 端到端落库汇总
 """
 from django.test import TestCase
+from unittest.mock import patch
 
 from rest_framework.test import APIClient
 
 from apps.core_platform.models import Organization, User
 from apps.tenant_features.models import FeatureCode, TenantFeature
+from apps.requirement_analysis.models import AIModelConfig
 
 from . import graders
 from .models import EvalCase, EvalDataset, EvalResult, EvalRun, EvalTrace, EvalTraceStep, GraderConfig
@@ -449,3 +451,134 @@ class EvalTraceTest(TestCase):
             format='json',
         )
         self.assertEqual(resp.status_code, 400)
+
+
+# ============================================================
+# E. Phase A · A2 租户自有模型（数据不出域）+ A4 全局榜单
+# ============================================================
+class TenantModelAndLeaderboardTest(TestCase):
+    """验证 LLM 裁判只取本租户模型配置，且无自有模型的租户数据零外送。"""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.org_a = Organization.objects.create(name='甲方A', code='org-a')
+        cls.org_b = Organization.objects.create(name='甲方B', code='org-b')
+        cls.user_a = User.objects.create_user('ua', password='x')
+        cls.user_a.organization = cls.org_a
+        cls.user_a.save()
+        cls.user_b = User.objects.create_user('ub', password='x')
+        cls.user_b.organization = cls.org_b
+        cls.user_b.save()
+        TenantFeature.objects.create(tenant=cls.org_a, feature_code=FeatureCode.AGENT_EVAL, enabled=True)
+        TenantFeature.objects.create(tenant=cls.org_b, feature_code=FeatureCode.AGENT_EVAL, enabled=True)
+        cls.client_a = APIClient()
+        cls.client_a.force_authenticate(cls.user_a)
+        cls.client_b = APIClient()
+        cls.client_b.force_authenticate(cls.user_b)
+
+        # 甲方A 拥有自有模型配置；乙方B 没有任何自有配置
+        cls.cfg_a = AIModelConfig.objects.create(
+            organization=cls.org_a, name='ma', model_type='deepseek', role='reviewer',
+            api_key='k', base_url='https://api.a.example', model_name='deepseek-chat',
+            is_active=True, created_by=cls.user_a,
+        )
+
+    def test_for_tenant_excludes_platform_level(self):
+        """平台级（organization 为空）配置不被评测舱 LLM 裁判取用。"""
+        AIModelConfig.objects.create(
+            name='plat', model_type='qwen', role='writer', api_key='k',
+            base_url='https://api.plat', model_name='qwen-plat', is_active=True,
+            created_by=self.user_a,
+        )
+        # org_b 无自有配置 → 即使存在平台级配置，也不返回（数据不出域）
+        self.assertIsNone(AIModelConfig.for_tenant(self.org_b))
+        # org_a 仅返回自己的配置
+        self.assertEqual(AIModelConfig.for_tenant(self.org_a).id, self.cfg_a.id)
+
+    @staticmethod
+    async def _fake_llm(config, messages):
+        """模拟 AIModelService 异步返回，使 LLM 裁判路径走通（不触达真实端点）。"""
+        return {
+            'choices': [{
+                'message': {'content': '{"score": 0.9, "passed": true, "reason": "judge-ok"}'}
+            }]
+        }
+
+    def test_tenant_with_own_config_uses_it(self):
+        """甲方A 有自有模型 → LLM 裁判使用该配置，结果 judge=LLM_JUDGE 且 model_config 溯源正确。"""
+        ds = EvalDataset.objects.create(organization=self.org_a, name='ds-a2', version='v1')
+        c1 = EvalCase.objects.create(dataset=ds, input_text='q', expected='ok')
+        grader = GraderConfig.objects.create(
+            organization=self.org_a, name='g-llm', grader_type='LLM_JUDGE'
+        )
+        run = EvalRun.objects.create(organization=self.org_a, dataset=ds, grader=grader)
+
+        with patch(
+            'apps.requirement_analysis.models.AIModelService.call_openai_compatible_api',
+            self._fake_llm,
+        ):
+            resp = self.client_a.post(
+                f'/api/eval/runs/{run.id}/run/',
+                {'outputs': {str(c1.id): 'some answer'}}, format='json',
+            )
+        self.assertEqual(resp.status_code, 200, resp.content)
+        run.refresh_from_db()
+        self.assertEqual(run.model_config_id, self.cfg_a.id)  # A4 溯源
+        result = EvalResult.objects.get(run=run, case=c1)
+        self.assertEqual(result.judge, 'LLM_JUDGE')  # 用上了自有模型
+
+    def test_tenant_without_own_config_falls_back_to_heuristic(self):
+        """乙方B 无自有模型 → LLM 裁判降级 HEURISTIC，run.model_config=None（零外送）。"""
+        ds = EvalDataset.objects.create(organization=self.org_b, name='ds-b2', version='v1')
+        c1 = EvalCase.objects.create(dataset=ds, input_text='q', expected='ok')
+        grader = GraderConfig.objects.create(
+            organization=self.org_b, name='g-llm-b', grader_type='LLM_JUDGE'
+        )
+        run = EvalRun.objects.create(organization=self.org_b, dataset=ds, grader=grader)
+
+        resp = self.client_b.post(
+            f'/api/eval/runs/{run.id}/run/',
+            {'outputs': {str(c1.id): 'some answer'}}, format='json',
+        )
+        self.assertEqual(resp.status_code, 200, resp.content)
+        run.refresh_from_db()
+        self.assertIsNone(run.model_config)  # 未触达任何外部端点
+        result = EvalResult.objects.get(run=run, case=c1)
+        self.assertEqual(result.judge, 'HEURISTIC')  # 确定性降级
+
+    def test_leaderboard_model_and_dataset_ranking(self):
+        """全局榜单：模型排名 + 数据集排名正确，且仅含本租户数据。"""
+        ds1 = EvalDataset.objects.create(organization=self.org_a, name='ds-lb1', version='v1')
+        ds2 = EvalDataset.objects.create(organization=self.org_a, name='ds-lb2', version='v1')
+        EvalCase.objects.create(dataset=ds1, input_text='q', expected='ok')
+        EvalCase.objects.create(dataset=ds2, input_text='q', expected='ok')
+        g1 = GraderConfig.objects.create(organization=self.org_a, name='g1', grader_type='RULE', rubric={'mode': 'contains'})
+        g2 = GraderConfig.objects.create(organization=self.org_a, name='g2', grader_type='RULE', rubric={'mode': 'contains'})
+        # run on ds1 with model_a (high score), run on ds2 with no model (low score)
+        EvalRun.objects.create(
+            organization=self.org_a, dataset=ds1, grader=g1, model_config=self.cfg_a,
+            status='DONE', mean_score=0.9, pass_rate=1.0,
+        )
+        EvalRun.objects.create(
+            organization=self.org_a, dataset=ds2, grader=g2, model_config=None,
+            status='DONE', mean_score=0.3, pass_rate=0.3,
+        )
+
+        resp = self.client_a.get('/api/eval/runs/leaderboard/')
+        self.assertEqual(resp.status_code, 200, resp.content)
+        payload = resp.data['data']
+        self.assertEqual(payload['total_runs'], 2)
+        models = {m['model']: m for m in payload['model_ranking']}
+        self.assertIn(self.cfg_a.model_name, models)
+        self.assertIn('（无 LLM / 启发式）', models)
+        # 按分数降序：deepseek-chat(0.9) 应排在最前
+        self.assertEqual(payload['model_ranking'][0]['model'], self.cfg_a.model_name)
+        self.assertEqual(payload['model_ranking'][0]['avg_mean_score'], 0.9)
+        ds_names = {d['dataset_name'] for d in payload['dataset_ranking']}
+        self.assertEqual(ds_names, {'ds-lb1', 'ds-lb2'})
+
+        # 乙方（租户隔离）：榜单只反映乙方自己的运行（此处无 → 空）
+        EvalDataset.objects.create(organization=self.org_b, name='ds-b-lb', version='v1')
+        resp_b = self.client_b.get('/api/eval/runs/leaderboard/')
+        self.assertEqual(resp_b.status_code, 200)
+        self.assertEqual(resp_b.data['data']['total_runs'], 0)

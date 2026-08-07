@@ -136,6 +136,12 @@ class EvalRun(models.Model):
     )
     dataset = models.ForeignKey(EvalDataset, on_delete=models.CASCADE)
     grader = models.ForeignKey(GraderConfig, on_delete=models.CASCADE)
+    model_config = models.ForeignKey(
+        'requirement_analysis.AIModelConfig', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='eval_runs',
+        help_text='本次运行实际使用的 LLM 模型配置（仅 LLM 类评分器有）；'
+                  '用于跨数据集模型榜单 / 溯源。为 None 表示离线启发式降级（零外送）',
+    )
     status = models.CharField(max_length=20, choices=STATUS, default='PENDING')
     mean_score = models.FloatField(null=True, blank=True)
     pass_rate = models.FloatField(null=True, blank=True)

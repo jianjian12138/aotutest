@@ -177,12 +177,14 @@
 | Phase 2 · M5 | 报告看板 | ⬜ 待建 | 评测报告 / 分数趋势 / 质量门禁阈值 |
 | Phase 3 | 智能体自动化辅舱 | ⬜ 待建 | agent 生成用例 + 复用执行设施 + 确定性基线 |
 | Phase 4 | 门禁 + 可观测进 CI | ⬜ 待建 | 扩展 `ci.yml` 加 eval 维度门禁；Langfuse/OTel 接 Trace |
-| 横切·安全 | 租户自有模型配置 | ⬜ 待办 | 给 `AIModelConfig` 加 `organization` 字段，使 LLM 调用按租户隔离端点（当前先用平台级 `AIModelConfig`，无配置即降级，保证未订阅租户零出域） |
+| 横切·安全 | 租户自有模型配置（**A2**） | ✅ **已落地** | 给 `AIModelConfig` 加 `organization` 字段 + `for_tenant()` 取数；评测舱 LLM 裁判只取本租户激活配置，平台级配置不被取用，无自有模型租户确定性降级（零外域） |
+| Phase A · **A4** | 全局/跨数据集榜单（leaderboard） | ✅ **已落地** | `EvalRunViewSet.leaderboard`：模型排名（按 `model_config.model_name`）+ 数据集排名，复用 report 聚合，严格按租户隔离；`EvalRun.model_config` 溯源字段支撑跨模型比较 |
 
 **本批次质量验证**：
-- `apps.eval_pod` 回归测试 **25 tests OK**（覆盖规则/LLM 裁判降级与注入、指标库 offline 启发式、红队 PII/越狱离线扫描、功能开关门禁 403、租户隔离 [数据集 + Trace]、RULE 评测端到端落库、HITL 复核门、Trace 创建/回放/越权拦截、REDTEAM 端到端拦截、报告看板聚合与隔离）。
-- `manage.py check` 无问题；`apps.tenant_features`(4) 全绿；Phase 0 基座稳固。
-- 本批次交付：Phase2 M3（指标库 + 复核门）+ M4（Trace 后端）+ 红队 REDTEAM 维度 + M5 报告看板（后端）+ 开源对标文档增补（Opik/Phoenix/Inspect AI）。
+- `apps.eval_pod` 回归测试 **29 tests OK**（在 25 项基础上新增：A2 租户自有模型出域隔离 3 项[for_tenant 排除平台级 / 甲方用自有配置走 LLM_JUDGE / 乙方无配置降级 HEURISTIC 零外送] + A4 全局榜单 1 项[模型+数据集排名与租户隔离]）。
+- `manage.py check` 无问题；Phase 0 基座稳固。
+- 本批次交付：Phase A·**A2 租户自有模型（数据不出域）** + **A4 全局/跨数据集榜单**；含 `AIModelConfig.organization` 迁移与 `EvalRun.model_config` 溯源迁移（本地生成不入库）。
+- 说明：`apps/requirement_analysis` 自带 4 项测试存在 `core_projects.owner_id` 缺失的历史失败，与本次改动无关（未触碰 Project 模型），不阻塞本次交付。
 
 **工程约定提醒（重要）**：本项目 `.gitignore` 忽略所有 `apps/*/migrations/*`，迁移**本地生成、不入库**（`makemigrations` 后由 syncdb/本地迁移建表）。因此：
 - 测试前需本地 `makemigrations`（本项目约定，迁移不入版本库）；
@@ -221,6 +223,6 @@
 | Phase 2 · 安全 | 红队评测类型（kind=REDTEAM，越狱/泄漏扫描） | promptfoo / Giskard | ✅ 已落地（offline 启发式优先，可选 LLM 升级） |
 | Phase 3 | 多 Agent 编排（生成/执行/分析 拆分，按文章四步法渐进） | 公众号文章 | ⬜ 待建 |
 | Phase 4 | CI 质量门禁（分数阈值 + 回归拦截 + 安全 PR 审查） | promptfoo / DeepEval | ⬜ 待建 |
-| 横切 | `AIModelConfig` 加 `organization`（租户自有模型，彻底隔离出域） | — | ⬜ 待建 |
+| 横切 | `AIModelConfig` 加 `organization`（租户自有模型，彻底隔离出域） | — | ✅ 已落地（见 A2） |
 
 **设计原则（写入 Phase 3）**：① 分工提升专注度（文章）；② 中间格式（`EvalCase` schema）必须稳定；③ 错误传播防护 = 分析端合理性校验 + 人机复核门；④ 所有 LLM 指标必须有 offline/HEURISTIC 降级，保证未订阅租户零出域。

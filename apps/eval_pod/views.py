@@ -138,8 +138,10 @@ class EvalRunViewSet(_EvalBase, viewsets.ModelViewSet):
 
         llm_config = None
         if run.grader.grader_type == 'LLM_JUDGE':
+            # A2 数据不出域：LLM 裁判只取「本租户」激活的模型配置；
+            # 无则 llm_config=None → 评估引擎确定性降级为启发式（零外送）。
             from apps.requirement_analysis.models import AIModelConfig
-            llm_config = AIModelConfig.objects.filter(is_active=True).first()
+            llm_config = AIModelConfig.for_tenant(run.dataset.organization)
 
         try:
             summary = graders.grade_run(run, outputs, llm_config=llm_config)
@@ -151,6 +153,7 @@ class EvalRunViewSet(_EvalBase, viewsets.ModelViewSet):
             )
 
         run.status = 'DONE'
+        run.model_config = llm_config  # A4 溯源：记录本次运行使用的模型
         run.mean_score = summary['mean_score']
         run.pass_rate = summary['pass_rate']
         run.edge_pass_rate = summary['edge_pass_rate']
@@ -196,6 +199,66 @@ class EvalRunViewSet(_EvalBase, viewsets.ModelViewSet):
         result.reviewed_at = timezone.now()
         result.save()
         return Response(EvalResultSerializer(result).data, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=['get'])
+    def leaderboard(self, request):
+        """A4 全局/跨数据集榜单（租户内）：模型排名 + 数据集排名。
+
+        复用 report 的聚合思路，但跨数据集横向比较：
+        - model_ranking：按 model_config.model_name 分组（含「无 LLM/启发式」组），
+          返回 avg_mean_score / avg_pass_rate / run_count，按分数降序；
+        - dataset_ranking：按 dataset 分组，返回 avg_mean_score / run_count。
+        只读、无副作用；严格按 request.user.organization 隔离。
+        """
+        org = request.user.organization
+        runs = (
+            EvalRun.objects.filter(organization=org, status='DONE')
+            .select_related('grader', 'dataset', 'model_config')
+            .order_by('created_at')
+        )
+
+        by_model = {}
+        for r in runs:
+            key = r.model_config.model_name if r.model_config else '（无 LLM / 启发式）'
+            d = by_model.setdefault(key, {'run_count': 0, 'scores': [], 'pass_rates': []})
+            d['run_count'] += 1
+            if r.mean_score is not None:
+                d['scores'].append(r.mean_score)
+            if r.pass_rate is not None:
+                d['pass_rates'].append(r.pass_rate)
+        model_ranking = [
+            {
+                'model': k,
+                'run_count': d['run_count'],
+                'avg_mean_score': round(sum(d['scores']) / len(d['scores']), 3) if d['scores'] else None,
+                'avg_pass_rate': round(sum(d['pass_rates']) / len(d['pass_rates']), 3) if d['pass_rates'] else None,
+            }
+            for k, d in by_model.items()
+        ]
+        model_ranking.sort(key=lambda x: (x['avg_mean_score'] or 0), reverse=True)
+
+        by_ds = {}
+        for r in runs:
+            d = by_ds.setdefault(r.dataset_id, {'name': r.dataset.name, 'scores': [], 'run_count': 0})
+            d['run_count'] += 1
+            if r.mean_score is not None:
+                d['scores'].append(r.mean_score)
+        dataset_ranking = [
+            {
+                'dataset_id': did,
+                'dataset_name': d['name'],
+                'run_count': d['run_count'],
+                'avg_mean_score': round(sum(d['scores']) / len(d['scores']), 3) if d['scores'] else None,
+            }
+            for did, d in by_ds.items()
+        ]
+        dataset_ranking.sort(key=lambda x: (x['avg_mean_score'] or 0), reverse=True)
+
+        return Response({
+            'model_ranking': model_ranking,
+            'dataset_ranking': dataset_ranking,
+            'total_runs': len(runs),
+        }, status=status.HTTP_200_OK)
 
 
 class EvalTraceViewSet(_EvalBase, viewsets.ModelViewSet):
