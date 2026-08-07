@@ -25,8 +25,11 @@
 - 已落地（Phase0~2 + Phase A + Phase B + Phase C）：M2 数据集 / M3 指标库+复核门 / M4 Trace / M5 报告看板(后端+前端) / 红队 REDTEAM / **A2 租户自有模型** / **A3 数据集版本化+Diff** / **A4 全局+跨数据集榜单** / **A1 Vue 前端看板** / **B1 用例生成 Agent** / **B3 分析 Agent** / **B4 确定性基线** / **C1 质量门禁** / **C2 Trace 导出** / **C3 CI 门禁工作流**。
 - 路线三全栈（Phase A/B/C）已于 2026-08-07 交付完毕；演进分支 `agent-eval-v2` 功能齐备，可进入主线合并评审。
 
-## Phase B/C/A1 已落地明细（2026-08-07 交付，45 tests 全绿）
+## Phase B/C/A1 已落地明细（2026-08-07 交付，47 tests 全绿）
 - B1 用例生成 Agent：`apps/eval_pod/agents.py:generate_cases`（离线启发式零外送 + 可选 LLM 升级 `default_llm_call` 复用 `AIModelService`，失败确定性降级）；`EvalDatasetViewSet.generate_cases` @action 批量写入 `EvalCase`，经 `EvalRunViewSet.run` 复用执行设施（B2）。
+- **端到端演示/集成测试（2026-08-07 追加）**：
+  - `apps/eval_pod/management/commands/demo_eval_flow.py`：离线零外送跑通「需求→生成(B1)→评测→基线(B4)→门禁(C1)→分析(B3)→Trace 导出(C2)」，幂等、支持 `--clean`；演示数据落在独立 `demo-eval` 租户，跑完可删。
+  - `tests.py:EvalEndToEndTest`（2 项）：真实 API 链路验证「劣化版触发 C1 门禁精确指出 mean_score/pass_rate 掉点 / 等价候选过门禁且 B4 不判回归」。
 - B3 分析 Agent：`agents.analyze_run` 按 judge 类型归类失败率≥0.5 系统性风险；`EvalRunViewSet.analyze`。
 - B4 确定性基线：`EvalRun.is_baseline` + `set_baseline`/`compare` @action + `agents.compare_to_baseline`(mean_score/pass_rate/edge_pass_rate delta，regress_delta 阈值)。
 - C1 质量门禁：`agents.eval_gate`(failed_thresholds + regressed_metrics 精确指出掉点指标) + `EvalRunViewSet.gate`；供 CI 调用。
@@ -34,6 +37,7 @@
 - A1 Vue 前端：`frontend/src/views/eval/EvalDashboard.vue` + `src/api/eval.js` + 路由 `/eval` + 侧边菜单「Agent 测评」；报告概览 + A4 榜单 + B1 生成 + A3 Diff + 运行详情抽屉(B4/B3/C1/C2)。**注意：前端 `node_modules` 缺失时需 `npm install`（本机 .venv311 为后端正确环境：Django 4.2.7）**。
 - C3 CI：` .github/workflows/eval-gate.yml` 监听 `agent-eval-v2` push/PR，跑 `apps.eval_pod` 测试套件（含 C1 门禁），任一失败阻断合并。
 - 测试环境：后端用项目 `.venv311`（`Django 4.2.7`）；运行需 `FIELD_ENCRYPTION_KEY`/`SECRET_KEY`/`DEBUG=True` 环境变量；迁移 `0007_evalrun_is_baseline.py` 本地生成不入库。
+- **端到端实跑提醒**：管理命令/演示连开发库 `db.sqlite3`，首次需 `manage.py migrate` 建表（迁移本地生成）；演示后删 `Organization(code='demo-eval')` 即可级联清理（eval 所有外键 on_delete=CASCADE）。
 
 ## Phase A 已落地明细（2026-08-07 提交 e22de8f，已推 origin/agent-eval-v2）
 - A2 数据不出域：修复了 `EvalRunViewSet.run` 原 `AIModelConfig.objects.filter(is_active=True).first()` 跨租户取首个激活配置的出域漏洞；改为 `AIModelConfig.for_tenant(org)`，平台级(organization=None)配置不被评测舱取用，无自有模型租户确定性降级 HEURISTIC（零外送）。

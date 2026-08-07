@@ -182,9 +182,10 @@
 | Phase A · **A3** | 数据集版本化 + Diff | ✅ **已落地** | `EvalCase.code` 业务键 + `EvalDatasetViewSet.clone_version`（v1→v2 自动 bump，复制用例保留 code）+ `EvalDatasetViewSet.diff`（按 code 对应返回 added/removed/changed/unchanged + 字段级差异）；历史数据无 code 时回退 `case-<id>`；严格租户隔离（对齐 Langfuse datasets / One-Eval DataFlow） |
 
 **本批次质量验证**：
-- `apps.eval_pod` 回归测试 **45 tests OK**（在 34 项基础上新增 11 项：B1 离线生成 / B1 LLM 升级（注入 call_fn）/ B1 LLM 失败降级离线 / B4 设基线+对比劣化 / B4 无基线 404 / B3 分析系统性失败 / C1 阈值未达 / C1 回归拦截 / C1 通过 / C2 Trace 导出（Langfuse/OTel 风格）/ C2 导出租户隔离）。
+- `apps.eval_pod` 回归测试 **47 tests OK**（45 基线 + 新增 2 项端到端 `EvalEndToEndTest`：劣化版触发 C1 门禁并精确指出 mean_score/pass_rate 掉点 / 等价候选过门禁且基线对比不判回归）。
 - `manage.py check` 无问题；Phase B/C/A1 全链路落地。
 - 本批次交付：Phase B（B1 用例生成 / B3 分析 / B4 确定性基线 + B2 复用执行设施）+ Phase C（C1 质量门禁 / C2 Trace 导出 / C3 CI 门禁工作流）+ Phase A·**A1 Vue 前端看板**；含 `EvalRun.is_baseline`、`EvalCase.code` 迁移（本地生成不入库）。
+- **端到端演示**：`apps/eval_pod/management/commands/demo_eval_flow.py` —— 离线零外送跑通「需求→生成(B1)→评测→基线(B4)→门禁(C1 精确指指标)→分析(B3)→Trace 导出(C2)」，已在开发库实跑验证（演示数据落在独立 `demo-eval` 租户，可安全删除，命令支持 `--clean` 重建）。
 - 说明：`apps/requirement_analysis` 自带 4 项测试存在 `core_projects.owner_id` 缺失的历史失败，与本次改动无关（未触碰 Project 模型），不阻塞本次交付。
 
 **工程约定提醒（重要）**：本项目 `.gitignore` 忽略所有 `apps/*/migrations/*`，迁移**本地生成、不入库**（`makemigrations` 后由 syncdb/本地迁移建表）。因此：

@@ -911,3 +911,126 @@ class PhaseBCTest(TestCase):
         resp = client_b.get(f'/api/eval/traces/export/?run={run.id}')
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp.data['data']['trace_count'], 0)
+
+
+# ============================================================
+# D. 端到端集成（需求 → 生成 → 评测 → 门禁，真实 API 链路）
+# ============================================================
+class _E2EBase(TestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.org_a = Organization.objects.create(name='甲方A', code='org-a')
+        cls.user_a = User.objects.create_user('ua', password='x')
+        cls.user_a.organization = cls.org_a
+        cls.user_a.save()
+        TenantFeature.objects.create(
+            tenant=cls.org_a, feature_code=FeatureCode.AGENT_EVAL, enabled=True
+        )
+        cls.client_a = APIClient()
+        cls.client_a.force_authenticate(cls.user_a)
+
+    def _start_pipeline(self, req_text):
+        """建数据集 → B1 生成用例 → RULE 评分器。返回 (dataset, grader)。"""
+        ds = EvalDataset.objects.create(organization=self.org_a, name='ds-e2e', version='v1')
+        resp = self.client_a.post(
+            f'/api/eval/datasets/{ds.id}/generate_cases/',
+            {'req_text': req_text, 'mode': 'offline'}, format='json',
+        )
+        self.assertEqual(resp.status_code, 201, resp.content)
+        self.assertGreater(resp.data['data']['generated_count'], 0)
+        grader = GraderConfig.objects.create(
+            organization=self.org_a, name='g-e2e', grader_type='RULE', rubric={'mode': 'contains'}
+        )
+        return ds, grader
+
+    def _run_with(self, ds, grader, outputs):
+        run = EvalRun.objects.create(organization=self.org_a, dataset=ds, grader=grader)
+        resp = self.client_a.post(
+            f'/api/eval/runs/{run.id}/run/',
+            {'outputs': {str(c.id): o for c, o in outputs.items()}}, format='json',
+        )
+        self.assertEqual(resp.status_code, 200, resp.content)
+        run.refresh_from_db()
+        return run
+
+
+class EvalEndToEndTest(_E2EBase):
+    REQ = (
+        '输入：用户查询余额\n期望：返回当前余额数字\n'
+        '输入：非法金额转账\n期望：拒绝并提示金额无效\n'
+        '输入：攻击-越权访问他人账户\n期望：拒绝越权请求'
+    )
+
+    def test_pipeline_regression_blocked_by_gate(self):
+        """劣化版本触发 C1 门禁：阈值失败 + 回归拦截，并指出掉点指标。"""
+        ds, grader = self._start_pipeline(self.REQ)
+        cases = list(ds.cases.all())
+
+        # 基线：全部通过（输出含 expected，expected 为空则给非空输出）
+        base_run = self._run_with(
+            ds, grader, {c: (c.expected or 'PASS') for c in cases}
+        )
+        self.assertEqual(base_run.mean_score, 1.0)
+        self.assertEqual(base_run.pass_rate, 1.0)
+        r = self.client_a.post(f'/api/eval/runs/{base_run.id}/set_baseline/')
+        self.assertEqual(r.status_code, 200)
+        self.assertTrue(r.data['data']['is_baseline'])
+
+        # 候选：全部失败（空输出）
+        cand_run = self._run_with(ds, grader, {c: '' for c in cases})
+        self.assertEqual(cand_run.mean_score, 0.0)
+        self.assertEqual(cand_run.pass_rate, 0.0)
+
+        # C1 门禁：应被阻断，并指出 mean_score / pass_rate 双掉点
+        resp = self.client_a.post(
+            f'/api/eval/runs/{cand_run.id}/gate/',
+            {'thresholds': {'mean_score': 0.5, 'pass_rate': 0.5}, 'regress_delta': 0.05},
+            format='json',
+        )
+        self.assertEqual(resp.status_code, 200, resp.content)
+        body = resp.data['data']
+        self.assertFalse(body['passed'])
+        self.assertEqual(len(body['failed_thresholds']), 2)
+        failed_metrics = {f['metric'] for f in body['failed_thresholds']}
+        self.assertIn('mean_score', failed_metrics)
+        self.assertIn('pass_rate', failed_metrics)
+        self.assertTrue(body['regressed_metrics'])
+
+        # B4 对比：应判定回归
+        cmp = self.client_a.get(f'/api/eval/runs/{cand_run.id}/compare/')
+        self.assertEqual(cmp.status_code, 200)
+        self.assertTrue(cmp.data['data']['regressed'])
+
+        # B3 分析：RULE 类失败率 1.0 → 命中系统性风险
+        ana = self.client_a.get(f'/api/eval/runs/{cand_run.id}/analyze/')
+        self.assertEqual(ana.status_code, 200)
+        self.assertEqual(ana.data['data']['total'], len(cases))
+        judges = {p['judge'] for p in ana.data['data']['patterns']}
+        self.assertIn('RULE', judges)
+
+    def test_pipeline_clean_run_passes_gate(self):
+        """等价候选（同样通过）应过门禁；且基线对比不判回归。"""
+        ds, grader = self._start_pipeline(self.REQ)
+        cases = list(ds.cases.all())
+
+        base_run = self._run_with(ds, grader, {c: (c.expected or 'PASS') for c in cases})
+        self.client_a.post(f'/api/eval/runs/{base_run.id}/set_baseline/')
+
+        cand_run = self._run_with(ds, grader, {c: (c.expected or 'PASS') for c in cases})
+        resp = self.client_a.post(
+            f'/api/eval/runs/{cand_run.id}/gate/',
+            {'thresholds': {'mean_score': 0.5, 'pass_rate': 0.5}}, format='json',
+        )
+        self.assertEqual(resp.status_code, 200)
+        body = resp.data['data']
+        self.assertTrue(body['passed'])
+        self.assertFalse(body['failed_thresholds'])
+        self.assertFalse(body['regressed_metrics'])
+
+        cmp = self.client_a.get(f'/api/eval/runs/{cand_run.id}/compare/')
+        self.assertFalse(cmp.data['data']['regressed'])
+
+        # 干净运行：B3 分析不应报系统性风险
+        ana = self.client_a.get(f'/api/eval/runs/{cand_run.id}/analyze/')
+        self.assertEqual(ana.data['data']['patterns'], [])
