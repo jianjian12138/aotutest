@@ -369,6 +369,14 @@
             </el-menu-item>
           </template>
 
+          <!-- Agent 测评 · LLM 测试舱（路线三 Phase A·A1） -->
+          <template v-else-if="currentModule === 'eval'">
+            <el-menu-item index="/eval">
+              <el-icon><DataAnalysis /></el-icon>
+              <span>评测看板</span>
+            </el-menu-item>
+          </template>
+
           <el-divider />
 
           <!-- 全局个人中心/设置 -->
@@ -480,6 +488,7 @@ const currentModule = computed(() => {
 
   if (route.path.startsWith('/knowledge-graph')) return 'knowledge-graph'
   if (route.path.startsWith('/unified')) return 'unified'
+  if (route.path.startsWith('/eval')) return 'eval'
   return ''
 })
 
@@ -497,7 +506,8 @@ const moduleName = computed(() => {
     'strix-security': '安全测试',
     'cicd': 'CI/CD管理',
     'knowledge-graph': '知识图谱',
-    'unified': '统一管理'
+    'unified': '统一管理',
+    'eval': 'Agent 测评'
   }
   return map[currentModule.value] || ''
 })

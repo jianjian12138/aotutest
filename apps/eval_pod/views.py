@@ -23,7 +23,7 @@ from apps.core_platform.permissions import TenantAwareViewSetMixin
 from apps.tenant_features.models import FeatureCode
 from apps.tenant_features.permissions import HasTenantFeature
 
-from . import graders
+from . import graders, agents
 from .models import EvalDataset, EvalCase, GraderConfig, EvalRun, EvalResult, EvalTrace
 from .serializers import (
     EvalCaseSerializer,
@@ -214,6 +214,51 @@ class EvalDatasetViewSet(_EvalBase, viewsets.ModelViewSet):
             'added': added, 'removed': removed, 'changed': changed, 'unchanged': unchanged,
         }, status=status.HTTP_200_OK)
 
+    @action(detail=True, methods=['post'])
+    def generate_cases(self, request, pk=None):
+        """B1 用例生成 Agent：需求/接口描述 → 稳定中间格式 EvalCase，批量写入本数据集。
+
+        body: {"req_text": "...", "mode": "offline"|"llm" 默认 offline}
+        - offline：零外送、确定性启发式；
+        - llm：调用本租户激活的 AIModelConfig.for_tenant(org) 生成更丰富用例，
+               失败自动降级 offline（数据不出域）。
+        生成后可直接经 EvalRunViewSet.run 复用执行设施（B2）批量评测。
+        """
+        dataset = self.get_object()
+        req_text = (request.data.get('req_text') or '').strip()
+        if not req_text:
+            return Response(
+                {'detail': 'req_text 不能为空'}, status=status.HTTP_400_BAD_REQUEST
+            )
+        mode = request.data.get('mode') or 'offline'
+
+        llm_config = None
+        call_fn = None
+        if mode == 'llm':
+            from apps.requirement_analysis.models import AIModelConfig
+            llm_config = AIModelConfig.for_tenant(dataset.organization)
+            if llm_config:
+                call_fn = agents.default_llm_call
+
+        cases = agents.generate_cases(req_text, mode=mode, llm_config=llm_config, call_fn=call_fn)
+        created = []
+        for c in cases:
+            ec = EvalCase.objects.create(
+                dataset=dataset,
+                code=c.get('code') or None,
+                input_text=c['input_text'],
+                expected=c.get('expected', ''),
+                is_edge=bool(c.get('is_edge', False)),
+                meta=c.get('meta', {}),
+            )
+            created.append(EvalCaseSerializer(ec).data)
+        return Response({
+            'generated_count': len(created),
+            'mode': mode,
+            'llm_used': bool(llm_config),
+            'cases': created,
+        }, status=status.HTTP_201_CREATED)
+
 
 class EvalCaseViewSet(_EvalBase, viewsets.ModelViewSet):
     # 用例经 dataset 归属于租户
@@ -365,6 +410,74 @@ class EvalRunViewSet(_EvalBase, viewsets.ModelViewSet):
             'total_runs': len(runs),
         }, status=status.HTTP_200_OK)
 
+    @action(detail=True, methods=['post'])
+    def set_baseline(self, request, pk=None):
+        """B4 标记当前 run 为其数据集的确定性基线（同 dataset 仅保留一个基线）。
+
+        基线用于后续 compare（B4 劣化定位）与 gate（C1 回归拦截）。
+        仅已完成(DONE)的运行可设为基线。
+        """
+        run = self.get_object()
+        if run.status != 'DONE':
+            return Response(
+                {'detail': '仅已完成(DONE)的运行可设为基线'}, status=status.HTTP_400_BAD_REQUEST
+            )
+        EvalRun.objects.filter(dataset=run.dataset, is_baseline=True).update(is_baseline=False)
+        run.is_baseline = True
+        run.save()
+        return Response(self.get_serializer(run).data, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['get'])
+    def compare(self, request, pk=None):
+        """B4 当前 run 与基线 run 对比（同 dataset 的 is_baseline 运行）。
+
+        query: ?regress_delta=0.05
+        返回各指标 current/baseline/delta 与是否 regressed。
+        """
+        run = self.get_object()
+        baseline = EvalRun.objects.filter(dataset=run.dataset, is_baseline=True).first()
+        if not baseline:
+            return Response(
+                {'detail': '该数据集尚未设置基线运行'}, status=status.HTTP_404_NOT_FOUND
+            )
+        regress_delta = float(request.query_params.get('regress_delta', 0.05))
+        result = agents.compare_to_baseline(run, baseline, regress_delta=regress_delta)
+        return Response({
+            'current_run': run.id,
+            'baseline_run': baseline.id,
+            'baseline_mean_score': baseline.mean_score,
+            **result,
+        }, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['get'])
+    def analyze(self, request, pk=None):
+        """B3 分析 Agent：跨用例模式识别（系统性失败定位），复用已有评分结果。
+
+        返回 total 与 patterns（按 judge 类型归类的失败率 ≥0.5 的系统性风险）。
+        """
+        run = self.get_object()
+        return Response(agents.analyze_run(run), status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'])
+    def gate(self, request, pk=None):
+        """C1 质量门禁：阈值 + 回归拦截，指出掉哪个指标（复用基线对比）。
+
+        body: {"thresholds": {"mean_score": 0.7, "pass_rate": 0.8},
+               "regress_delta": 0.05}
+        基线自动取同 dataset 的 is_baseline 运行（若有）。返回 passed / 掉点明细。
+        供 CI（C3 eval-gate.yml）调用做合并门禁。
+        """
+        run = self.get_object()
+        thresholds = request.data.get('thresholds') or {}
+        regress_delta = float(request.data.get('regress_delta', 0.05))
+        baseline = EvalRun.objects.filter(dataset=run.dataset, is_baseline=True).first()
+        result = agents.eval_gate(run, thresholds, baseline_run=baseline, regress_delta=regress_delta)
+        return Response({
+            'run': run.id,
+            'baseline_run': baseline.id if baseline else None,
+            **result,
+        }, status=status.HTTP_200_OK)
+
 
 class EvalTraceViewSet(_EvalBase, viewsets.ModelViewSet):
     """M4：步骤级 Trace 的存储与回放检索。
@@ -389,3 +502,44 @@ class EvalTraceViewSet(_EvalBase, viewsets.ModelViewSet):
         if case:
             qs = qs.filter(case_id=case)
         return qs
+
+    @action(detail=False, methods=['get'])
+    def export(self, request):
+        """C2 Trace 可观测导出：Langfuse / OTel 风格 JSON。
+
+        query: ?run=<id>&case=<id>（可选，复用 get_queryset 过滤）。
+        对齐 Langfuse ingestion 形态（trace + observations），便于导入外部可观测平台
+        或本地回放（前端按 step 顺序渲染规划/工具/观察/输出）。
+        租户隔离经 get_queryset 的 Org 过滤（非本租户 trace 不出现）。
+        """
+        traces = self.get_queryset()
+        out = []
+        for t in traces:
+            out.append({
+                'id': f'trace-{t.id}',
+                'name': f'eval-run-{t.run_id}',
+                'metadata': {
+                    'run': t.run_id,
+                    'case': t.case_id,
+                    'dataset': t.run.dataset_id,
+                    'status': t.status,
+                    'total_latency_ms': t.total_latency_ms,
+                },
+                'timestamp': t.created_at.isoformat() if t.created_at else None,
+                'observations': [
+                    {
+                        'id': f'step-{s.id}',
+                        'type': s.step_type.lower(),
+                        'name': s.name,
+                        'input': s.input_data,
+                        'output': s.output_data,
+                        'metadata': {'latency_ms': s.latency_ms, 'error': s.error or None},
+                    }
+                    for s in t.steps.all()
+                ],
+            })
+        return Response({
+            'format': 'langfuse-otel-compatible',
+            'trace_count': len(out),
+            'traces': out,
+        }, status=status.HTTP_200_OK)

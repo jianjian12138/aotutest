@@ -62,11 +62,11 @@ class EvalRunSerializer(serializers.ModelSerializer):
         model = EvalRun
         fields = (
             'id', 'organization', 'dataset', 'grader', 'model_config',
-            'model_config_name', 'status',
+            'model_config_name', 'status', 'is_baseline',
             'mean_score', 'pass_rate', 'edge_pass_rate', 'created_at', 'created_by',
         )
         read_only_fields = (
-            'id', 'organization', 'status', 'mean_score', 'pass_rate',
+            'id', 'organization', 'status', 'is_baseline', 'mean_score', 'pass_rate',
             'edge_pass_rate', 'created_at', 'created_by',
         )
 

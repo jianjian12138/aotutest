@@ -1,0 +1,52 @@
+name: Eval Gate (Agent 测评 / LLM 测试舱)
+
+# 路线三 · Phase C · C1 质量门禁进 CI
+# 在升级分支 agent-eval-v2 上每次 push / 对其发起的 PR 运行评测舱质量门禁：
+#   - 语法编译 + flake8
+#   - 评测舱 Django 测试套件（含 B1 生成 / B3 分析 / B4 基线 / C1 门禁 / C2 导出 / A2-A4 既有能力）
+#   任一用例失败即阻断合并，等价于把「阈值 + 回归拦截」落到流水线。
+#
+# 注：本项目 .gitignore 忽略 apps/*/migrations/*（迁移本地生成、不入库，见 docs 约定），
+# 故此处用 `makemigrations`（不带 --check）在 CI 内生成迁移以构建测试库，而非 makemigrations --check。
+on:
+  push:
+    branches: [agent-eval-v2]
+  pull_request:
+    branches: [agent-eval-v2]
+
+jobs:
+  eval-gate:
+    runs-on: ubuntu-latest
+    env:
+      SECRET_KEY: ci-test-secret-key
+      DEBUG: "True"
+      FIELD_ENCRYPTION_KEY: ci-test-encryption-key-0123456789abcdef
+      DJANGO_SETTINGS_MODULE: backend.settings
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y libpq-dev gcc
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-django flake8
+
+      - name: Compile check (syntax)
+        run: python -m compileall -q backend apps
+
+      - name: Lint (flake8)
+        run: flake8 apps/eval_pod --count --max-line-length=120 --exclude=*/migrations/*
+
+      - name: Generate migrations locally (gitignored convention)
+        run: python manage.py makemigrations
+
+      - name: Eval quality gate — run eval_pod test suite (C1 阈值 + 回归拦截)
+        run: python manage.py test apps.eval_pod -v 2

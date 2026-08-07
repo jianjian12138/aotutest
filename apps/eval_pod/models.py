@@ -151,6 +151,10 @@ class EvalRun(models.Model):
                   '用于跨数据集模型榜单 / 溯源。为 None 表示离线启发式降级（零外送）',
     )
     status = models.CharField(max_length=20, choices=STATUS, default='PENDING')
+    is_baseline = models.BooleanField(
+        default=False, db_index=True,
+        help_text='是否为所属数据集的确定性基线运行（Phase B·B4 基线对比用）',
+    )
     mean_score = models.FloatField(null=True, blank=True)
     pass_rate = models.FloatField(null=True, blank=True)
     edge_pass_rate = models.FloatField(null=True, blank=True)

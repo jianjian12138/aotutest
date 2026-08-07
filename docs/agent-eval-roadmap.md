@@ -174,17 +174,17 @@
 | Phase 2 · M4 | **Trace 步骤级观测** | ✅ **已落地** | `EvalTrace` + `EvalTraceStep`（规划/工具/观察/输出/错误步骤，按 step_index 回放）；`/api/eval/traces/` 存储+检索；失败归因基座（区分「规划弱」vs「工具错」）；租户隔离经 `run__organization` + 越权创建拦截 |
 | Phase 2 · M3+ | **红队/安全扫描（REDTEAM）** | ✅ **已落地** | `GraderConfig.grader_type=REDTEAM` + `graders.redteam_grade`：离线启发式扫描 **PII 泄漏 / 越狱-注入企图 / 毒性内容**（零外送），可选 LLM 升级；命中即不通过、默认 PENDING 待复核（对齐 Opik Guardrails + promptfoo/Giskard + Inspect AI elicitation） |
 | Phase 2 · M5 | **报告看板（后端聚合）** | ✅ **后端已落地** | `EvalDatasetViewSet.report`：数据集下运行趋势（按时间升序）+ 聚合概览（latest/best/worst/avg）+ 各评分器维度汇总（grader_breakdown）；前端看板（Vue）待接入 |
-| Phase 2 · M5 | 报告看板 | ⬜ 待建 | 评测报告 / 分数趋势 / 质量门禁阈值 |
-| Phase 3 | 智能体自动化辅舱 | ⬜ 待建 | agent 生成用例 + 复用执行设施 + 确定性基线 |
-| Phase 4 | 门禁 + 可观测进 CI | ⬜ 待建 | 扩展 `ci.yml` 加 eval 维度门禁；Langfuse/OTel 接 Trace |
+| Phase A · **A1** | 报告看板（Vue 前端） | ✅ **已落地** | `frontend/src/views/eval/EvalDashboard.vue` + `src/api/eval.js` + 路由 `/eval` + 侧边菜单「Agent 测评」：报告概览 + 全局榜单(A4) + B1 生成 + A3 Diff + 运行详情抽屉(B4 基线/对比·B3 分析·C1 门禁·C2 导出) |
+| Phase 3 · B1/B4/B3 | 智能体自动化辅舱 | ✅ **已落地** | `agents.generate_cases`(B1 生成，离线+LLM 升级+降级) / `set_baseline`+`compare`(B4 基线) / `analyze`(B3 分析)；生成用例经 `run` 复用执行设施（B2） |
+| Phase 4 · C1/C2/C3 | 门禁 + 可观测进 CI | ✅ **已落地** | `agents.eval_gate`(C1 阈值+回归拦截) / `EvalTraceViewSet.export`(C2 Langfuse/OTel 导出) / `.github/workflows/eval-gate.yml`(C3 CI 门禁) |
 | 横切·安全 | 租户自有模型配置（**A2**） | ✅ **已落地** | 给 `AIModelConfig` 加 `organization` 字段 + `for_tenant()` 取数；评测舱 LLM 裁判只取本租户激活配置，平台级配置不被取用，无自有模型租户确定性降级（零外域） |
 | Phase A · **A4** | 全局/跨数据集榜单（leaderboard） | ✅ **已落地** | `EvalRunViewSet.leaderboard`：模型排名（按 `model_config.model_name`）+ 数据集排名，复用 report 聚合，严格按租户隔离；`EvalRun.model_config` 溯源字段支撑跨模型比较 |
 | Phase A · **A3** | 数据集版本化 + Diff | ✅ **已落地** | `EvalCase.code` 业务键 + `EvalDatasetViewSet.clone_version`（v1→v2 自动 bump，复制用例保留 code）+ `EvalDatasetViewSet.diff`（按 code 对应返回 added/removed/changed/unchanged + 字段级差异）；历史数据无 code 时回退 `case-<id>`；严格租户隔离（对齐 Langfuse datasets / One-Eval DataFlow） |
 
 **本批次质量验证**：
-- `apps.eval_pod` 回归测试 **34 tests OK**（在 29 项基础上新增：A3 数据集版本化+Diff 5 项[clone 复制用例并自动 bump / 重复版本 400 / diff added-removed-changed-unchanged / 无 code 回退 case-<id> / 跨租户 diff 404]）。
-- `manage.py check` 无问题；Phase 0 基座稳固。
-- 本批次交付：Phase A·**A2 租户自有模型（数据不出域）** + **A3 数据集版本化 + Diff** + **A4 全局/跨数据集榜单**；含 `AIModelConfig.organization`、`EvalRun.model_config`、`EvalCase.code` 迁移（本地生成不入库）。
+- `apps.eval_pod` 回归测试 **45 tests OK**（在 34 项基础上新增 11 项：B1 离线生成 / B1 LLM 升级（注入 call_fn）/ B1 LLM 失败降级离线 / B4 设基线+对比劣化 / B4 无基线 404 / B3 分析系统性失败 / C1 阈值未达 / C1 回归拦截 / C1 通过 / C2 Trace 导出（Langfuse/OTel 风格）/ C2 导出租户隔离）。
+- `manage.py check` 无问题；Phase B/C/A1 全链路落地。
+- 本批次交付：Phase B（B1 用例生成 / B3 分析 / B4 确定性基线 + B2 复用执行设施）+ Phase C（C1 质量门禁 / C2 Trace 导出 / C3 CI 门禁工作流）+ Phase A·**A1 Vue 前端看板**；含 `EvalRun.is_baseline`、`EvalCase.code` 迁移（本地生成不入库）。
 - 说明：`apps/requirement_analysis` 自带 4 项测试存在 `core_projects.owner_id` 缺失的历史失败，与本次改动无关（未触碰 Project 模型），不阻塞本次交付。
 
 **工程约定提醒（重要）**：本项目 `.gitignore` 忽略所有 `apps/*/migrations/*`，迁移**本地生成、不入库**（`makemigrations` 后由 syncdb/本地迁移建表）。因此：
@@ -219,11 +219,11 @@
 | Phase A · **A3** | 数据集版本化 + Diff | promptfoo/DeepEval/One-Eval | ✅ 已落地 |
 | Phase 2 · M3+ | **指标库扩充**（faithfulness/relevancy/bias/toxicity/tool_correctness/plan_adherence，全 offline 降级）+ **强制 reason** | DeepEval / Giskard | ✅ 已落地 |
 | Phase 2 · M3+ | **人机协同复核门**（review_status + reviewer，阻断误报） | One-Eval / Giskard | ✅ 已落地 |
-| Phase 2 · M4 | Trace 模型（步骤级观测/回放，Django+Postgres） | Langfuse / One-Eval | ✅ 后端已落地（回放 UI 待前端） |
-| Phase 2 · M5 | 多维报告 / 模型排名 / 趋势 | One-Eval / Langfuse | ✅ 后端已落地（前端看板待 Vue 接入） |
+| Phase 2 · M4 | Trace 模型（步骤级观测/回放，Django+Postgres） | Langfuse / One-Eval | ✅ 已落地（回放 UI 经 A1 看板 + C2 导出） |
+| Phase 2 · M5 | 多维报告 / 模型排名 / 趋势 | One-Eval / Langfuse | ✅ 已落地（含 A1 Vue 前端看板） |
 | Phase 2 · 安全 | 红队评测类型（kind=REDTEAM，越狱/泄漏扫描） | promptfoo / Giskard | ✅ 已落地（offline 启发式优先，可选 LLM 升级） |
-| Phase 3 | 多 Agent 编排（生成/执行/分析 拆分，按文章四步法渐进） | 公众号文章 | ⬜ 待建 |
-| Phase 4 | CI 质量门禁（分数阈值 + 回归拦截 + 安全 PR 审查） | promptfoo / DeepEval | ⬜ 待建 |
+| Phase 3 | 多 Agent 编排（生成/执行/分析 拆分，按文章四步法渐进） | 公众号文章 | ✅ 已落地（B1 生成 / B4 基线 / B3 分析 / B2 复用执行设施） |
+| Phase 4 | CI 质量门禁（分数阈值 + 回归拦截 + 安全 PR 审查） | promptfoo / DeepEval | ✅ 已落地（C1 门禁 / C2 导出 / C3 `eval-gate.yml`） |
 | 横切 | `AIModelConfig` 加 `organization`（租户自有模型，彻底隔离出域） | — | ✅ 已落地（见 A2） |
 
 **设计原则（写入 Phase 3）**：① 分工提升专注度（文章）；② 中间格式（`EvalCase` schema）必须稳定；③ 错误传播防护 = 分析端合理性校验 + 人机复核门；④ 所有 LLM 指标必须有 offline/HEURISTIC 降级，保证未订阅租户零出域。

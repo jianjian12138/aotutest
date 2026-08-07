@@ -236,6 +236,19 @@ const routes = [
 
     ]
   },
+  // Agent 测评 · LLM 测试舱（评测舱前端，路线三 Phase A·A1）
+  {
+    path: '/eval',
+    component: Layout,
+    meta: { requiresAuth: true },
+    children: [
+      {
+        path: '',
+        name: 'EvalDashboard',
+        component: () => import('@/views/eval/EvalDashboard.vue')
+      }
+    ]
+  },
   {
     path: '/ui-automation',
     component: Layout,

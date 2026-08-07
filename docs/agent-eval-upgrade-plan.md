@@ -100,18 +100,18 @@
 - **A4. 全局 / 跨数据集榜单**：模型排名、维度对比（复用 report 聚合）。
   - *验收*：多数据集横向可比。
 
-### Phase B —— 智能体自动化辅舱（2–3 周）
-- **B1. 用例生成 Agent**：需求 / API 文档 → 结构化 `EvalCase` JSON（稳定中间格式）。
-- **B2. 复用 aotutest 执行设施**（UiDevice / 执行器）跑生成用例。
-- **B3. 分析 Agent**：机械断言 + LLM-Judge + 跨用例模式识别，接 HITL。
-- **B4. 保留确定性基线**：agent 负责生成 / 探索，传统脚本作回归基线。
-  - *验收*：一条「需求 → 生成 → 执行 → 报告」端到端链路跑通。
+### Phase B —— 智能体自动化辅舱（2–3 周）　✅ 已全部落地（见 roadmap §11）
+- **B1. 用例生成 Agent**：需求 / API 文档 → 结构化 `EvalCase` JSON（稳定中间格式）。→ `apps/eval_pod/agents.py:generate_cases` + `EvalDatasetViewSet.generate_cases`（离线启发式零外送 + 可选 LLM 升级，失败确定性降级）。
+- **B2. 复用 aotutest 执行设施**（UiDevice / 执行器）跑生成用例。→ 生成用例写入数据集后直接经 `EvalRunViewSet.run` 复用既有评分/执行设施批量评测。
+- **B3. 分析 Agent**：机械断言 + LLM-Judge + 跨用例模式识别，接 HITL。→ `agents.analyze_run` + `EvalRunViewSet.analyze`。
+- **B4. 保留确定性基线**：agent 负责生成 / 探索，传统脚本作回归基线。→ `EvalRun.is_baseline` + `set_baseline`/`compare` + `agents.compare_to_baseline`。
+  - *验收*：一条「需求 → 生成 → 执行 → 报告」端到端链路跑通（45 tests 覆盖）。
 
-### Phase C —— 质量门禁 + 可观测进 CI（1–2 周）
-- **C1. CI 质量门禁**：分数阈值 + 回归拦截（复用 report 接口，劣化即红）。
-- **C2. Trace 可观测接入**：OTel / Langfuse 风格，M4 已奠基。
-- **C3. 评测纳入安全审计基线**。
-  - *验收*：提交一个故意劣化的 Prompt / 评测，CI 自动拦截并指出掉哪个指标。
+### Phase C —— 质量门禁 + 可观测进 CI（1–2 周）　✅ 已全部落地
+- **C1. CI 质量门禁**：分数阈值 + 回归拦截（复用 report 接口，劣化即红）。→ `agents.eval_gate`（failed_thresholds + regressed_metrics 精确指出掉点指标）+ `EvalRunViewSet.gate`。
+- **C2. Trace 可观测接入**：OTel / Langfuse 风格，M4 已奠基。→ `EvalTraceViewSet.export`（Langfuse/OTel 风格 JSON，含 trace + observations）。
+- **C3. 评测纳入安全审计基线**。→ `.github/workflows/eval-gate.yml`：push/PR 到 `agent-eval-v2` 跑评测舱测试套件（含 C1 阈值+回归拦截），任一失败阻断合并。
+  - *验收*：提交一个故意劣化的 Prompt / 评测，CI 自动拦截并指出掉哪个指标（C1 gate 测试覆盖阈值与回归两种拦截）。
 
 ---
 

@@ -675,3 +675,239 @@ class DatasetVersioningTest(TestCase):
         target = EvalDataset.objects.get(name='ds-x', version='v2', organization=self.org_a)
         r = self.client_b.get(f'/api/eval/datasets/diff/?base={ds.id}&target={target.id}')
         self.assertEqual(r.status_code, 404)
+
+
+# ============================================================
+# G. Phase B 智能体辅舱（B1 生成 / B3 分析 / B4 基线）+ Phase C 门禁（C1/C2）
+# ============================================================
+import json as _json  # noqa: E402  (置于文件末尾分组，保持既有 import 顺序)
+import uuid  # noqa: E402
+
+from . import agents  # noqa: E402
+
+
+class PhaseBCTest(TestCase):
+    """验证 B1 生成 Agent（零外送 + LLM 升级 + 降级）、B3 分析、B4 基线、C1 门禁、C2 导出。"""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.org_a = Organization.objects.create(name='甲方A', code='org-a')
+        cls.user_a = User.objects.create_user('ua', password='x')
+        cls.user_a.organization = cls.org_a
+        cls.user_a.save()
+        TenantFeature.objects.create(
+            tenant=cls.org_a, feature_code=FeatureCode.AGENT_EVAL, enabled=True
+        )
+        cls.client_a = APIClient()
+        cls.client_a.force_authenticate(cls.user_a)
+        # 甲方A 拥有自有模型配置 → 走 LLM 升级路径
+        cls.cfg_a = AIModelConfig.objects.create(
+            organization=cls.org_a, name='ma', model_type='deepseek', role='reviewer',
+            api_key='k', base_url='https://api.a.example', model_name='deepseek-chat',
+            is_active=True, created_by=cls.user_a,
+        )
+
+    def _make_run(self, ds, status='DONE', **metrics):
+        # 每次使用唯一 grader 名，避免 (organization, name) 唯一约束冲突
+        grader = GraderConfig.objects.create(
+            organization=self.org_a, name=f'g-bc-{uuid.uuid4().hex[:8]}',
+            grader_type='RULE', rubric={'mode': 'contains'}
+        )
+        return EvalRun.objects.create(
+            organization=self.org_a, dataset=ds, grader=grader, status=status, **metrics
+        )
+
+    def test_b1_generate_cases_offline(self):
+        """B1 离线生成：零外送、确定性（同输入多次结果 code 稳定），写库后可被 run 复用(B2)。"""
+        ds = EvalDataset.objects.create(organization=self.org_a, name='ds-b1', version='v1')
+        resp = self.client_a.post(
+            f'/api/eval/datasets/{ds.id}/generate_cases/',
+            {'req_text': '输入：问天气\n期望：返回晴\n输入：攻击越权\n期望：拒绝', 'mode': 'offline'},
+            format='json',
+        )
+        self.assertEqual(resp.status_code, 201, resp.content)
+        payload = resp.data['data']
+        self.assertGreater(payload['generated_count'], 0)
+        self.assertFalse(payload['llm_used'])
+        codes = {c['code'] for c in payload['cases']}
+        self.assertEqual(len(codes), len(payload['cases']))  # hash 派生 code 唯一
+        # 边界用例识别：含"攻击/越权"的条目应被标记 is_edge
+        self.assertTrue(any(c['is_edge'] for c in payload['cases']))
+        # 生成的用例已落库，可直接经 run 评测（B2 执行设施复用）
+        self.assertEqual(EvalCase.objects.filter(dataset=ds).count(), payload['generated_count'])
+
+    def test_b1_generate_cases_llm_upgrade(self):
+        """B1 LLM 升级：有租户模型时调用生成更丰富用例（注入 call_fn 避免触达真实端点）。"""
+        ds = EvalDataset.objects.create(organization=self.org_a, name='ds-b1llm', version='v1')
+        llm_out = [
+            {'input_text': 'q1', 'expected': 'a1', 'is_edge': True},
+            {'input_text': 'q2', 'expected': 'a2', 'is_edge': False},
+        ]
+
+        def fake_llm_call(config, messages):
+            return {'choices': [{'message': {'content': _json.dumps(llm_out)}}]}
+
+        with patch('apps.eval_pod.agents.default_llm_call', fake_llm_call):
+            resp = self.client_a.post(
+                f'/api/eval/datasets/{ds.id}/generate_cases/',
+                {'req_text': 'anything', 'mode': 'llm'}, format='json',
+            )
+        self.assertEqual(resp.status_code, 201, resp.content)
+        payload = resp.data['data']
+        self.assertTrue(payload['llm_used'])
+        self.assertEqual(payload['generated_count'], 2)
+        self.assertTrue(payload['cases'][0]['is_edge'])
+
+    def test_b1_llm_failure_degrades_offline(self):
+        """B1 LLM 调用失败 → 确定性降级离线（数据不出域），仍返回用例。"""
+
+        def boom(config, messages):
+            raise RuntimeError('LLM down')
+
+        ds = EvalDataset.objects.create(organization=self.org_a, name='ds-b1deg', version='v1')
+        with patch('apps.eval_pod.agents.default_llm_call', side_effect=boom) as mock_call:
+            resp = self.client_a.post(
+                f'/api/eval/datasets/{ds.id}/generate_cases/',
+                {'req_text': '输入：q\n期望：a', 'mode': 'llm'}, format='json',
+            )
+        self.assertEqual(resp.status_code, 201, resp.content)
+        # 已尝试走 LLM 升级路径（mock 被调用），但失败 → 降级离线仍产出用例
+        self.assertTrue(mock_call.called)
+        self.assertGreater(resp.data['data']['generated_count'], 0)
+        # 生成的用例落库、可继续评测（零外送：失败也未将请求送出域）
+        self.assertEqual(EvalCase.objects.filter(dataset=ds).count(), resp.data['data']['generated_count'])
+
+    def test_b4_set_baseline_and_compare(self):
+        """B4 设基线 + 对比：当前 run 相对基线劣化时正确标记 regressed 并给出 delta。"""
+        ds = EvalDataset.objects.create(organization=self.org_a, name='ds-b4', version='v1')
+        EvalCase.objects.create(dataset=ds, input_text='q', expected='ok')
+        baseline = self._make_run(ds, mean_score=0.9, pass_rate=1.0, edge_pass_rate=None)
+        run = self._make_run(ds, mean_score=0.6, pass_rate=0.5, edge_pass_rate=None)
+
+        r = self.client_a.post(f'/api/eval/runs/{baseline.id}/set_baseline/')
+        self.assertEqual(r.status_code, 200, r.content)
+        baseline.refresh_from_db()
+        self.assertTrue(baseline.is_baseline)
+
+        c = self.client_a.get(f'/api/eval/runs/{run.id}/compare/')
+        self.assertEqual(c.status_code, 200, c.content)
+        payload = c.data['data']
+        self.assertTrue(payload['regressed'])
+        self.assertIn('mean_score', payload['diffs'])
+        self.assertLess(payload['diffs']['mean_score']['delta'], 0)
+
+    def test_b4_compare_no_baseline_404(self):
+        """未设基线时 compare → 404。"""
+        ds = EvalDataset.objects.create(organization=self.org_a, name='ds-b4nb', version='v1')
+        run = self._make_run(ds, mean_score=0.5)
+        resp = self.client_a.get(f'/api/eval/runs/{run.id}/compare/')
+        self.assertEqual(resp.status_code, 404)
+
+    def test_b3_analyze_pattern(self):
+        """B3 分析 Agent：同一 judge 类型失败率 ≥0.5 → 标记系统性失败模式。"""
+        ds = EvalDataset.objects.create(organization=self.org_a, name='ds-b3', version='v1')
+        c1 = EvalCase.objects.create(dataset=ds, input_text='q', expected='ok')
+        c2 = EvalCase.objects.create(dataset=ds, input_text='q2', expected='ok')
+        grader = GraderConfig.objects.create(
+            organization=self.org_a, name='g-b3', grader_type='RULE', rubric={'mode': 'contains'}
+        )
+        run = EvalRun.objects.create(organization=self.org_a, dataset=ds, grader=grader, status='DONE')
+        EvalResult.objects.create(run=run, case=c1, score=0.0, passed=False, judge='HEURISTIC', reason='x')
+        EvalResult.objects.create(run=run, case=c2, score=0.0, passed=False, judge='HEURISTIC', reason='x')
+        resp = self.client_a.get(f'/api/eval/runs/{run.id}/analyze/')
+        self.assertEqual(resp.status_code, 200, resp.content)
+        payload = resp.data['data']
+        self.assertEqual(payload['total'], 2)
+        self.assertTrue(
+            any(p['judge'] == 'HEURISTIC' and p['fail_rate'] >= 0.5 for p in payload['patterns'])
+        )
+
+    def test_c1_gate_threshold_fail(self):
+        """C1 门禁：分数低于阈值 → 不通过，并指出掉哪个指标。"""
+        ds = EvalDataset.objects.create(organization=self.org_a, name='ds-c1', version='v1')
+        EvalCase.objects.create(dataset=ds, input_text='q', expected='ok')
+        run = self._make_run(ds, mean_score=0.5, pass_rate=0.5)
+        resp = self.client_a.post(
+            f'/api/eval/runs/{run.id}/gate/',
+            {'thresholds': {'mean_score': 0.8, 'pass_rate': 0.8}}, format='json',
+        )
+        self.assertEqual(resp.status_code, 200, resp.content)
+        payload = resp.data['data']
+        self.assertFalse(payload['passed'])
+        self.assertTrue(any(f['metric'] == 'mean_score' for f in payload['failed_thresholds']))
+
+    def test_c1_gate_regression_block(self):
+        """C1 门禁：相对基线回归 → 不通过，regressed_metrics 指出掉点指标。"""
+        ds = EvalDataset.objects.create(organization=self.org_a, name='ds-c1r', version='v1')
+        EvalCase.objects.create(dataset=ds, input_text='q', expected='ok')
+        baseline = self._make_run(ds, mean_score=0.9, pass_rate=0.9)
+        run = self._make_run(ds, mean_score=0.7, pass_rate=0.7)
+        self.client_a.post(f'/api/eval/runs/{baseline.id}/set_baseline/')
+        resp = self.client_a.post(
+            f'/api/eval/runs/{run.id}/gate/',
+            {'thresholds': {}, 'regress_delta': 0.05}, format='json',
+        )
+        self.assertEqual(resp.status_code, 200, resp.content)
+        payload = resp.data['data']
+        self.assertFalse(payload['passed'])
+        self.assertTrue(payload['regressed_metrics'])  # 精确指出掉点指标
+
+    def test_c1_gate_pass(self):
+        """C1 门禁：达阈值且无回归 → 通过。"""
+        ds = EvalDataset.objects.create(organization=self.org_a, name='ds-c1p', version='v1')
+        EvalCase.objects.create(dataset=ds, input_text='q', expected='ok')
+        run = self._make_run(ds, mean_score=0.95, pass_rate=0.95)
+        resp = self.client_a.post(
+            f'/api/eval/runs/{run.id}/gate/',
+            {'thresholds': {'mean_score': 0.8, 'pass_rate': 0.8}}, format='json',
+        )
+        payload = resp.data['data']
+        self.assertTrue(payload['passed'])
+        self.assertEqual(payload['failed_thresholds'], [])
+        self.assertEqual(payload['regressed_metrics'], [])
+
+    def test_c2_trace_export(self):
+        """C2 Trace 导出：Langfuse/OTel 风格 JSON，步骤类型小写、按索引顺序、含 metadata。"""
+        ds = EvalDataset.objects.create(organization=self.org_a, name='ds-c2', version='v1')
+        c1 = EvalCase.objects.create(dataset=ds, input_text='q', expected='ok')
+        grader = GraderConfig.objects.create(
+            organization=self.org_a, name='g-c2', grader_type='RULE', rubric={'mode': 'contains'}
+        )
+        run = EvalRun.objects.create(organization=self.org_a, dataset=ds, grader=grader)
+        trace = EvalTrace.objects.create(run=run, case=c1, status='OK', total_latency_ms=100)
+        EvalTraceStep.objects.create(trace=trace, step_index=0, step_type='PLAN', name='plan', input_data={'g': 'q'})
+        EvalTraceStep.objects.create(trace=trace, step_index=1, step_type='OUTPUT', name='out', output_data={'text': 'ok'})
+
+        resp = self.client_a.get(f'/api/eval/traces/export/?run={run.id}')
+        self.assertEqual(resp.status_code, 200, resp.content)
+        payload = resp.data['data']
+        self.assertEqual(payload['format'], 'langfuse-otel-compatible')
+        self.assertEqual(payload['trace_count'], 1)
+        tr = payload['traces'][0]
+        self.assertEqual(tr['observations'][0]['type'], 'plan')
+        self.assertEqual(tr['observations'][1]['type'], 'output')
+        self.assertEqual(tr['metadata']['run'], run.id)
+        self.assertEqual(tr['metadata']['dataset'], ds.id)
+
+    def test_c2_trace_export_tenant_isolation(self):
+        """C2 导出：他租户 run 的 trace 不出现（经 Org 过滤）。"""
+        org_b = Organization.objects.create(name='甲方B', code='org-b')
+        user_b = User.objects.create_user('ub2', password='x')
+        user_b.organization = org_b
+        user_b.save()
+        TenantFeature.objects.create(tenant=org_b, feature_code=FeatureCode.AGENT_EVAL, enabled=True)
+        client_b = APIClient()
+        client_b.force_authenticate(user_b)
+
+        ds = EvalDataset.objects.create(organization=self.org_a, name='ds-c2iso', version='v1')
+        c1 = EvalCase.objects.create(dataset=ds, input_text='q', expected='ok')
+        grader = GraderConfig.objects.create(
+            organization=self.org_a, name='g-c2iso', grader_type='RULE', rubric={'mode': 'contains'}
+        )
+        run = EvalRun.objects.create(organization=self.org_a, dataset=ds, grader=grader)
+        EvalTrace.objects.create(run=run, case=c1, status='OK')
+
+        # 乙方（无该 run 的租户权限）导出应得到 0 条 trace
+        resp = client_b.get(f'/api/eval/traces/export/?run={run.id}')
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.data['data']['trace_count'], 0)
