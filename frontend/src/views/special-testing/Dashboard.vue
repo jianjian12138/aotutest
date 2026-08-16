@@ -2,6 +2,7 @@
   <BasePage title="数据看板">
     
     
+    <template v-if="!notImplemented">
     <el-row :gutter="20">
       <el-col :span="6" v-for="card in cards" :key="card.title">
         <el-card shadow="hover" class="dashboard-card" @click="router.push(card.path)">
@@ -33,6 +34,14 @@
       </el-table-column>
       <el-table-column prop="created_at" label="创建时间" />
     </el-table>
+    </template>
+
+    <NotImplementedPlaceholder
+      v-else
+      module-name="专项测试"
+      :message="niMessage"
+      :planned="niPlanned"
+    />
 
   </BasePage>
 </template>
@@ -41,10 +50,14 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import request from '@/utils/request'
 import { Connection, Cellphone, DataLine, Files } from '@element-plus/icons-vue'
+import NotImplementedPlaceholder from '@/components/NotImplementedPlaceholder.vue'
 
 const router = useRouter()
 const recentTasks = ref([])
 const loading = ref(false)
+const notImplemented = ref(false)
+const niMessage = ref('')
+const niPlanned = ref([])
 
 const cards = [
   { title: 'MQTT 测试', desc: 'IoT 设备通信测试', icon: Connection, iconClass: 'icon-mqtt', path: '/special-testing/mqtt' },
@@ -57,7 +70,18 @@ const fetchRecent = async () => {
   loading.value = true
   try {
     const res = await request.get('/special-testing/tasks/')
-    recentTasks.value = (res.data.results || res.data).slice(0, 5)
+    const data = res.data || {}
+    if (data.status === 'not_implemented') {
+      notImplemented.value = true
+      niMessage.value = data.message || ''
+      niPlanned.value = data.planned || []
+      return
+    }
+    recentTasks.value = (data.results || data).slice(0, 5)
+  } catch (e) {
+    // 兜底：即便接口异常也不弹「服务器错误」，直接展示规划占位
+    notImplemented.value = true
+    niPlanned.value = cards.map((c) => ({ name: c.title, desc: c.desc }))
   } finally {
     loading.value = false
   }

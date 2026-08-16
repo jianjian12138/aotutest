@@ -5,6 +5,7 @@ import { useUserStore } from '@/stores/user'
 // 静态导入常用组件来避免动态导入问题
 import Login from '@/views/auth/Login.vue'
 import Register from '@/views/auth/Register.vue'
+import NotImplementedPlaceholder from '@/components/NotImplementedPlaceholder.vue'
 import Layout from '@/layout/index.vue'
 
 // 简单内联错误页组件（避免新增文件，使用渲染函数，无需模板编译器）
@@ -542,22 +543,26 @@ const routes = [
       {
         path: 'mqtt',
         name: 'MqttTest',
-        component: () => import('@/views/special-testing/mqtt/MqttTest.vue')
+        component: NotImplementedPlaceholder,
+        props: { moduleName: 'MQTT 测试', message: 'IoT 设备通信测试（MQTT）能力本期未交付，敬请期待。', planned: [{ key: 'MQTT', name: 'MQTT 测试', desc: 'IoT 设备通信测试' }] }
       },
       {
         path: 'monkey',
         name: 'MonkeyTest',
-        component: () => import('@/views/special-testing/monkey/MonkeyTest.vue')
+        component: NotImplementedPlaceholder,
+        props: { moduleName: 'Monkey 压测', message: 'Android 稳定性压测（Monkey）能力本期未交付，敬请期待。', planned: [{ key: 'MONKEY', name: 'Monkey 压测', desc: 'Android 稳定性测试' }] }
       },
       {
         path: 'redis',
         name: 'RedisTest',
-        component: () => import('@/views/special-testing/middleware/RedisTest.vue')
+        component: NotImplementedPlaceholder,
+        props: { moduleName: 'Redis 工具', message: '缓存读写验证（Redis）能力本期未交付，敬请期待。', planned: [{ key: 'REDIS', name: 'Redis 工具', desc: '缓存读写验证' }] }
       },
       {
         path: 'kafka',
         name: 'KafkaTest',
-        component: () => import('@/views/special-testing/middleware/KafkaTest.vue')
+        component: NotImplementedPlaceholder,
+        props: { moduleName: 'Kafka 工具', message: '消息队列验证（Kafka）能力本期未交付，敬请期待。', planned: [{ key: 'KAFKA', name: 'Kafka 工具', desc: '消息队列验证' }] }
       }
     ]
   },
@@ -733,6 +738,13 @@ router.beforeEach(async (to, from, next) => {
   // 1) requiresAuth 校验
   if (to.meta.requiresAuth && !userStore.isAuthenticated) {
     next('/login')
+    return
+  }
+
+  // 1.5) 超管 / 平台管理员豁免角色校验（与后端 HasRolePermission 对 superuser 放行保持一致，
+  // 避免 is_superuser=true 但 roles:[] 的账号被前端 fail-closed 挡在 /system/*、/configuration/users 之外）
+  if (userStore.user && (userStore.user.is_superuser || userStore.user.is_staff)) {
+    next()
     return
   }
 

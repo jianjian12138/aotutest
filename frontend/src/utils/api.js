@@ -103,6 +103,19 @@ api.interceptors.response.use(
             response.data = resData.data
         }
     }
+    // 友好化：未交付能力返回 200 + {status:'not_implemented'}
+    // 仅对写操作（POST/PUT/DELETE，非 GET 轮询）弹友好提示，避免列表轮询刷屏
+    if (resData && typeof resData === 'object' && resData.status === 'not_implemented') {
+      const method = (response.config?.method || 'get').toLowerCase()
+      if (method !== 'get') {
+        ElMessage({
+          message: resData.message || '该能力本期未交付',
+          type: 'warning',
+          duration: 3500,
+        })
+      }
+      response._notImplemented = true
+    }
     return response
   },
   async (error) => {

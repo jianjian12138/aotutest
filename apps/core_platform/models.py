@@ -47,7 +47,16 @@ class User(AbstractUser):
         related_name="core_user_set",
         related_query_name="core_user",
     )
-    
+    # User <-> Role 多对多：必须在类体内声明，由元类 add_to_class 装上正向描述符，
+    # 否则实例上 roles 会返回字段对象而非管理器（导致序列化 500）。
+    # Role 在下方定义，故用字符串引用延迟解析。
+    roles = models.ManyToManyField(
+        'Role',
+        blank=True,
+        related_name='users',
+        verbose_name='角色',
+    )
+
     class Meta:
         db_table = 'core_users'
         verbose_name = 'User'
@@ -227,12 +236,6 @@ class Role(models.Model):
 
     def permission_codenames(self):
         return set(self.permissions.values_list('codename', flat=True))
-
-
-# User <-> Role 多对多（在 Role 定义之后追加到 User 模型）
-User.roles = models.ManyToManyField(
-    Role, blank=True, related_name='users', verbose_name='角色'
-)
 
 
 # ==========================================

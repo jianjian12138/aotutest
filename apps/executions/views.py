@@ -224,17 +224,22 @@ class K8sRunnerViewSet(viewsets.ViewSet):
     已按整改要求移除；真实 K8s 执行能力本期未交付，统一返回 501）"""
     permission_classes = [permissions.IsAuthenticated]
 
-    NOT_IMPLEMENTED_BODY = {'error': '该能力本期未交付', 'status': 'not_implemented'}
+    NOT_IMPLEMENTED_BODY = {
+        'status': 'not_implemented',
+        'module': 'K8s 执行池',
+        'message': '云原生 K8s 执行能力本期未交付',
+        'planned': ['Kubernetes Pod 编排', '执行日志流式回传', 'Runner 生命周期管理'],
+    }
 
     def list(self, request):
         """获取活跃 Runners 列表（本期未交付）"""
-        return Response(self.NOT_IMPLEMENTED_BODY, status=status.HTTP_501_NOT_IMPLEMENTED)
+        return Response(self.NOT_IMPLEMENTED_BODY, status=status.HTTP_200_OK)
 
     def create(self, request):
         """分发新 Runner（本期未交付）"""
-        return Response(self.NOT_IMPLEMENTED_BODY, status=status.HTTP_501_NOT_IMPLEMENTED)
+        return Response(self.NOT_IMPLEMENTED_BODY, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=['get'])
     def logs(self, request):
         """获取指定 Pod 日志（本期未交付）"""
-        return Response(self.NOT_IMPLEMENTED_BODY, status=status.HTTP_501_NOT_IMPLEMENTED)
+        return Response(self.NOT_IMPLEMENTED_BODY, status=status.HTTP_200_OK)

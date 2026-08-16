@@ -68,6 +68,11 @@ class Command(BaseCommand):
         run.mean_score = summary['mean_score']
         run.pass_rate = summary['pass_rate']
         run.edge_pass_rate = summary['edge_pass_rate']
+        # P3-2：运行级成本/性能聚合
+        run.cost_tokens_total = summary.get('cost_tokens_total')
+        run.cost_calls_total = summary.get('cost_calls_total')
+        run.latency_avg = summary.get('latency_avg')
+        run.latency_max = summary.get('latency_max')
         run.save()
         EvalResult.objects.filter(run=run).delete()
         for r in summary['results']:
@@ -75,6 +80,13 @@ class Command(BaseCommand):
             EvalResult.objects.create(
                 run=run, case=r['case'], score=r['score'], passed=r['passed'],
                 judge=r['judge'], reason=r['reason'], review_status=review_status,
+                faithfulness_score=r.get('faithfulness'),
+                red_flags=r.get('red_flags', []),
+                confidence=r.get('confidence'),
+                cost_tokens=r.get('cost_tokens'),
+                cost_calls=r.get('cost_calls'),
+                latency_first=r.get('latency_first'),
+                latency_total=r.get('latency_total'),
             )
         return summary
 
@@ -115,9 +127,20 @@ class Command(BaseCommand):
             defaults={'grader_type': 'RULE', 'rubric': {'mode': 'contains'}},
         )
 
-        # ③ 评测：基线运行（全部通过）
+        # ③ 评测：基线运行（全部通过，含示例成本/时延指标 P3-2）
         base_run = EvalRun.objects.create(organization=org, dataset=ds, grader=grader)
-        base_outputs = {c.id: (c.expected or 'PASS') for c in cases}
+        base_outputs = {
+            c.id: {
+                'output': c.expected or 'PASS',
+                'metrics': {
+                    'cost_tokens': 120 + i,
+                    'cost_calls': 2,
+                    'latency_first': 0.2,
+                    'latency_total': round(1.0 + i * 0.1, 3),
+                },
+            }
+            for i, c in enumerate(cases)
+        }
         self._grade_and_persist(base_run, base_outputs)
         EvalRun.objects.filter(dataset=ds, is_baseline=True).update(is_baseline=False)
         base_run.is_baseline = True
@@ -126,14 +149,35 @@ class Command(BaseCommand):
             f'[3a] 基线评测完成 mean_score={base_run.mean_score} '
             f'pass_rate={base_run.pass_rate}（已设为数据集确定性基线 B4）'
         )
+        self.stdout.write(
+            f'     成本/时延：tokens={base_run.cost_tokens_total} '
+            f'calls={base_run.cost_calls_total} '
+            f'lat_avg={base_run.latency_avg}s lat_max={base_run.latency_max}s'
+        )
 
-        # ③ 评测：候选运行（全部失败，模拟回归）
+        # ③ 评测：候选运行（全部失败，模拟回归，成本更高如多轮重试 P3-2）
         cand_run = EvalRun.objects.create(organization=org, dataset=ds, grader=grader)
-        cand_outputs = {c.id: '' for c in cases}
+        cand_outputs = {
+            c.id: {
+                'output': '',
+                'metrics': {
+                    'cost_tokens': 300 + i,
+                    'cost_calls': 5,
+                    'latency_first': 0.4,
+                    'latency_total': round(2.5 + i * 0.2, 3),
+                },
+            }
+            for i, c in enumerate(cases)
+        }
         self._grade_and_persist(cand_run, cand_outputs)
         self.stdout.write(
             f'[3b] 候选评测完成 mean_score={cand_run.mean_score} '
             f'pass_rate={cand_run.pass_rate}（模拟质量劣化）'
+        )
+        self.stdout.write(
+            f'     成本/时延：tokens={cand_run.cost_tokens_total} '
+            f'calls={cand_run.cost_calls_total} '
+            f'lat_avg={cand_run.latency_avg}s lat_max={cand_run.latency_max}s'
         )
 
         # ④ 门禁（C1）：阈值 + 回归拦截

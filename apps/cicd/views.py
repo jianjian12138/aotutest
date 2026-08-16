@@ -14,29 +14,42 @@ import requests
 import json
 from django.utils import timezone
 
-NOT_IMPLEMENTED_BODY = {'error': '该能力本期未交付', 'status': 'not_implemented'}
+NOT_IMPLEMENTED_BODY = {
+    'status': 'not_implemented',
+    'message': 'CI/CD 流水线编排与触发能力本期未交付，敬请期待。',
+    'planned': [
+        {'key': 'PIPELINE', 'name': '流水线管理', 'desc': 'Pipeline 编排与触发'},
+        {'key': 'BUILD', 'name': '构建记录', 'desc': '构建历史与产物'},
+        {'key': 'STAGE', 'name': '阶段编排', 'desc': '原生流水线阶段管理'},
+    ],
+    'eta': '规划中',
+}
 
 
 class PipelineViewSet(viewsets.ViewSet):
-    """Pipeline 视图集（真实执行能力本期未交付，统一返回 501）"""
+    """Pipeline 视图集（真实执行能力本期未交付）。
+
+    返回 200 + 结构化 not_implemented 负载（含 planned 规划项），
+    前端据此渲染友好占位，避免 api.js 拦截器把 5xx 当作「服务器错误」弹红条。
+    """
     permission_classes = [IsAuthenticated]
 
     def list(self, request):
-        return Response(NOT_IMPLEMENTED_BODY, status=status.HTTP_501_NOT_IMPLEMENTED)
+        return Response(NOT_IMPLEMENTED_BODY, status=status.HTTP_200_OK)
 
     def create(self, request):
-        return Response(NOT_IMPLEMENTED_BODY, status=status.HTTP_501_NOT_IMPLEMENTED)
+        return Response(NOT_IMPLEMENTED_BODY, status=status.HTTP_200_OK)
 
     def retrieve(self, request, pk=None):
-        return Response(NOT_IMPLEMENTED_BODY, status=status.HTTP_501_NOT_IMPLEMENTED)
+        return Response(NOT_IMPLEMENTED_BODY, status=status.HTTP_200_OK)
 
     def destroy(self, request, pk=None):
-        return Response(NOT_IMPLEMENTED_BODY, status=status.HTTP_501_NOT_IMPLEMENTED)
+        return Response(NOT_IMPLEMENTED_BODY, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=['post'], url_path='trigger')
     def trigger(self, request, pk=None):
         """触发Pipeline（本期未交付）"""
-        return Response(NOT_IMPLEMENTED_BODY, status=status.HTTP_501_NOT_IMPLEMENTED)
+        return Response(NOT_IMPLEMENTED_BODY, status=status.HTTP_200_OK)
 
 class CICDServerViewSet(TenantAwareViewSetMixin, viewsets.ModelViewSet):
     """CI/CD服务器视图集"""

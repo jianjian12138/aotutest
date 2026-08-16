@@ -152,7 +152,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { Refresh, ArrowDown, ArrowUp } from '@element-plus/icons-vue'
-import { Chrome, Firefox, Globe, Monitor } from '@element-plus/icons-vue'
+import { ChromeFilled, Monitor, Link } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import api from '@/utils/api'
 
@@ -164,12 +164,12 @@ const tutorialCollapsed = ref(true)
 
 const getBrowserIcon = (name) => {
   const iconMap = {
-    'chrome': Chrome,
-    'firefox': Firefox,
-    'safari': Globe,
+    'chrome': ChromeFilled,
+    'firefox': ChromeFilled, // Element Plus 无独立 Firefox 图标，复用 ChromeFilled 作通用浏览器字形
+    'safari': Link,
     'edge': Monitor,
-    'chromium': Chrome,
-    'webkit': Globe
+    'chromium': ChromeFilled,
+    'webkit': Link
   }
   return iconMap[name] || Globe
 }

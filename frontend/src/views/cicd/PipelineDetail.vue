@@ -1,7 +1,6 @@
 <template>
   <BasePage >
-    
-    
+    <template v-if="!notImplemented">
     <el-card class="box-card" v-loading="loading">
       <template #header>
         <div class="card-header">
@@ -127,8 +126,14 @@
         </template>
       </el-table-column>
     </el-table>
+    </template>
 
-
+    <NotImplementedPlaceholder
+      v-else
+      module-name="CI/CD 流水线"
+      :message="niMessage"
+      :planned="niPlanned"
+    />
   </BasePage>
 </template>
 <script setup>
@@ -136,6 +141,7 @@ import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import request from '@/utils/request'
 import { ElMessage } from 'element-plus'
+import NotImplementedPlaceholder from '@/components/NotImplementedPlaceholder.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -150,14 +156,24 @@ const pipeline = ref({
 const stages = ref([])
 const builds = ref([])
 const loading = ref(false)
+const notImplemented = ref(false)
+const niMessage = ref('')
+const niPlanned = ref([])
 
 const fetchData = async () => {
   loading.value = true
   try {
     // 1. Pipeline Info
     const pRes = await request.get(`/cicd/pipelines/${pipelineId}/`)
-    pipeline.value = pRes.data
-    stages.value = pRes.data.stages || []
+    const pData = pRes.data || {}
+    if (pData.status === 'not_implemented') {
+      notImplemented.value = true
+      niMessage.value = pData.message || ''
+      niPlanned.value = pData.planned || []
+      return
+    }
+    pipeline.value = pData
+    stages.value = pData.stages || []
 
     // 2. Builds
     const bRes = await request.get('/cicd/builds/', { params: { pipeline: pipelineId } })

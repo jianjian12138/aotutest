@@ -17,20 +17,20 @@ export default defineConfig({
     }
   },
   server: {
-    port: 5566,
+    port: 8787,
     host: '0.0.0.0',
     proxy: {
       // 注意：Vite 代理 key 为字符串前缀匹配（或正则需以 ^ 开头）。
       // 此处使用明确的前缀匹配，避免正则 key 在部分版本下不生效。
       '/api/': {
-        target: 'http://localhost:4545',
+        target: 'http://localhost:8686',
         changeOrigin: true,
         secure: false,
         timeout: 60000,
         proxyTimeout: 60000,
       },
       '/media/': {
-        target: 'http://localhost:4545',
+        target: 'http://localhost:8686',
         changeOrigin: true,
         secure: false,
       },

@@ -81,7 +81,7 @@ import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import {
-  MagicStick, Link, Monitor, DataLine, Cpu, Setting, DocumentChecked,
+  MagicStick, Link, Monitor, DataAnalysis, Cpu, Setting, DocumentChecked,
   Operation, ArrowDown, Tools, Folder, Mouse
 } from '@element-plus/icons-vue'
 
@@ -106,7 +106,8 @@ const cards = ref([
   { type: 'data', title: '数据工厂', icon: DataLine, color: '#ec4899', offsetX: 0, offsetY: 0 },
   { type: 'performance', title: '性能测试', icon: Cpu, color: '#8b5cf6', offsetX: 0, offsetY: 0 },
   { type: 'config', title: '配置中心', icon: Setting, color: '#64748b', offsetX: 0, offsetY: 0 },
-  { type: 'unified', title: '统一管理', icon: Folder, color: '#a855f7', offsetX: 0, offsetY: 0 }
+  { type: 'unified', title: '统一管理', icon: Folder, color: '#a855f7', offsetX: 0, offsetY: 0 },
+  { type: 'eval', title: 'Agent 测评', icon: DataAnalysis, color: '#0ea5e9', offsetX: 0, offsetY: 0 }
 ])
 
 const totalItems = cards.value.length
@@ -206,7 +207,8 @@ const handleNavigate = (type) => {
     data: '/data-factory/dashboard',
     performance: '/performance-test/dashboard',
     config: '/configuration/ai-model',
-    unified: '/unified/projects'
+    unified: '/unified/projects',
+    eval: '/eval'
   }
   if (routes[type]) router.push(routes[type])
 }

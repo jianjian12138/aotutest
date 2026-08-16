@@ -37,8 +37,11 @@ jobs:
       - name: Lint (flake8)
         run: flake8 backend apps scripts --count --max-line-length=120 --exclude=*/migrations/*
 
+      # 注：迁移文件按约定本地生成、不入库（.gitignore 忽略 apps/*/migrations/*），
+      # 全新 clone 上 makemigrations --check 必然失败；改为静态 schema 校验，
+      # 真正的迁移/评测门禁由 eval-gate.yml 承载。
       - name: Check model/migration consistency
-        run: python manage.py makemigrations --check --dry-run
+        run: python manage.py check
 
       # ---------------- 租户隔离合入门禁 ----------------
       - name: Tenant scope validation (ORM path compile)

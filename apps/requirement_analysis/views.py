@@ -229,8 +229,13 @@ class BusinessRequirementViewSet(TenantAwareViewSetMixin, viewsets.ReadOnlyModel
         """为选中的需求生成测试用例（原实现为模板伪造 LLM 生成结果，
         真实 LLM 生成请使用 TestCaseGenerationTask 路径；本端点本期未交付）"""
         return Response(
-            {'error': '该能力本期未交付', 'status': 'not_implemented'},
-            status=status.HTTP_501_NOT_IMPLEMENTED,
+            {
+                'status': 'not_implemented',
+                'module': '需求转用例',
+                'message': '基于需求的 LLM 测试用例生成能力本期未交付',
+                'planned': ['需求结构化解析', '测试用例自动生成', '用例质量自检'],
+            },
+            status=status.HTTP_200_OK,
         )
 
 
@@ -284,8 +289,13 @@ class GeneratedTestCaseViewSet(TenantAwareViewSetMixin, viewsets.ModelViewSet):
         """评审测试用例（原实现以 'AI-Reviewer-v1.0' 名义用长度启发式伪造 AI 评审结论，
         已按整改要求移除；真实 AI 评审能力本期未交付）"""
         return Response(
-            {'error': '该能力本期未交付', 'status': 'not_implemented'},
-            status=status.HTTP_501_NOT_IMPLEMENTED,
+            {
+                'status': 'not_implemented',
+                'module': 'AI 用例评审',
+                'message': 'AI 评审能力本期未交付',
+                'planned': ['用例正确性评审', '覆盖度评估', '风险标注'],
+            },
+            status=status.HTTP_200_OK,
         )
 
 

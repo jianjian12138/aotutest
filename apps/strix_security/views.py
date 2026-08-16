@@ -70,8 +70,13 @@ class StrixConfigViewSet(TenantAwareViewSetMixin, viewsets.ModelViewSet):
         """测试Strix服务连接（真实连接能力本期未交付）"""
         self.get_object()
         return Response(
-            {'error': '该能力本期未交付', 'status': 'not_implemented'},
-            status=status.HTTP_501_NOT_IMPLEMENTED,
+            {
+                'status': 'not_implemented',
+                'module': 'Strix 连接测试',
+                'message': 'Strix 服务真实连接能力本期未交付',
+                'planned': ['Strix 服务连通性校验', '配置健康探测'],
+            },
+            status=status.HTTP_200_OK,
         )
 
 
@@ -115,8 +120,13 @@ class SecurityTestExecutionViewSet(TenantAwareViewSetMixin, viewsets.ModelViewSe
         """执行安全测试（真实扫描能力本期未交付）"""
         self.get_object()
         return Response(
-            {'error': '该能力本期未交付', 'status': 'not_implemented'},
-            status=status.HTTP_501_NOT_IMPLEMENTED,
+            {
+                'status': 'not_implemented',
+                'module': '安全测试执行',
+                'message': '安全测试真实扫描能力本期未交付',
+                'planned': ['漏洞扫描引擎对接', '扫描任务编排', '结果归一化'],
+            },
+            status=status.HTTP_200_OK,
         )
 
     @action(detail=True, methods=['post'])
@@ -124,8 +134,13 @@ class SecurityTestExecutionViewSet(TenantAwareViewSetMixin, viewsets.ModelViewSe
         """停止安全测试（真实执行能力本期未交付）"""
         self.get_object()
         return Response(
-            {'error': '该能力本期未交付', 'status': 'not_implemented'},
-            status=status.HTTP_501_NOT_IMPLEMENTED,
+            {
+                'status': 'not_implemented',
+                'module': '安全测试停止',
+                'message': '安全测试停止能力本期未交付',
+                'planned': ['扫描任务中断控制', '资源回收'],
+            },
+            status=status.HTTP_200_OK,
         )
 
 

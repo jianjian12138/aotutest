@@ -69,8 +69,13 @@ class MidsceneConfigViewSet(TenantAwareViewSetMixin, viewsets.ModelViewSet):
         """测试Midscene API连接（真实连接能力本期未交付）"""
         self.get_object()
         return Response(
-            {'error': '该能力本期未交付', 'status': 'not_implemented'},
-            status=status.HTTP_501_NOT_IMPLEMENTED,
+            {
+                'status': 'not_implemented',
+                'module': 'Midscene 连接测试',
+                'message': 'Midscene API 真实连接能力本期未交付',
+                'planned': ['Midscene API 连通性校验', '配置健康探测'],
+            },
+            status=status.HTTP_200_OK,
         )
 
 

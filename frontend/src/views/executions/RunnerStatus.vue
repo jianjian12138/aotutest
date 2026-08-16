@@ -1,6 +1,12 @@
 <template>
   <BasePage title="云原生执行池">
-    <div class="card-container main-content">
+    <NotImplementedPlaceholder
+      v-if="notImpl"
+      :moduleName="implMeta && implMeta.module"
+      :message="implMeta && implMeta.message"
+      :planned="implMeta && implMeta.planned"
+    />
+    <div v-else class="card-container main-content">
       <el-card class="top-stats" shadow="never">
         <template #header>
           <div class="card-header">
@@ -78,6 +84,10 @@
 import { ref, reactive, onMounted, onUnmounted, nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
 import axios from 'axios'
+import NotImplementedPlaceholder from '@/components/NotImplementedPlaceholder.vue'
+import { useNotImplemented } from '@/composables/useNotImplemented'
+
+const { notImplemented: notImpl, implMeta, check: checkNotImpl } = useNotImplemented()
 
 const runners = ref([])
 const selectedPod = ref('')
@@ -97,10 +107,22 @@ const getStatusTag = (status) => {
   return map[status] || 'info'
 }
 
+const stopPolling = () => {
+  if (timer.value) {
+    clearInterval(timer.value)
+    timer.value = null
+  }
+}
+
 const fetchRunners = async (isManual = false) => {
   if (isManual) loading.value = true
   try {
     const res = await axios.get('/api/executions/k8s-runners/')
+    // 未交付能力：渲染占位并停止轮询，避免空表 + 控制台刷屏
+    if (checkNotImpl(res)) {
+      stopPolling()
+      return
+    }
     const body = res.data.data || res.data
     const status = res.data.status || body.status
     if (status === 'SUCCESS') {

@@ -274,6 +274,10 @@ if DEBUG:
         "http://127.0.0.1:5656",
         "http://localhost:5566",
         "http://127.0.0.1:5566",
+        "http://localhost:8787",
+        "http://127.0.0.1:8787",
+        "http://localhost:8686",
+        "http://127.0.0.1:8686",
     ]
     CORS_ALLOW_CREDENTIALS = True
 else:
@@ -296,6 +300,10 @@ if DEBUG:
         "http://127.0.0.1:4545",
         "http://localhost:5566",
         "http://127.0.0.1:5566",
+        "http://localhost:8787",
+        "http://127.0.0.1:8787",
+        "http://localhost:8686",
+        "http://127.0.0.1:8686",
     ]
 else:
     CSRF_TRUSTED_ORIGINS = [

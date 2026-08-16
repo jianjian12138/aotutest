@@ -1,9 +1,10 @@
 <template>
   <BasePage title="流水线管理">
     <template #actions>
-      <el-button type="primary" @click="showCreateDialog">新建流水线</el-button>
+      <el-button v-if="!notImplemented" type="primary" @click="showCreateDialog">新建流水线</el-button>
     </template>
-    
+
+    <template v-if="!notImplemented">
     <el-table :data="pipelines" v-loading="loading">
       <el-table-column prop="id" label="ID" width="80" />
       <el-table-column prop="name" label="名称" />
@@ -42,6 +43,14 @@
         </span>
       </template>
     </el-dialog>
+    </template>
+
+    <NotImplementedPlaceholder
+      v-else
+      module-name="CI/CD 流水线"
+      :message="niMessage"
+      :planned="niPlanned"
+    />
   </BasePage>
 </template>
 <script setup>
@@ -49,11 +58,15 @@ import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import request from '@/utils/request'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import NotImplementedPlaceholder from '@/components/NotImplementedPlaceholder.vue'
 
 const router = useRouter()
 const pipelines = ref([])
 const loading = ref(false)
 const dialogVisible = ref(false)
+const notImplemented = ref(false)
+const niMessage = ref('')
+const niPlanned = ref([])
 
 const form = reactive({
   name: '',
@@ -64,7 +77,14 @@ const fetchPipelines = async () => {
   loading.value = true
   try {
     const res = await request.get('/cicd/pipelines/')
-    pipelines.value = res.data.results || res.data
+    const data = res.data || {}
+    if (data.status === 'not_implemented') {
+      notImplemented.value = true
+      niMessage.value = data.message || ''
+      niPlanned.value = data.planned || []
+      return
+    }
+    pipelines.value = data.results || data
   } finally {
     loading.value = false
   }
